@@ -1,0 +1,22 @@
+{
+  "name": "divinemarg-platform",
+  "private": true,
+  "workspaces": [
+    "apps/*",
+    "backend",
+    "shared"
+  ],
+  "scripts": {
+    "dev:web": "npm run dev --workspace=divinemarg-web",
+    "dev:admin": "npm run dev --workspace=divinemarg-admin",
+    "dev:backend": "npm run dev --workspace=divinemarg-backend",
+    "dev:mobile": "npm run start --workspace=divinemarg-mobile",
+    "build": "npm run build --workspaces --if-present"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "devDependencies": {
+    "ajv": "^8.18.0"
+  }
+}
