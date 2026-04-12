@@ -24,6 +24,7 @@ const bodySchema = z.object({
     .gte(-180, "lng must be >= -180")
     .lte(180, "lng must be <= 180"),
   gender: z.enum(["male", "female"]),
+  utcOffset: z.number().finite().optional().default(5.5),
 });
 
 export async function POST(req: Request) {

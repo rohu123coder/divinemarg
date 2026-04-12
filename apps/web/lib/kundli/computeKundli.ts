@@ -1,5 +1,4 @@
-import { find } from "geo-tz";
-import { DateTime } from "luxon";
+import { DateTime, FixedOffsetZone } from "luxon";
 import type { PlanetKey, VimPlanet } from "./ephemerisUtils";
 import {
   NAKSHATRA_LORDS,
@@ -19,16 +18,11 @@ import {
   signLordPlanetKey,
 } from "./ephemerisUtils";
 
-// eslint-disable-next-line @typescript-eslint/no-require-imports
-const swisseph: typeof import("swisseph") = require("swisseph");
-
-const EPHE_FLAGS =
-  swisseph.SEFLG_SIDEREAL | swisseph.SEFLG_SPEED | swisseph.SEFLG_SWIEPH;
-const EPHE_FLAGS_FALLBACK =
-  swisseph.SEFLG_SIDEREAL | swisseph.SEFLG_SPEED | swisseph.SEFLG_MOSEPH;
-
+const JD_UNIX_EPOCH = 2440587.5;
+const J2000 = 2451545.0;
 const YEAR_DAYS = 365.2425;
 
+/** Optional UTC offset in hours (e.g. 5.5 for India). Used when not inferred from place name. */
 export type KundliInput = {
   name: string;
   dob: string;
@@ -37,105 +31,87 @@ export type KundliInput = {
   lat: number;
   lng: number;
   gender: "male" | "female";
+  utcOffset?: number;
 };
 
 function normalizeLon(deg: number): number {
   return ((deg % 360) + 360) % 360;
 }
 
-function calcBody(
-  jd: number,
-  planetId: number,
-  flags: number
-):
-  | {
-      longitude: number;
-      longitudeSpeed: number;
-    }
-  | { error: string } {
-  try {
-    const r = swisseph.swe_calc_ut(jd, planetId, flags);
-    if (r && typeof r === "object" && "error" in r && r.error) {
-      return { error: String(r.error) };
-    }
-    if (
-      r &&
-      typeof r === "object" &&
-      "longitude" in r &&
-      typeof r.longitude === "number"
-    ) {
-      return {
-        longitude: r.longitude,
-        longitudeSpeed: r.longitudeSpeed ?? 0,
-      };
-    }
-    return { error: "Unknown swe_calc_ut response" };
-  } catch (e) {
-    return { error: e instanceof Error ? e.message : String(e) };
+/** Rough IST / India place detection when `utcOffset` is omitted. */
+function resolveUtcOffset(input: KundliInput): number {
+  if (typeof input.utcOffset === "number" && Number.isFinite(input.utcOffset)) {
+    return input.utcOffset;
   }
+  const p = input.pob.toLowerCase();
+  if (
+    /\b(mumbai|delhi|bangalore|bengaluru|kolkata|chennai|hyderabad|pune|ahmedabad|jaipur|lucknow|kanpur|nagpur|indore|thane|bhopal|visakhapatnam|patna|vadodara|ghaziabad|ludhiana|agra|nashik|faridabad|meerut|ranchi|srinagar|amritsar|chandigarh|gurgaon|gurugram|noida|dehradun|varanasi|mangalore|mysuru|mysore|coimbatore|kochi|goa|surat|kerala|tamil|gujarat|maharashtra|karnataka|punjab|rajasthan|uttar|pradesh|bihar|west bengal|odisha|telangana)\b/i.test(
+      p
+    )
+  ) {
+    return 5.5;
+  }
+  if (/\bindia\b|\bbharat\b|\bist\b/i.test(p)) {
+    return 5.5;
+  }
+  return 5.5;
 }
 
-function julianDayUTFromBirth(input: KundliInput): {
-  jd: number;
-  timeZone: string;
-  approximate: boolean;
-} {
-  const zones = find(input.lat, input.lng);
-  const timeZone = zones[0] ?? "UTC";
+function jdFromUtcMs(ms: number): number {
+  return ms / 86400000 + JD_UNIX_EPOCH;
+}
+
+function utcHourFractionFromJd(jd: number): number {
+  const ms = (jd - JD_UNIX_EPOCH) * 86400000;
+  const d = new Date(ms);
+  return (
+    d.getUTCHours() +
+    d.getUTCMinutes() / 60 +
+    d.getUTCSeconds() / 3600 +
+    d.getUTCMilliseconds() / 3600000
+  );
+}
+
+/** Lahiri ayanamsa (simplified), using UTC calendar month/year at JD. */
+function ayanamsaSimplified(jd: number): number {
+  const ms = (jd - JD_UNIX_EPOCH) * 86400000;
+  const d = new Date(ms);
+  const year = d.getUTCFullYear();
+  const month = d.getUTCMonth() + 1;
+  return 23.85 + (year - 1900) * 0.013611 + (month - 1) * 0.001134;
+}
+
+function julianDayUTFromBirth(
+  input: KundliInput,
+  utcOffset: number
+): { jd: number; approximate: boolean } {
+  const offsetMin = Math.round(utcOffset * 60);
+  const zone = FixedOffsetZone.instance(offsetMin);
   const [y, mo, d] = input.dob.split("-").map((x) => parseInt(x, 10));
   if (!input.tob) {
     const dt = DateTime.fromObject(
       { year: y, month: mo, day: d, hour: 12, minute: 0, second: 0 },
-      { zone: timeZone }
+      { zone }
     );
     const utc = dt.toUTC();
-    const hour =
-      utc.hour +
-      utc.minute / 60 +
-      utc.second / 3600 +
-      utc.millisecond / 3600000;
-    const jd = swisseph.swe_julday(
-      utc.year,
-      utc.month,
-      utc.day,
-      hour,
-      swisseph.SE_GREG_CAL
-    );
-    return { jd, timeZone, approximate: true };
+    return { jd: jdFromUtcMs(utc.toMillis()), approximate: true };
   }
   const [hh, mm] = input.tob.split(":").map((x) => parseInt(x, 10));
   const dt = DateTime.fromObject(
     { year: y, month: mo, day: d, hour: hh, minute: mm ?? 0, second: 0 },
-    { zone: timeZone }
+    { zone }
   );
   const utc = dt.toUTC();
-  const hour =
-    utc.hour +
-    utc.minute / 60 +
-    utc.second / 3600 +
-    utc.millisecond / 3600000;
-  const jd = swisseph.swe_julday(
-    utc.year,
-    utc.month,
-    utc.day,
-    hour,
-    swisseph.SE_GREG_CAL
-  );
-  return { jd, timeZone, approximate: false };
+  return { jd: jdFromUtcMs(utc.toMillis()), approximate: false };
 }
 
 function jdToIso(jd: number): string {
-  const r = swisseph.swe_revjul(jd, swisseph.SE_GREG_CAL);
-  const iso = new Date(
-    Date.UTC(
-      r.year,
-      r.month - 1,
-      r.day,
-      Math.floor(r.hour),
-      Math.round((r.hour - Math.floor(r.hour)) * 60)
-    )
-  );
-  return iso.toISOString().slice(0, 10);
+  const ms = (jd - JD_UNIX_EPOCH) * 86400000;
+  const d = new Date(ms);
+  const y = d.getUTCFullYear();
+  const m = String(d.getUTCMonth() + 1).padStart(2, "0");
+  const day = String(d.getUTCDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
 }
 
 function addYearsToJd(jd: number, years: number): number {
@@ -234,26 +210,107 @@ function vimshottariStateSimple(
   };
 }
 
-function saturnLongitude(jd: number, flags: number): number | null {
-  const r = calcBody(jd, swisseph.SE_SATURN, flags);
-  if ("error" in r) return null;
-  return r.longitude;
+function tropicalSun(jd: number): number {
+  const D = jd - J2000;
+  const L = 280.46 + 0.9856474 * D;
+  const gDeg = 357.528 + 0.9856003 * D;
+  const g = (gDeg * Math.PI) / 180;
+  return L + 1.915 * Math.sin(g) + 0.02 * Math.sin(2 * g);
+}
+
+function tropicalMoon(jd: number): number {
+  const D = jd - J2000;
+  const L0 = 218.316 + 13.176396 * D;
+  const M = 134.963 + 13.064993 * D;
+  return L0 + 6.289 * Math.sin((M * Math.PI) / 180);
+}
+
+function tropicalMean(jd: number, L0: number, coeff: number): number {
+  const D = jd - J2000;
+  return L0 + coeff * D;
+}
+
+function siderealFromTropical(jd: number, tropical: number): number {
+  return normalizeLon(tropical - ayanamsaSimplified(jd));
+}
+
+function siderealSun(jd: number): number {
+  return siderealFromTropical(jd, tropicalSun(jd));
+}
+
+function siderealMoon(jd: number): number {
+  return siderealFromTropical(jd, tropicalMoon(jd));
+}
+
+function siderealMercury(jd: number): number {
+  return siderealFromTropical(jd, tropicalMean(jd, 252.251, 4.092338));
+}
+
+function siderealVenus(jd: number): number {
+  return siderealFromTropical(jd, tropicalMean(jd, 181.98, 1.602136));
+}
+
+function siderealMars(jd: number): number {
+  return siderealFromTropical(jd, tropicalMean(jd, 355.433, 0.524033));
+}
+
+function siderealJupiter(jd: number): number {
+  return siderealFromTropical(jd, tropicalMean(jd, 34.351, 0.083056));
+}
+
+function siderealSaturn(jd: number): number {
+  return siderealFromTropical(jd, tropicalMean(jd, 50.077, 0.033459));
+}
+
+function siderealRahu(jd: number): number {
+  const D = jd - J2000;
+  const L = 125.044 - 0.052954 * D;
+  return siderealFromTropical(jd, L);
+}
+
+function siderealKetu(jd: number): number {
+  return normalizeLon(siderealRahu(jd) + 180);
+}
+
+const SIDEREAL_GETTERS: Record<PlanetKey, (jd: number) => number> = {
+  Sun: siderealSun,
+  Moon: siderealMoon,
+  Mars: siderealMars,
+  Mercury: siderealMercury,
+  Jupiter: siderealJupiter,
+  Venus: siderealVenus,
+  Saturn: siderealSaturn,
+  Rahu: siderealRahu,
+  Ketu: siderealKetu,
+};
+
+function centralLongitudeSpeed(
+  jd: number,
+  siderealLon: (j: number) => number
+): number {
+  const e = 0.01;
+  const a = siderealLon(jd - e);
+  const b = siderealLon(jd + e);
+  let diff = normalizeLon(b - a);
+  if (diff > 180) diff -= 360;
+  if (diff < -180) diff += 360;
+  return diff / (2 * e);
+}
+
+function saturnLongitude(jd: number): number {
+  return siderealSaturn(jd);
 }
 
 function sadeSatiInfo(
   natalMoonRashi: number,
-  nowJd: number,
-  flags: number
+  nowJd: number
 ): {
   present: boolean;
   phase: "rising" | "peak" | "setting" | null;
   startYear: number | null;
   endYear: number | null;
 } {
-  const satLon = saturnLongitude(nowJd, flags);
-  if (satLon === null) {
-    return { present: false, phase: null, startYear: null, endYear: null };
-  }
+  const satLon = saturnLongitude(nowJd);
   const satSign = rashiFromDegree(satLon);
   const rel = (satSign - natalMoonRashi + 12) % 12;
   let phase: "rising" | "peak" | "setting" | null = null;
@@ -267,8 +324,7 @@ function sadeSatiInfo(
   let endYear: number | null = null;
   if (present) {
     const inPhase = (jd: number) => {
-      const sl = saturnLongitude(jd, flags);
-      if (sl === null) return false;
+      const sl = saturnLongitude(jd);
       const s = rashiFromDegree(sl);
       const r = (s - natalMoonRashi + 12) % 12;
       return r === 11 || r === 0 || r === 1;
@@ -334,73 +390,63 @@ function conjunctionException(
   return sameHouse(marsLon, jupiterLon, asc);
 }
 
-export function computeKundli(input: KundliInput) {
-  try {
-    swisseph.swe_set_sid_mode(swisseph.SE_SIDM_LAHIRI, 0, 0);
-  } catch {
-    /* ignore */
+/** Sidereal ascendant: LMST-based when birth time known; else Sun longitude. */
+function computeSiderealAscendant(
+  birthJd: number,
+  input: KundliInput,
+  approximate: boolean,
+  sunSidereal: number
+): number {
+  if (approximate) {
+    return sunSidereal;
   }
-
-  const { jd: birthJd, approximate } = julianDayUTFromBirth(input);
-  const now = new Date();
-  const nowJd = swisseph.swe_julday(
-    now.getUTCFullYear(),
-    now.getUTCMonth() + 1,
-    now.getUTCDate(),
-    now.getUTCHours() +
-      now.getUTCMinutes() / 60 +
-      now.getUTCSeconds() / 3600 +
-      now.getUTCMilliseconds() / 3600000,
-    swisseph.SE_GREG_CAL
+  const T = (birthJd - J2000) / 36525;
+  const ut = utcHourFractionFromJd(birthJd);
+  let LMST = 100.4606184 + 36000.77004 * T + input.lng / 15 + ut;
+  LMST = normalizeLon(LMST);
+  const obliquity = 23.44;
+  const ascDeg = normalizeLon(
+    LMST + obliquity * Math.sin((LMST * Math.PI) / 180)
   );
+  return normalizeLon(ascDeg - ayanamsaSimplified(birthJd));
+}
 
-  let flags = EPHE_FLAGS;
-  const test = calcBody(birthJd, swisseph.SE_SUN, flags);
-  if ("error" in test) {
-    flags = EPHE_FLAGS_FALLBACK;
-  }
+export function computeKundli(input: KundliInput) {
+  const utcOffset = resolveUtcOffset(input);
+  const merged: KundliInput = { ...input, utcOffset };
 
-  let ascDeg: number;
-  try {
-    const housesRes = swisseph.swe_houses_ex(
-      birthJd,
-      swisseph.SEFLG_SIDEREAL,
-      input.lat,
-      input.lng,
-      "P"
-    ) as { error?: string; ascendant?: number };
-    if (housesRes.error) {
-      throw new Error(`swe_houses_ex failed: ${housesRes.error}`);
-    }
-    if (typeof housesRes.ascendant !== "number") {
-      throw new Error("swe_houses_ex: missing ascendant");
-    }
-    ascDeg = normalizeLon(housesRes.ascendant);
-  } catch (e) {
-    throw new Error(
-      e instanceof Error ? e.message : "House calculation failed"
-    );
-  }
+  const { jd: birthJd, approximate } = julianDayUTFromBirth(merged, utcOffset);
+  const now = new Date();
+  const nowJd = now.getTime() / 86400000 + JD_UNIX_EPOCH;
 
-  const planetIds: { key: PlanetKey; id: number }[] = [
-    { key: "Sun", id: swisseph.SE_SUN },
-    { key: "Moon", id: swisseph.SE_MOON },
-    { key: "Mars", id: swisseph.SE_MARS },
-    { key: "Mercury", id: swisseph.SE_MERCURY },
-    { key: "Jupiter", id: swisseph.SE_JUPITER },
-    { key: "Venus", id: swisseph.SE_VENUS },
-    { key: "Saturn", id: swisseph.SE_SATURN },
-    { key: "Rahu", id: swisseph.SE_MEAN_NODE },
+  const raw: Record<string, { longitude: number; longitudeSpeed: number }> =
+    {};
+  const order: PlanetKey[] = [
+    "Sun",
+    "Moon",
+    "Mars",
+    "Mercury",
+    "Jupiter",
+    "Venus",
+    "Saturn",
+    "Rahu",
+    "Ketu",
   ];
 
-  const raw: Record<string, { longitude: number; longitudeSpeed: number }> = {};
-  for (const p of planetIds) {
-    const res = calcBody(birthJd, p.id, flags);
-    if ("error" in res) throw new Error(`${p.key}: ${res.error}`);
-    raw[p.key] = res;
+  for (const key of order) {
+    const getLon = SIDEREAL_GETTERS[key];
+    raw[key] = {
+      longitude: getLon(birthJd),
+      longitudeSpeed: centralLongitudeSpeed(birthJd, getLon),
+    };
   }
-  const ketuLon = normalizeLon(raw["Rahu"].longitude + 180);
-  raw["Ketu"] = { longitude: ketuLon, longitudeSpeed: raw["Rahu"].longitudeSpeed };
+
+  const ascDeg = computeSiderealAscendant(
+    birthJd,
+    merged,
+    approximate,
+    raw["Sun"].longitude
+  );
 
   const moonLon = raw["Moon"].longitude;
   const sunLon = raw["Sun"].longitude;
@@ -511,18 +557,6 @@ export function computeKundli(input: KundliInput) {
     ownSign: boolean;
   }> = [];
 
-  const order: PlanetKey[] = [
-    "Sun",
-    "Moon",
-    "Mars",
-    "Mercury",
-    "Jupiter",
-    "Venus",
-    "Saturn",
-    "Rahu",
-    "Ketu",
-  ];
-
   for (const key of order) {
     const lon = raw[key].longitude;
     const sp = raw[key].longitudeSpeed;
@@ -571,8 +605,11 @@ export function computeKundli(input: KundliInput) {
     };
   });
 
-  const sade = sadeSatiInfo(moonRashi, nowJd, flags);
-  const ks = kaalsarp(raw["Rahu"].longitude, order.map((k) => ({ key: k, lon: raw[k].longitude })));
+  const sade = sadeSatiInfo(moonRashi, nowJd);
+  const ks = kaalsarp(
+    raw["Rahu"].longitude,
+    order.map((k) => ({ key: k, lon: raw[k].longitude }))
+  );
 
   const lagnaInfo = rashiFromIndex(ascRashi);
   const tenth = houses[9];

@@ -204,7 +204,7 @@ export function KundliForm({
               🔮 Free Kundli Generator
             </h1>
             <p className="mt-2 text-sm text-violet-100 sm:text-base">
-              निःशुल्क कुंडली — Swiss Ephemeris precision · Vedic D1 chart
+              निःशुल्क कुंडली — simplified Vedic formulas · D1 chart
             </p>
             <p className="mt-1 text-xs text-violet-200/90">
               Birth details → instant planets, houses, Dasha &amp; Yogas
