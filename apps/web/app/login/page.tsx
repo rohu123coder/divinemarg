@@ -2,14 +2,7 @@
 
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import {
-  useCallback,
-  useEffect,
-  useRef,
-  useState,
-  type ClipboardEvent,
-  type KeyboardEvent,
-} from "react";
+import { Suspense, useCallback, useEffect, useRef, useState, type ClipboardEvent, type KeyboardEvent } from "react";
 
 import { Navbar } from "@/components/Navbar";
 import api from "@/lib/api";
@@ -17,7 +10,7 @@ import { useAuthStore, type AuthUser } from "@/lib/store";
 
 const phoneRegex = /^[6-9]\d{9}$/;
 
-export default function LoginPage() {
+function LoginContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const setUser = useAuthStore((s) => s.setUser);
@@ -248,5 +241,19 @@ export default function LoginPage() {
         </p>
       </div>
     </div>
+  );
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="flex min-h-screen items-center justify-center">
+          <div className="h-8 w-8 animate-spin rounded-full border-b-2 border-purple-600" />
+        </div>
+      }
+    >
+      <LoginContent />
+    </Suspense>
   );
 }
