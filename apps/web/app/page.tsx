@@ -6,6 +6,7 @@ import { useEffect, useState } from "react";
 import { AstrologerCard } from "@/components/AstrologerCard";
 import { Navbar } from "@/components/Navbar";
 import api from "@/lib/api";
+import { rashis } from "@/lib/horoscope";
 
 type Astro = {
   id: string;
@@ -160,6 +161,42 @@ export default function HomePage() {
               View all astrologers →
             </Link>
           </div>
+        </div>
+      </section>
+
+      <section className="mx-auto max-w-6xl px-4 py-16 sm:px-6">
+        <h2 className="text-center text-2xl font-bold text-slate-900 sm:text-3xl">
+          Aaj Ka Rashifal
+        </h2>
+        <p className="mx-auto mt-3 max-w-2xl text-center text-sm text-slate-600">
+          Pick your zodiac sign and get quick daily guidance in Hindi and
+          English.
+        </p>
+        <div className="mt-8 grid grid-cols-3 gap-3 sm:grid-cols-4 md:grid-cols-6">
+          {rashis.map((rashi) => (
+            <Link
+              key={rashi.id}
+              href={`/horoscope/${rashi.id}`}
+              className="group rounded-2xl border border-violet-100 bg-white p-4 text-center shadow-sm transition duration-200 hover:-translate-y-1 hover:shadow-md"
+              style={{
+                background: `linear-gradient(150deg, ${rashi.color}26 0%, #ffffff 55%)`,
+              }}
+            >
+              <p className="text-3xl">{rashi.symbol}</p>
+              <p className="mt-2 text-sm font-semibold text-slate-900">
+                {rashi.hindi}
+              </p>
+              <p className="text-xs text-slate-600">{rashi.english}</p>
+            </Link>
+          ))}
+        </div>
+        <div className="mt-8 text-center">
+          <Link
+            href="/horoscope"
+            className="inline-flex rounded-full bg-gradient-to-r from-violet-600 to-fuchsia-500 px-6 py-3 text-sm font-semibold text-white shadow-md transition hover:opacity-95"
+          >
+            View All Horoscopes
+          </Link>
         </div>
       </section>
 

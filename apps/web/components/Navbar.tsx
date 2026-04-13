@@ -35,6 +35,12 @@ export function Navbar() {
         </Link>
 
         <nav className="hidden items-center gap-6 md:flex">
+          <Link
+            href="/horoscope"
+            className="text-sm font-medium text-slate-700 transition hover:text-purple-600"
+          >
+            🔮 Rashifal
+          </Link>
           {!mounted ? (
             <div className="h-9 w-24 animate-pulse rounded-lg bg-slate-100" />
           ) : isLoggedIn ? (
@@ -143,6 +149,13 @@ export function Navbar() {
 
       {menuOpen && mounted ? (
         <div className="border-t border-slate-100 bg-white px-4 py-4 md:hidden">
+          <Link
+            href="/horoscope"
+            className="block rounded-lg px-3 py-2 text-slate-800 hover:bg-slate-50"
+            onClick={() => setMenuOpen(false)}
+          >
+            🔮 Rashifal
+          </Link>
           {isLoggedIn ? (
             <div className="flex flex-col gap-3">
               <Link
