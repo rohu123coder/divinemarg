@@ -96,7 +96,7 @@ export default function AstrologerProfilePage() {
       return;
     }
     if (!isLoggedIn) {
-      router.push(`/login`);
+      router.push(`/login?redirect=${encodeURIComponent(`/astrologers/${id}`)}`);
       return;
     }
     const price = data.astrologer.price_per_minute ?? 0;
@@ -111,7 +111,8 @@ export default function AstrologerProfilePage() {
       const res = await api.post(`/api/chat/request`, {
         astrologer_id: data.astrologer.id,
       });
-      const sessionId = res.data?.data?.session_id as string | undefined;
+      const sessionId = (res.data?.data?.session_id ??
+        res.data?.data?.sessionId) as string | undefined;
       if (!sessionId) {
         throw new Error("No session");
       }

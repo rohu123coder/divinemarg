@@ -33,7 +33,7 @@ export function Navbar() {
     { label: "Astrology", href: "/astrology" },
     { label: "2026", href: "/horoscope?year=2026" },
     { label: "Remedies", href: "/remedies" },
-    { label: "Free Reports", href: "/reports/free" },
+    { label: "Free Reports", href: "/reports" },
     { label: "Panchang", href: "/panchang" },
   ];
 

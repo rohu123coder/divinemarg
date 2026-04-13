@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import {
   useCallback,
   useEffect,
@@ -19,6 +19,7 @@ const phoneRegex = /^[6-9]\d{9}$/;
 
 export default function LoginPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const setUser = useAuthStore((s) => s.setUser);
   const { user, isLoggedIn, token } = useAuthStore();
   const [step, setStep] = useState<1 | 2>(1);
@@ -27,6 +28,7 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const inputsRef = useRef<Array<HTMLInputElement | null>>([]);
+  const redirectTarget = searchParams.get("redirect");
 
   useEffect(() => {
     if (isLoggedIn && token && user?.role === "astrologer") {
@@ -81,7 +83,13 @@ export default function LoginPage() {
         throw new Error("Invalid response");
       }
       setUser({ ...data.user, role: "user" }, data.token);
-      router.replace("/dashboard");
+      const safeRedirect =
+        redirectTarget &&
+        redirectTarget.startsWith("/") &&
+        !redirectTarget.startsWith("//")
+          ? redirectTarget
+          : "/dashboard";
+      router.replace(safeRedirect);
     } catch (e: unknown) {
       const msg =
         e &&
@@ -99,7 +107,7 @@ export default function LoginPage() {
     } finally {
       setLoading(false);
     }
-  }, [otp, phone, router, setUser]);
+  }, [otp, phone, redirectTarget, router, setUser]);
 
   const setDigit = (index: number, value: string) => {
     const digit = value.replace(/\D/g, "").slice(-1);

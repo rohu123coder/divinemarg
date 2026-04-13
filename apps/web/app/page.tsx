@@ -24,7 +24,7 @@ const topServices = [
   { icon: "🪐", name: "Kundli (Birth Chart)", href: "/kundli" },
   { icon: "💞", name: "Horoscope Matching", href: "/kundli/match" },
   { icon: "🔆", name: "Daily Rashifal", href: "/horoscope?period=today" },
-  { icon: "📜", name: "Free Reports", href: "/reports/free" },
+  { icon: "📜", name: "Free Reports", href: "/reports" },
   { icon: "🔥", name: "Mangal Dosha", href: "/reports/mangal-dosha" },
   { icon: "🧿", name: "Sade Sati Report", href: "/reports/sade-sati" },
   { icon: "🔢", name: "Numerology", href: "/numerology" },
