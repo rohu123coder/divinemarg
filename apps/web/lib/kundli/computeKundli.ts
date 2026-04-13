@@ -22,6 +22,101 @@ const JD_UNIX_EPOCH = 2440587.5;
 const J2000 = 2451545.0;
 const YEAR_DAYS = 365.2425;
 
+const SIGN_SHORT_NAMES = [
+  "Mesh",
+  "Vrishabh",
+  "Mithun",
+  "Kark",
+  "Singh",
+  "Kanya",
+  "Tula",
+  "Vrishchik",
+  "Dhanu",
+  "Makar",
+  "Kumbh",
+  "Meen",
+] as const;
+
+const PERSONALITY_PREDICTIONS: Record<number, string> = {
+  0: "Mesh Lagna makes you bold, energetic, and naturally ready to lead from the front. You move fast, trust your instincts, and can sometimes act before fully thinking things through. Your willpower is strong, and competition often brings out your best performance. Physically, you may carry an athletic or active aura with noticeable dynamism. Mars rulership gives courage, directness, and passionate drive in every major life area.",
+  1: "Vrishabh Lagna gives patience, reliability, and a strong appreciation for comfort and quality. You are steady in decisions, though once committed you can become quite stubborn. Your taste in art, food, and music is usually refined and naturally attractive to others. Venus rulership brings romance, sensuality, and a desire for emotional as well as material harmony. Financial security and long-term stability become key priorities throughout life.",
+  2: "Mithun Lagna makes you curious, witty, and naturally gifted at communication. You adapt quickly to changing situations, though your dual nature can create occasional inconsistency. Learning, networking, and exchanging ideas keep your mind active and motivated. Mercury rulership gives sharp intellect, humor, and strong language ability. You often maintain a youthful style and energetic social presence even as you mature.",
+  3: "Kark Lagna gives emotional depth, intuition, and a nurturing personality. Home, family, and emotional security hold great importance in your life choices. You usually have excellent memory, empathy, and sensitivity toward others' needs. Moon rulership can create mood fluctuations, yet also grants profound inner resilience and caring strength. You are often seen as a natural protector, counselor, or caretaker.",
+  4: "Singh Lagna gives charisma, confidence, and a natural flair for visibility. You carry leadership energy with a dignified or royal style of presence. Warm-hearted generosity is one of your key strengths, especially toward loved ones. Sun rulership creates a need for recognition, respect, and meaningful appreciation. Creative expression, performance, and influence become major themes in personal and professional life.",
+  5: "Kanya Lagna makes you analytical, precise, and oriented toward service and improvement. You notice details others miss and prefer systems that are practical and efficient. Mercury rulership gives intelligence, problem-solving ability, and sharp critical thinking. You are often health-conscious, disciplined, and focused on self-betterment. At times, high standards can turn into self-criticism, so balance and compassion are essential.",
+  6: "Tula Lagna gives diplomacy, charm, and a strong instinct for harmony. You are naturally drawn to beauty, aesthetics, and balanced human relationships. Venus rulership supports romance, artistic taste, and social grace in public settings. You can become indecisive when weighing many options, yet fairness remains your core principle. Networking and partnership often open important doors in life.",
+  7: "Vrishchik Lagna gives intensity, depth, and powerful emotional perception. You may appear private or mysterious, but your inner will is exceptionally strong. Mars-Ketu style energy supports transformation, research, investigation, and crisis-handling strength. In relationships you are deeply passionate and fiercely loyal once trust is formed. You remember key experiences strongly and rarely give up before reaching your goal.",
+  8: "Dhanu Lagna gives optimism, philosophy, and a love for freedom and expansion. Jupiter rulership makes you naturally drawn to teaching, mentoring, and sharing wisdom. Travel, higher learning, and spiritual inquiry strongly shape your worldview. You are honest and straightforward, though occasional bluntness may need refinement. Life path often includes a quest for meaning, ethics, and purposeful contribution.",
+  9: "Makar Lagna gives ambition, discipline, and a realistic long-term mindset. Saturn rulership makes success gradual but enduring through consistent effort. You are patient, strategic, and often willing to work harder than most people around you. Outer demeanor can appear serious, yet loyalty and responsibility run very deep. Financial planning and practical management abilities tend to be naturally strong.",
+  10: "Kumbh Lagna gives innovation, independence, and a broad humanitarian outlook. Saturn-Rahu style influence makes you think ahead of current trends and systems. You are friendly and socially aware, yet can stay emotionally detached when needed. Technology, reform, and social impact themes repeatedly attract your attention. Your originality and unconventional decisions become key signatures of your life path.",
+  11: "Meen Lagna gives compassion, intuition, and a deeply spiritual temperament. Jupiter-Ketu style influence supports empathy, imagination, and subtle healing abilities. You often feel others' emotions strongly and need healthy emotional boundaries. Creative and mystical pursuits can become major channels of expression and purpose. At times, escapist patterns may arise, so grounding routines are important for balance.",
+};
+
+const CAREER_PREDICTIONS_10TH: Record<number, string> = {
+  0: "With Mesh in the 10th house, careers linked to leadership, defense, sports, engineering, surgery, and entrepreneurship become strong possibilities. You perform best in fast-paced and competitive environments where initiative is rewarded. Authority roles suit you because you are comfortable taking responsibility under pressure. Mars influence gives courage, ambition, and a desire to build something independently. Career momentum usually improves notably after age 28 as discipline stabilizes raw drive.",
+  1: "Vrishabh in the 10th house supports careers in banking, luxury products, hospitality, music, food, design, and stable business ventures. You prefer steady growth over risky jumps and can create lasting professional value. Public image often benefits from calm reliability and refined taste. Venus influence supports client relations, branding, and value creation. Long-term wealth is often built through consistency, quality, and strategic asset accumulation.",
+  2: "Mithun in the 10th house favors communication-driven careers such as media, sales, writing, teaching, marketing, consulting, and technology interfaces. Multi-tasking and adaptability become key strengths in professional life. You may handle dual roles or frequent career shifts before settling into a niche. Mercury influence gives networking ability and intellectual agility in changing markets. Success rises when you combine communication skill with one specialized domain.",
+  3: "Kark in the 10th house supports careers connected with caregiving, education, hospitality, psychology, real estate, public service, and people management. You work best where emotional intelligence and trust-building matter. Public recognition often comes through supportive leadership rather than aggressive competition. Moon influence can create periodic career fluctuations, but intuition guides major turns well. Stability improves when you align work with service, protection, and meaningful connection.",
+  4: "Singh in the 10th house supports careers in administration, government, entertainment, leadership, politics, branding, and visible authority positions. You are naturally noticed and often drawn toward roles with recognition and influence. Confidence and creative expression become professional assets. Sun influence favors status, responsibility, and work that carries public impact. Career growth accelerates when ego is balanced with humility and team mentorship.",
+  5: "Kanya in the 10th house supports careers in analytics, healthcare, data, accounting, operations, quality control, law support, and technical services. You excel in systems, process refinement, and precision-based responsibilities. Mercury influence gives practical intelligence and problem-solving ability for complex workflows. Professional success comes from detail orientation and credibility. You progress steadily when perfectionism is managed and delegation improves execution speed.",
+  6: "Tula in the 10th house supports careers in law, diplomacy, HR, design, beauty, consulting, partnerships, and negotiation-heavy roles. You handle stakeholders gracefully and perform well in collaborative environments. Venus influence supports public relations, aesthetics, and value-driven branding. Career rise often comes through strategic alliances rather than solo struggle. Strong ethical balance and fair decision-making become your long-term reputation assets.",
+  7: "Vrishchik in the 10th house favors careers in research, investigation, medicine, surgery, defense strategy, intelligence, psychology, crisis management, and deep analytics. You perform best in high-stakes roles that demand focus and confidentiality. Mars-Ketu style intensity gives stamina for difficult transformations. Career path can include sudden shifts followed by powerful reinvention. Success grows when emotional intensity is channeled into disciplined strategic execution.",
+  8: "Dhanu in the 10th house supports careers in education, law, publishing, coaching, travel, consulting, religion, and global business. You need meaningful work that aligns with principles and long-term vision. Jupiter influence brings guidance ability and public respect as a mentor or advisor. Foreign links or multicultural exposure often boost career expansion. Success rises when idealism is paired with operational discipline and practical timelines.",
+  9: "Makar in the 10th house strongly supports administration, management, engineering, governance, infrastructure, compliance, and long-cycle enterprises. You are built for structure, persistence, and difficult responsibilities. Saturn influence gives delayed but durable success through hard work and credibility. Career progress may feel slow in early years, then compound significantly over time. Leadership becomes strongest when patience, ethics, and strategic planning stay consistent.",
+  10: "Kumbh in the 10th house supports careers in technology, innovation, social impact, policy reform, analytics, large networks, and futuristic domains. You prefer work that improves systems rather than just maintaining them. Saturn-Rahu style influence supports unconventional solutions and independent thought. Professional identity can be unique, sometimes ahead of market timing. Success comes when visionary ideas are backed by disciplined execution and collaborative scaling.",
+  11: "Meen in the 10th house supports careers in healing arts, counseling, spirituality, cinema, design, writing, maritime sectors, and charitable institutions. You thrive in roles requiring empathy, imagination, and subtle perception. Jupiter-Ketu style influence can create non-linear career paths with meaningful turning points. Work linked to service, creativity, or inspiration brings deeper satisfaction. Financial and professional stability increase when vision is paired with routine and structure.",
+};
+
+const MARRIAGE_PREDICTIONS_7TH: Record<number, string> = {
+  0: "Mesh in the 7th house indicates a dynamic, independent, and assertive spouse energy. Relationships may start quickly and require patience to avoid ego clashes. Compatibility is strongest with partners who respect individuality and direct communication. Marriage timing often improves after emotional maturity and career grounding develop. Shared goals and physical activity can keep the bond vibrant.",
+  1: "Vrishabh in the 7th house suggests a loyal, practical, and comfort-loving spouse. Marriage tends to value stability, family routines, and long-term financial security. Compatibility improves with partners who appreciate commitment and calm communication. Timing is generally favorable when finances and home stability are in place. Sensuality, trust, and consistency become pillars of relationship success.",
+  2: "Mithun in the 7th house indicates an intelligent, social, and communicative spouse nature. Mental compatibility and conversation are essential for relationship longevity. You may attract partners with youthful energy or dual interests. Marriage timing can involve phases of indecision before clarity emerges. Shared learning, travel, and flexibility strengthen compatibility over time.",
+  3: "Kark in the 7th house gives an emotional, caring, and family-oriented spouse pattern. Partnership thrives on emotional safety, nurturing behavior, and shared domestic priorities. Sensitivity can create mood-based misunderstandings if communication is not clear. Marriage timing is favorable when both families align and emotional readiness is strong. A warm home environment becomes central to marital harmony.",
+  4: "Singh in the 7th house indicates a proud, expressive, and dignified spouse energy. Partnership needs appreciation, respect, and visible affection to stay balanced. Compatibility is high with partners who support each other's ambitions. Marriage timing often improves after confidence and social standing stabilize. Celebration, creativity, and shared public goals strengthen the relationship.",
+  5: "Kanya in the 7th house suggests a practical, detail-oriented, and health-conscious spouse. Marriage works best with clear routines, mutual service, and realistic expectations. Over-analysis or criticism can affect emotional warmth if unchecked. Timing tends to favor periods when life structure and daily habits are settled. Respect for small efforts and practical teamwork builds long-term compatibility.",
+  6: "Tula in the 7th house is naturally favorable for marriage and partnership dynamics. Spouse nature is likely charming, diplomatic, and fairness-oriented. Relationship success depends on balance, aesthetics, and respectful communication. Timing often aligns with social or professional networking phases. Shared values, grace, and compromise create strong compatibility.",
+  7: "Vrishchik in the 7th house indicates intense attraction, deep loyalty, and transformative partnership experiences. Spouse nature may be passionate, private, and emotionally powerful. Trust and transparency are critical, as secrecy can create friction. Marriage timing may involve karmic lessons before stable commitment forms. Emotional depth, devotion, and shared resilience define compatibility.",
+  8: "Dhanu in the 7th house suggests a philosophical, optimistic, and freedom-loving spouse. Partnership thrives on honesty, growth, and shared exploration. Compatibility is strongest when both partners respect personal space and life purpose. Marriage timing often improves through travel, higher studies, or spiritual connection. Shared ethics and long-term vision sustain marital harmony.",
+  9: "Makar in the 7th house indicates a mature, responsible, and practical spouse nature. Marriage may arrive slightly later but with stronger long-term commitment. Compatibility improves with partners who value duty, stability, and measurable progress. Timing is favorable after career foundations become stable. Patience, loyalty, and disciplined partnership building create durable bonds.",
+  10: "Kumbh in the 7th house suggests a unique, intellectual, and independent spouse profile. Marriage may begin through friendship, networks, or unconventional circumstances. Emotional expression can seem detached at times, so conscious intimacy building is useful. Timing may be non-traditional but meaningful when shared ideals align. Compatibility grows through mutual respect, social purpose, and freedom.",
+  11: "Meen in the 7th house indicates a gentle, empathetic, and spiritually inclined spouse nature. Relationship bonds are emotional, intuitive, and often idealistic. Boundaries and practical clarity are important to avoid confusion or over-sacrifice. Marriage timing can align with spiritual growth phases or family blessings. Compassion, forgiveness, and shared faith strengthen compatibility deeply.",
+};
+
+const HEALTH_PREDICTIONS_LAGNA: Record<number, string> = {
+  0: "Mesh Lagna highlights head, brain, eyes, and blood heat sensitivity. Watch for headaches, fever tendencies, inflammation, and blood pressure spikes. Manage stress through cooling foods, hydration, and regular sleep discipline. Strength training is favorable but avoid overexertion and impulsive routines. Preventive eye care and periodic blood pressure checks are beneficial.",
+  1: "Vrishabh Lagna brings focus to throat, neck, vocal cords, and thyroid balance. You should monitor recurrent throat irritation, stiffness in neck-shoulder region, and metabolism rhythm. Avoid excessive cold foods and maintain regular movement to reduce sluggishness. Gentle voice care and posture correction help long-term wellness. Thyroid profile checks at intervals are useful.",
+  2: "Mithun Lagna governs lungs, shoulders, arms, and nervous system regulation. Watch for anxiety-driven fatigue, respiratory sensitivity, and irregular sleep patterns. Breathing exercises and consistent movement improve vitality significantly. Avoid overthinking and information overload that drains mental energy. Nervous system calming routines and magnesium-rich nutrition can help.",
+  3: "Kark Lagna rules chest, breasts, stomach fluids, and emotional digestion. Stress often reflects quickly in digestion, acidity, or appetite fluctuations. Warm, satvic meals and stable meal timing support resilience. Emotional boundaries and moon-cycle aligned rest improve hormonal balance. Chest and gastric care should remain a preventive focus.",
+  4: "Singh Lagna emphasizes heart, spine, circulation, and upper back vitality. Monitor cardiac strain, posture issues, and heat-related fatigue during high stress. Structured exercise, sunlight balance, and disciplined recovery improve stamina. Ego pressure can somatize as chest tightness, so relaxation practices are essential. Routine heart and lipid screening supports long-term health.",
+  5: "Kanya Lagna rules intestines, gut absorption, skin sensitivity, and digestive detail. Watch for acidity, constipation, gut inflammation, and food intolerance patterns. Hygiene, routine, and clean nutrition are especially important for you. Overwork and worry can disturb digestion quickly, so mindfulness is therapeutic. Periodic gut and micronutrient evaluations can be useful.",
+  6: "Tula Lagna governs kidneys, lower back, skin balance, and sugar regulation. Hydration, mineral balance, and blood sugar discipline deserve attention. Avoid excessive processed food and sedentary patterns that burden renal function. Gentle yoga and spine care maintain long-term comfort. Periodic kidney profile and glucose monitoring are recommended.",
+  7: "Vrishchik Lagna highlights reproductive organs, elimination system, and hidden inflammatory conditions. You may need to watch hormonal balance, urinary health, and stress toxins. Detox-friendly routines, hydration, and emotional release practices are beneficial. Suppressed emotions can affect physical vitality over time. Preventive reproductive and urinary checkups support stability.",
+  8: "Dhanu Lagna governs hips, thighs, liver metabolism, and sciatic channel. Watch for liver overload, weight fluctuations, and hip-thigh strain. Moderate exercise with flexibility work keeps movement channels healthy. Excess optimism around diet can cause overindulgence, so moderation is key. Liver function and vitamin profiling can help preventive care.",
+  9: "Makar Lagna focuses on bones, knees, joints, teeth, and chronic stiffness. Joint lubrication, calcium metabolism, and posture maintenance are key priorities. Overwork can create fatigue accumulation and musculoskeletal tightness. Strength plus mobility training supports longevity best. Bone density and vitamin D evaluation become valuable over time.",
+  10: "Kumbh Lagna governs calves, ankles, circulation, and nervous conductivity in lower limbs. Watch for varicose tendencies, cramps, circulation irregularity, and sudden energy drops. Walking, stretching, and hydration help maintain smooth flow. Irregular schedules may disturb health rhythms, so routine is medicine for you. Vascular and electrolyte monitoring can be supportive.",
+  11: "Meen Lagna rules feet, lymphatic fluids, immunity, and psychosomatic sensitivity. You absorb stress and emotions quickly, which can affect sleep and immunity. Gentle movement, spiritual grounding, and salt-water routines help recharge. Avoid escapist habits that weaken vitality over time. Foot care, immunity support, and emotional hygiene are essential.",
+};
+
+const MAHADASHA_PREDICTIONS: Record<VimPlanet, string> = {
+  Ketu: "Ketu Mahadasha activates detachment, karmic clearing, and deep inner introspection. Material priorities may shift as spiritual and psychological themes become stronger. Sudden endings or relocations can occur to redirect life toward authenticity. This period favors meditation, occult study, healing work, and simplifying distractions. Relationships and career paths that lack soul alignment often transform rapidly. Grounding routines and mentorship are important to avoid confusion or isolation.",
+  Venus: "Venus Mahadasha brings focus on relationships, comfort, creativity, and financial refinement. This 20-year period often supports marriage prospects, artistic pursuits, and improved lifestyle quality. Business in beauty, design, hospitality, luxury, branding, and client-facing roles can flourish. Emotional fulfillment increases when values and partnerships are balanced. Overindulgence in pleasure or spending should be managed with discipline. Harmony, diplomacy, and aesthetic intelligence become major success factors.",
+  Sun: "Sun Mahadasha amplifies authority, confidence, visibility, and leadership responsibilities. You are pushed to define identity clearly and take ownership of your path. Career can bring recognition, promotions, or public-facing opportunities when ego is balanced with service. Father figures, government matters, and reputation themes become prominent. Health focus is needed for heart, eyes, and burnout prevention through routine. Strong integrity and purpose-driven action produce the best outcomes.",
+  Moon: "Moon Mahadasha emphasizes emotions, family life, nourishment, and inner security. Home transitions, caregiving roles, and mental wellness become central during this 10-year cycle. Intuition increases, making this period favorable for counseling, hospitality, education, and public connection roles. Mood swings may rise if sleep and boundaries are weak. Financial flow can fluctuate, so budgeting and emotional balance are essential. Practices that stabilize mind and hydration improve overall outcomes.",
+  Mars: "Mars Mahadasha brings high action, courage, competition, and execution power. You may feel driven toward entrepreneurship, technical fields, property actions, or leadership under pressure. This period rewards discipline, physical fitness, and decisive planning. Anger, haste, and conflict need conscious management to protect relationships and health. Surgeries, machinery, defense, sports, and engineering themes can become active. Structured strategy channels Mars energy into major achievements.",
+  Rahu: "Rahu Mahadasha creates rapid ambition, unconventional opportunities, and foreign or technological influence. Life can move quickly with sudden leaps in career, network, and social visibility. This period favors innovation, digital fields, mass communication, and global expansion. Confusion, obsession, or risky decisions may arise if ethics are ignored. Grounding through spiritual practice and mentorship keeps growth aligned. When handled wisely, Rahu grants bold breakthroughs and market relevance.",
+  Jupiter: "Jupiter Mahadasha brings wisdom, expansion, and spiritual growth. This 16-year period is excellent for education, teaching, and financial growth. Marriage and children are often blessed, especially when natal Jupiter is well placed. Opportunities in law, finance, consulting, and education arise steadily. Foreign travel, higher studies, or settlement possibilities increase during major sub-periods. Health remains generally supportive, though liver function and sugar balance should be monitored.",
+  Saturn: "Saturn Mahadasha is a karmic period of discipline, responsibility, and durable achievement. Progress may seem slow initially, but results become long-lasting and structurally strong. Career often shifts toward serious roles, management, compliance, engineering, or governance. This cycle tests patience, ethics, and consistency in relationships and finances. Health attention is needed for bones, joints, nerves, and chronic stress load. With humility and sustained effort, Saturn grants respected status and maturity.",
+  Mercury: "Mercury Mahadasha activates intellect, communication, commerce, and skill development. This period favors business, analytics, writing, education, consulting, technology, and negotiation-heavy roles. You may handle multiple projects, contracts, or learning tracks at once. Financial gains improve through networking, adaptability, and smart information management. Nervous strain and overthinking should be balanced with rest and focused routines. Precision in speech and documentation becomes a key advantage.",
+};
+
+function cleanRashiName(value: string): string {
+  return value.split(" ")[0] ?? value;
+}
+
+function joinPlanets(planets: string[]): string {
+  return planets.length > 0 ? planets.join(", ") : "none";
+}
+
 /** Optional UTC offset in hours (e.g. 5.5 for India). Used when not inferred from place name. */
 export type KundliInput = {
   name: string;
@@ -611,20 +706,40 @@ export function computeKundli(input: KundliInput) {
     order.map((k) => ({ key: k, lon: raw[k].longitude }))
   );
 
-  const lagnaInfo = rashiFromIndex(ascRashi);
   const tenth = houses[9];
   const seventh = houses[6];
   const sixth = houses[5];
   const second = houses[1];
   const eleventh = houses[10];
 
+  const tenthSign = rashiFromDegree(normalizeLon(ascDeg + 9 * 30));
+  const seventhSign = rashiFromDegree(normalizeLon(ascDeg + 6 * 30));
+  const secondSign = rashiFromDegree(normalizeLon(ascDeg + 30));
+  const eleventhSign = rashiFromDegree(normalizeLon(ascDeg + 10 * 30));
+  const secondLord = signLordPlanetKey(secondSign);
+  const eleventhLord = signLordPlanetKey(eleventhSign);
+
+  const secondLordHouse = houseOf(raw[secondLord].longitude);
+  const eleventhLordHouse = houseOf(raw[eleventhLord].longitude);
+  const wealthStrength =
+    (second.planets.length > 0 ? 1 : 0) +
+    (eleventh.planets.length > 0 ? 1 : 0) +
+    (secondLordHouse === 2 || secondLordHouse === 11 ? 1 : 0) +
+    (eleventhLordHouse === 2 || eleventhLordHouse === 11 ? 1 : 0);
+  const wealthBand =
+    wealthStrength >= 3
+      ? "strong wealth-building cycles"
+      : wealthStrength === 2
+        ? "steady but effort-dependent growth"
+        : "fluctuating gains that improve with disciplined planning";
+
   const predictions = {
-    personality: `Lagna in ${lagnaInfo.name.split(" ")[0]} (${lagnaInfo.element}) emphasizes ${lagnaInfo.lord}-ruled themes in self-expression and vitality.`,
-    career: `The 10th house (${tenth.rashi}) and its lord ${tenth.lord}, with planets ${tenth.planets.join(", ") || "none"} there, shape career direction and public reputation.`,
-    marriage: `The 7th house (${seventh.rashi}) and occupants ${seventh.planets.join(", ") || "none"} describe partnership patterns and spouse significations.`,
-    health: `The 6th (${sixth.rashi}) and Lagna (${lagnaInfo.name}) together indicate routines, resilience, and health focus areas.`,
-    finance: `Wealth houses 2 (${second.rashi}) and 11 (${eleventh.rashi}), with planets ${second.planets.join(", ")} and ${eleventh.planets.join(", ")}, outline earning and gains.`,
-    currentPeriod: `Ongoing ${dasha.mahadasha.planet} Mahadasha with ${dasha.antardasha.planet} Antardasha highlights themes tied to those planetary karakas.`,
+    personality: PERSONALITY_PREDICTIONS[ascRashi],
+    career: `${CAREER_PREDICTIONS_10TH[tenthSign]} The 10th house holds ${joinPlanets(tenth.planets)} and lord ${tenth.lord} is a key career trigger in your chart.`,
+    marriage: `${MARRIAGE_PREDICTIONS_7TH[seventhSign]} Your 7th house contains ${joinPlanets(seventh.planets)}, adding practical clues about spouse behavior and relationship timing.`,
+    health: `${HEALTH_PREDICTIONS_LAGNA[ascRashi]} Your 6th house sign is ${cleanRashiName(sixth.rashi)}, so preventive care through routine, digestion balance, and stress control gives the best long-term results.`,
+    finance: `Income patterns depend strongly on the 2nd house ${cleanRashiName(second.rashi)} and 11th house ${cleanRashiName(eleventh.rashi)}. Wealth can arise through ${SIGN_SHORT_NAMES[secondSign]} style assets, networking, and the gains channels of ${SIGN_SHORT_NAMES[eleventhSign]}. The 2nd lord ${secondLord} in house ${secondLordHouse} and 11th lord ${eleventhLord} in house ${eleventhLordHouse} indicate ${wealthBand}. Planets in wealth houses are 2nd: ${joinPlanets(second.planets)} and 11th: ${joinPlanets(eleventh.planets)}. Favor long-horizon investing, disciplined savings, and timing major moves during supportive Jupiter or Venus periods.`,
+    currentPeriod: `${MAHADASHA_PREDICTIONS[dasha.mahadasha.planet]} Current sub-period of ${dasha.antardasha.planet} refines the experience with short-term events tied to that planet's house placement and strength.`,
   };
 
   return {
