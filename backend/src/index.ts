@@ -36,7 +36,11 @@ app.use("/api/chat", chatRouter);
 app.use("/api/wallet", walletRouter);
 
 const httpServer = createServer(app);
-const io = new Server(httpServer, { cors: { origin: "*" } });
+const io = new Server(httpServer, {
+  cors: { origin: "*" },
+  pingTimeout: 60000,
+  pingInterval: 25000,
+});
 
 setSocketServer(io);
 registerSocketHandlers(io);

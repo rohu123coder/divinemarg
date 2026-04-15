@@ -83,14 +83,32 @@ export default function AstrologerDashboardPage() {
 
     const socket = io(getSocketApiBase(), {
       auth: { token },
+      reconnection: true,
+      reconnectionAttempts: 10,
+      reconnectionDelay: 1000,
+      timeout: 20000,
       transports: ["websocket", "polling"],
     });
     socketRef.current = socket;
+
+    const rejoinUserRoom = () => {
+      socket.emit("join_user_room");
+    };
+
+    socket.on("connect", rejoinUserRoom);
+    socket.io.on("reconnect", rejoinUserRoom);
 
     socket.on("incoming_request", (payload: IncomingRequest) => {
       incomingRef.current = payload;
       setIncoming(payload);
       setCountdown(30);
+    });
+
+    socket.on("disconnect", () => {
+      // Keep any active incoming request visible across transient disconnects.
+      if (incomingRef.current) {
+        setIncoming(incomingRef.current);
+      }
     });
 
     return () => {

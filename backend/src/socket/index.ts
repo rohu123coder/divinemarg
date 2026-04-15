@@ -228,6 +228,10 @@ export function registerSocketHandlers(io: Server): void {
     const user = socket.data.user;
     socket.join(`user:${user.userId}`);
 
+    socket.on("join_user_room", () => {
+      socket.join(`user:${user.userId}`);
+    });
+
     socket.on("join_session", async (payload: unknown) => {
       const parsed = sessionIdPayload.safeParse(payload);
       if (!parsed.success) {
@@ -400,19 +404,32 @@ export function registerSocketHandlers(io: Server): void {
       });
     });
 
-    socket.on("disconnect", async () => {
+    socket.on("disconnect", () => {
       const uid = user.userId;
-      const open = await pool.query<{ id: string }>(
-        `SELECT cs.id
-         FROM chat_sessions cs
-         INNER JOIN astrologers a ON a.id = cs.astrologer_id
-         WHERE cs.status IN ('waiting', 'active')
-           AND (cs.user_id = $1 OR a.user_id = $1)`,
-        [uid]
-      );
-      for (const row of open.rows) {
-        await finalizeChatSession(io, row.id);
-      }
+      setTimeout(async () => {
+        try {
+          // If the user reconnected in the grace window, do not end sessions.
+          const userRoomSockets = await io.in(`user:${uid}`).fetchSockets();
+          const stillDisconnected = userRoomSockets.length === 0;
+          if (!stillDisconnected) {
+            return;
+          }
+
+          const open = await pool.query<{ id: string }>(
+            `SELECT cs.id
+             FROM chat_sessions cs
+             INNER JOIN astrologers a ON a.id = cs.astrologer_id
+             WHERE cs.status IN ('waiting', 'active')
+               AND (cs.user_id = $1 OR a.user_id = $1)`,
+            [uid]
+          );
+          for (const row of open.rows) {
+            await finalizeChatSession(io, row.id);
+          }
+        } catch (err) {
+          console.error("disconnect grace-period handling failed:", err);
+        }
+      }, 10_000);
     });
   });
 }
