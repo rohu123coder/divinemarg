@@ -47,7 +47,7 @@ type WalletWidgetProps = {
 };
 
 export function WalletWidget({ className = "" }: WalletWidgetProps) {
-  const { user, updateWalletBalance } = useAuthStore();
+  const { user, updateWalletBalance, isWalletRefreshing } = useAuthStore();
   const balance = user?.wallet_balance ?? 0;
   const [open, setOpen] = useState(false);
   const [custom, setCustom] = useState("");
@@ -168,7 +168,9 @@ export function WalletWidget({ className = "" }: WalletWidgetProps) {
       <div className="flex flex-wrap items-center gap-3">
         <div className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-slate-800">
           <WalletIcon className="h-5 w-5 text-violet-600" />
-          <span className="text-sm font-semibold">{formatMoney(balance)}</span>
+          <span className="text-sm font-semibold">
+            {isWalletRefreshing ? "Updating..." : formatMoney(balance)}
+          </span>
         </div>
         <button
           type="button"

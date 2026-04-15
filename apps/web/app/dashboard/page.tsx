@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 
 import { Navbar } from "@/components/Navbar";
@@ -21,7 +21,8 @@ type SessionRow = {
 
 export default function DashboardPage() {
   const router = useRouter();
-  const { user, isLoggedIn, token } = useAuthStore();
+  const pathname = usePathname();
+  const { user, isLoggedIn, token, refreshWalletBalance } = useAuthStore();
   const [mounted, setMounted] = useState(false);
   const [sessions, setSessions] = useState<SessionRow[]>([]);
   const [loading, setLoading] = useState(true);
@@ -42,6 +43,7 @@ export default function DashboardPage() {
       router.replace("/astrologer/dashboard");
       return;
     }
+    void refreshWalletBalance();
     let cancelled = false;
     void (async () => {
       setLoading(true);
@@ -66,7 +68,16 @@ export default function DashboardPage() {
     return () => {
       cancelled = true;
     };
-  }, [mounted, isLoggedIn, token, router, user?.role]);
+  }, [mounted, isLoggedIn, token, router, user?.role, refreshWalletBalance]);
+
+  useEffect(() => {
+    if (!mounted || !isLoggedIn || !token) {
+      return;
+    }
+    if (pathname === "/dashboard") {
+      void refreshWalletBalance();
+    }
+  }, [mounted, isLoggedIn, token, pathname, refreshWalletBalance]);
 
   if (!mounted) {
     return (

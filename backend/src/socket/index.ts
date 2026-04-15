@@ -18,9 +18,17 @@ type SessionRow = {
   user_id: string;
   astrologer_id: string;
   astrologer_user_id: string;
+  astrologer_name: string;
   status: string;
   started_at: Date | null;
   price_per_minute: string | null;
+};
+
+type LiveSessionState = {
+  startTime: number;
+  timerInterval: ReturnType<typeof setInterval> | null;
+  billed: boolean;
+  messageCount: number;
 };
 
 const sessionIdPayload = z.object({
@@ -46,15 +54,93 @@ async function loadSessionRow(sessionId: string): Promise<SessionRow | null> {
             cs.user_id,
             cs.astrologer_id,
             a.user_id AS astrologer_user_id,
+            au.name AS astrologer_name,
             cs.status,
             cs.started_at,
             a.price_per_minute
      FROM chat_sessions cs
      INNER JOIN astrologers a ON a.id = cs.astrologer_id
+     INNER JOIN users au ON au.id = a.user_id
      WHERE cs.id = $1`,
     [sessionId]
   );
   return r.rows[0] ?? null;
+}
+
+const liveSessions = new Map<string, LiveSessionState>();
+
+// BILLING TEST CHECKLIST:
+// 1. Normal session: chat 2 min → End Session → wallet -₹30, astrologer +₹30, dashboard shows "2 min / ₹30"
+// 2. Sub-minute session with messages: chat 30s, send 1 msg → End → charge ₹15 (min 1 min rule)
+// 3. Sub-minute session NO messages: join → End immediately → charge ₹0
+// 4. Double end: user clicks End Chat, astrologer also clicks End Session simultaneously → billing fires once only
+// 5. Server restart mid-session: restart backend → rejoin → timer resumes from DB started_at → End → correct duration billed
+// 6. Wallet display: after session ends, navbar + dashboard wallet shows updated balance (not stale ₹500)
+
+function ensureLiveSession(
+  sessionId: string,
+  startTime?: number
+): LiveSessionState {
+  const existing = liveSessions.get(sessionId);
+  if (existing) {
+    if (typeof startTime === "number" && Number.isFinite(startTime)) {
+      existing.startTime = Math.min(existing.startTime, startTime);
+    }
+    return existing;
+  }
+  const next: LiveSessionState = {
+    startTime:
+      typeof startTime === "number" && Number.isFinite(startTime)
+        ? startTime
+        : Date.now(),
+    timerInterval: null,
+    billed: false,
+    messageCount: 0,
+  };
+  liveSessions.set(sessionId, next);
+  return next;
+}
+
+function emitSessionTick(io: Server, sessionId: string): void {
+  const state = liveSessions.get(sessionId);
+  if (!state) {
+    return;
+  }
+  const elapsedMs = Date.now() - state.startTime;
+  const elapsedMinutes = Math.max(0, Math.floor(elapsedMs / 60_000));
+  const elapsedSeconds = Math.max(0, Math.floor(elapsedMs / 1000));
+  io.to(sessionId).emit("session_tick", { elapsedMinutes, elapsedSeconds });
+}
+
+function startSessionTimer(
+  io: Server,
+  sessionId: string,
+  startTime?: number
+): void {
+  const state = ensureLiveSession(sessionId, startTime);
+  if (state.timerInterval) {
+    return;
+  }
+  state.timerInterval = setInterval(() => {
+    if (!liveSessions.has(sessionId)) {
+      return;
+    }
+    emitSessionTick(io, sessionId);
+  }, 1000);
+  emitSessionTick(io, sessionId);
+  console.log("[TIMER] session started", sessionId, new Date().toISOString());
+}
+
+function stopSessionTimer(sessionId: string): LiveSessionState | null {
+  const state = liveSessions.get(sessionId);
+  if (!state) {
+    return null;
+  }
+  if (state.timerInterval) {
+    clearInterval(state.timerInterval);
+  }
+  state.timerInterval = null;
+  return state;
 }
 
 async function finalizeChatSession(
@@ -65,6 +151,15 @@ async function finalizeChatSession(
   | { ended: false; reason: "deduction_failed" }
   | null
 > {
+  const liveState = liveSessions.get(sessionId);
+  if (liveState?.billed) {
+    return null;
+  }
+  if (liveState) {
+    liveState.billed = true;
+  }
+
+  let live: LiveSessionState | null = null;
   const client = await pool.connect();
   try {
     await client.query("BEGIN");
@@ -73,14 +168,16 @@ async function finalizeChatSession(
       id: string;
       user_id: string;
       astrologer_id: string;
+      astrologer_name: string;
       status: string;
       started_at: Date | null;
       price_per_minute: string | null;
     }>(
-      `SELECT cs.id, cs.user_id, cs.astrologer_id, cs.status, cs.started_at,
-              a.price_per_minute
+      `SELECT cs.id, cs.user_id, cs.astrologer_id, au.name AS astrologer_name,
+              cs.status, cs.started_at, a.price_per_minute
        FROM chat_sessions cs
        INNER JOIN astrologers a ON a.id = cs.astrologer_id
+       INNER JOIN users au ON au.id = a.user_id
        WHERE cs.id = $1
        FOR UPDATE`,
       [sessionId]
@@ -88,25 +185,38 @@ async function finalizeChatSession(
 
     const row = lockResult.rows[0];
     if (!row) {
+      if (liveState) {
+        liveState.billed = false;
+      }
       await client.query("ROLLBACK");
       return null;
     }
 
     if (row.status === "ended") {
+      liveSessions.delete(sessionId);
       await client.query("ROLLBACK");
       return null;
     }
 
+    live = stopSessionTimer(sessionId);
     const price = Number(row.price_per_minute ?? 0);
-    let totalMinutes = 0;
-    if (row.started_at) {
-      const ms = Date.now() - new Date(row.started_at).getTime();
-      totalMinutes = Math.max(0, Math.ceil(ms / 60_000));
+    if (!live) {
+      console.log("[TIMER] using DB fallback for duration calc", sessionId);
     }
+    const authoritativeStart =
+      live?.startTime ??
+      (row.started_at ? new Date(row.started_at).getTime() : Date.now());
+    const rawDuration = Math.max(
+      0,
+      Math.ceil((Date.now() - authoritativeStart) / 60_000)
+    );
+    const finalDuration =
+      rawDuration === 0 && (live?.messageCount ?? 0) > 0 ? 1 : rawDuration;
 
-    const rawCharge = totalMinutes * price;
+    const rawCharge = finalDuration * price;
     const totalCharged = Math.round(rawCharge * 100) / 100;
     const userId = row.user_id;
+    const astrologerName = row.astrologer_name;
 
     if (totalCharged > 0) {
       const deduct = await client.query<{ wallet_balance: string }>(
@@ -117,6 +227,10 @@ async function finalizeChatSession(
         [totalCharged, userId]
       );
       if (deduct.rows.length === 0) {
+        if (live) {
+          startSessionTimer(io, sessionId, live.startTime);
+          live.billed = false;
+        }
         await client.query("ROLLBACK");
         return { ended: false, reason: "deduction_failed" };
       }
@@ -141,19 +255,45 @@ async function finalizeChatSession(
            total_minutes = $1,
            total_charged = $2::numeric
        WHERE id = $3`,
-      [totalMinutes, totalCharged, sessionId]
+      [finalDuration, totalCharged, sessionId]
     );
 
     await client.query("COMMIT");
+    liveSessions.delete(sessionId);
+
+    console.log("[TIMER] session ended", sessionId, "duration:", finalDuration, "mins");
+    console.log("[BILLING] charged:", finalDuration * price);
+    console.log(
+      "[BILLING AUDIT]",
+      JSON.stringify({
+        sessionId,
+        userId,
+        astrologerName,
+        durationMinutes: finalDuration,
+        ratePerMinute: price,
+        totalCharged,
+        timestamp: new Date().toISOString(),
+        timerSource: live ? "live_memory" : "db_fallback",
+      })
+    );
 
     io.to(sessionId).emit("session_ended", {
       sessionId,
-      totalMinutes,
+      duration: finalDuration,
+      charge: totalCharged,
+      astrologerName,
+      totalMinutes: finalDuration,
       totalCharged,
     });
 
-    return { ended: true, totalMinutes, totalCharged };
+    return { ended: true, totalMinutes: finalDuration, totalCharged };
   } catch (e) {
+    if (live) {
+      startSessionTimer(io, sessionId, live.startTime);
+      live.billed = false;
+    } else if (liveState) {
+      liveState.billed = false;
+    }
     await client.query("ROLLBACK");
     console.error("finalizeChatSession failed:", e);
     return null;
@@ -263,6 +403,7 @@ export function registerSocketHandlers(io: Server): void {
         );
         const started = upd.rows[0];
         if (started) {
+          startSessionTimer(io, sessionId, started.started_at.getTime());
           io.to(sessionId).emit("session_started", {
             sessionId,
             startedAt: started.started_at.toISOString(),
@@ -272,6 +413,22 @@ export function registerSocketHandlers(io: Server): void {
       }
 
       const latest = await loadSessionRow(sessionId);
+      if (latest?.status === "active") {
+        const startedAtMs = latest.started_at
+          ? new Date(latest.started_at).getTime()
+          : Date.now();
+        if (!liveSessions.has(sessionId)) {
+          console.log("[TIMER] recovered session from DB", sessionId);
+        }
+        startSessionTimer(io, sessionId, startedAtMs);
+        socket.emit("session_tick", {
+          elapsedMinutes: Math.max(
+            0,
+            Math.floor((Date.now() - startedAtMs) / 60_000)
+          ),
+          elapsedSeconds: Math.max(0, Math.floor((Date.now() - startedAtMs) / 1000)),
+        });
+      }
       socket.emit("joined_session", {
         sessionId,
         status: latest?.status ?? session.status,
@@ -313,6 +470,11 @@ export function registerSocketHandlers(io: Server): void {
       if (!row) {
         return;
       }
+      const state = ensureLiveSession(
+        sessionId,
+        session.started_at ? new Date(session.started_at).getTime() : Date.now()
+      );
+      state.messageCount = (state.messageCount ?? 0) + 1;
 
       io.to(sessionId).emit("new_message", {
         id: row.id,
@@ -396,9 +558,14 @@ export function registerSocketHandlers(io: Server): void {
          WHERE id = $1 AND status = 'waiting'`,
         [sessionId]
       );
+      stopSessionTimer(sessionId);
+      liveSessions.delete(sessionId);
 
       io.to(sessionId).emit("session_ended", {
         sessionId,
+        duration: 0,
+        charge: 0,
+        astrologerName: session.astrologer_name,
         totalMinutes: 0,
         totalCharged: 0,
       });

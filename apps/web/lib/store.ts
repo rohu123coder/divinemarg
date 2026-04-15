@@ -16,8 +16,10 @@ type AuthState = {
   user: AuthUser | null;
   token: string | null;
   isLoggedIn: boolean;
+  isWalletRefreshing: boolean;
   setUser: (user: AuthUser, token: string) => void;
   updateWalletBalance: (amount: number) => void;
+  refreshWalletBalance: () => Promise<void>;
   logout: () => void;
 };
 
@@ -29,11 +31,12 @@ export const useAuthStore = create<AuthState>()(
       user: null,
       token: null,
       isLoggedIn: false,
+      isWalletRefreshing: false,
       setUser: (user, token) => {
         if (typeof window !== "undefined") {
           localStorage.setItem(TOKEN_KEY, token);
         }
-        set({ user, token, isLoggedIn: true });
+        set({ user, token, isLoggedIn: true, isWalletRefreshing: false });
       },
       updateWalletBalance: (amount) => {
         const u = get().user;
@@ -41,11 +44,54 @@ export const useAuthStore = create<AuthState>()(
           set({ user: { ...u, wallet_balance: amount } });
         }
       },
+      refreshWalletBalance: async () => {
+        const { token, user, isWalletRefreshing } = get();
+        if (!token || !user || isWalletRefreshing || typeof window === "undefined") {
+          return;
+        }
+
+        set({ isWalletRefreshing: true });
+        try {
+          const baseURL =
+            process.env.NEXT_PUBLIC_API_URL?.replace(/\/$/, "") ??
+            "http://localhost:4000";
+
+          const walletRes = await fetch(`${baseURL}/api/users/wallet`, {
+            method: "GET",
+            headers: {
+              Authorization: `Bearer ${token}`,
+              "Content-Type": "application/json",
+            },
+          });
+
+          if (!walletRes.ok) {
+            throw new Error("Failed to refresh wallet");
+          }
+
+          const walletPayload = (await walletRes.json()) as {
+            data?: { balance?: number };
+          };
+          const nextBalance = walletPayload?.data?.balance;
+
+          if (typeof nextBalance === "number") {
+            set({ user: { ...user, wallet_balance: nextBalance } });
+          }
+        } catch (error) {
+          console.error("Wallet refresh failed", error);
+        } finally {
+          set({ isWalletRefreshing: false });
+        }
+      },
       logout: () => {
         if (typeof window !== "undefined") {
           localStorage.removeItem(TOKEN_KEY);
         }
-        set({ user: null, token: null, isLoggedIn: false });
+        set({
+          user: null,
+          token: null,
+          isLoggedIn: false,
+          isWalletRefreshing: false,
+        });
       },
     }),
     {

@@ -11,7 +11,6 @@ import {
 import { io, type Socket } from "socket.io-client";
 
 import { Navbar } from "@/components/Navbar";
-import api from "@/lib/api";
 import { useAuthStore } from "@/lib/store";
 
 type ChatMessage = {
@@ -30,35 +29,6 @@ function apiBase(): string {
   );
 }
 
-async function fetchSessionStartedAt(
-  sessionId: string
-): Promise<string | null> {
-  let page = 1;
-  for (let i = 0; i < 12; i++) {
-    const res = await api.get(`/api/chat/history`, {
-      params: { page, limit: 50 },
-    });
-    const data = res.data?.data as
-      | {
-          sessions: Array<{ id: string; started_at: string | null }>;
-          total: number;
-        }
-      | undefined;
-    if (!data) {
-      break;
-    }
-    const hit = data.sessions.find((s) => s.id === sessionId);
-    if (hit?.started_at) {
-      return hit.started_at;
-    }
-    if (page * 50 >= data.total) {
-      break;
-    }
-    page++;
-  }
-  return null;
-}
-
 type ChatSessionClientProps = {
   sessionId: string;
 };
@@ -71,13 +41,12 @@ export function ChatSessionClient({ sessionId }: ChatSessionClientProps) {
     ? decodeURIComponent(rawName)
     : "Astrologer";
 
-  const { user, token, isLoggedIn } = useAuthStore();
+  const { user, token, isLoggedIn, refreshWalletBalance } = useAuthStore();
   const [mounted, setMounted] = useState(false);
   const [status, setStatus] = useState<string>("connecting");
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState("");
   const [typing, setTyping] = useState(false);
-  const [startedAt, setStartedAt] = useState<string | null>(null);
   const [elapsedMin, setElapsedMin] = useState(0);
   const [summary, setSummary] = useState<{
     totalMinutes: number;
@@ -95,7 +64,7 @@ export function ChatSessionClient({ sessionId }: ChatSessionClientProps) {
     setSummary(null);
     setMessages([]);
     setStatus("connecting");
-    setStartedAt(null);
+    setElapsedMin(0);
   }, [sessionId]);
 
   useEffect(() => {
@@ -132,13 +101,6 @@ export function ChatSessionClient({ sessionId }: ChatSessionClientProps) {
           return;
         }
         setStatus(payload.status);
-        if (payload.status === "active") {
-          void fetchSessionStartedAt(sessionId).then((iso) => {
-            if (iso) {
-              setStartedAt(iso);
-            }
-          });
-        }
       }
     );
 
@@ -149,7 +111,16 @@ export function ChatSessionClient({ sessionId }: ChatSessionClientProps) {
           return;
         }
         setStatus("active");
-        setStartedAt(payload.startedAt);
+      }
+    );
+
+    socket.on(
+      "session_tick",
+      (payload: {
+        elapsedMinutes: number;
+        elapsedSeconds: number;
+      }) => {
+        setElapsedMin(Math.max(0, payload.elapsedMinutes ?? 0));
       }
     );
 
@@ -183,6 +154,9 @@ export function ChatSessionClient({ sessionId }: ChatSessionClientProps) {
       "session_ended",
       (payload: {
         sessionId: string;
+        duration?: number;
+        charge?: number;
+        astrologerName?: string;
         totalMinutes: number;
         totalCharged: number;
       }) => {
@@ -190,11 +164,14 @@ export function ChatSessionClient({ sessionId }: ChatSessionClientProps) {
           return;
         }
         setStatus("ended");
+        void refreshWalletBalance();
         if (!summaryShownRef.current) {
           summaryShownRef.current = true;
+          const duration = payload.duration ?? payload.totalMinutes ?? 0;
+          const charge = payload.charge ?? payload.totalCharged ?? 0;
           setSummary({
-            totalMinutes: payload.totalMinutes,
-            totalCharged: payload.totalCharged,
+            totalMinutes: duration,
+            totalCharged: charge,
           });
         }
       }
@@ -213,7 +190,7 @@ export function ChatSessionClient({ sessionId }: ChatSessionClientProps) {
       socket.disconnect();
       socketRef.current = null;
     };
-  }, [mounted, token, sessionId, isLoggedIn, user?.id]);
+  }, [mounted, token, sessionId, isLoggedIn, user?.id, refreshWalletBalance]);
 
   useEffect(() => {
     if (!mounted) {
@@ -223,20 +200,6 @@ export function ChatSessionClient({ sessionId }: ChatSessionClientProps) {
       router.replace("/login");
     }
   }, [mounted, isLoggedIn, token, router]);
-
-  useEffect(() => {
-    if (!startedAt || status !== "active") {
-      setElapsedMin(0);
-      return;
-    }
-    const tick = () => {
-      const ms = Date.now() - new Date(startedAt).getTime();
-      setElapsedMin(Math.max(0, Math.floor(ms / 60_000)));
-    };
-    tick();
-    const id = setInterval(tick, 1000);
-    return () => clearInterval(id);
-  }, [startedAt, status]);
 
   useEffect(() => {
     if (!listRef.current) {

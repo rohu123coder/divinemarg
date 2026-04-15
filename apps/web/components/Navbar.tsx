@@ -16,7 +16,7 @@ function formatMoney(n: number): string {
 
 export function Navbar() {
   const router = useRouter();
-  const { user, isLoggedIn, logout } = useAuthStore();
+  const { user, isLoggedIn, logout, isWalletRefreshing } = useAuthStore();
   const [mounted, setMounted] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
 
@@ -89,7 +89,7 @@ export function Navbar() {
           ) : isLoggedIn ? (
             <>
               <span className="inline-flex items-center rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700 sm:text-sm">
-                {formatMoney(balance)}
+                {isWalletRefreshing ? "Updating..." : formatMoney(balance)}
               </span>
               <Link
                 href="/astrologers"
@@ -148,7 +148,7 @@ export function Navbar() {
         <div className="flex items-center gap-2 md:hidden">
           {!mounted ? null : isLoggedIn ? (
             <span className="max-w-[6rem] truncate rounded-full border border-emerald-200 bg-emerald-50 px-2 py-1 text-xs font-semibold text-emerald-700">
-              {formatMoney(balance)}
+              {isWalletRefreshing ? "Updating..." : formatMoney(balance)}
             </span>
           ) : null}
           <button
