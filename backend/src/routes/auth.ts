@@ -83,7 +83,34 @@ router.post("/send-otp", async (req: Request, res: Response) => {
     return;
   }
 
-  console.log(`TODO: Twilio — OTP for ${phone}: ${otp}`);
+  const fast2smsKey = process.env.FAST2SMS_API_KEY;
+  if (fast2smsKey) {
+    try {
+      const smsRes = await fetch('https://www.fast2sms.com/dev/bulkV2', {
+        method: 'POST',
+        headers: {
+          'authorization': fast2smsKey,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          route: 'otp',
+          variables_values: otp,
+          numbers: phone,
+          flash: 0
+        })
+      });
+      const smsData = await smsRes.json() as { return: boolean; message?: string };
+      if (!smsData.return) {
+        console.error('Fast2SMS failed:', smsData);
+      } else {
+        console.log(`OTP sent to ${phone} via Fast2SMS`);
+      }
+    } catch (e) {
+      console.error('Fast2SMS error:', e);
+    }
+  } else {
+    console.log(`[DEV] OTP for ${phone}: ${otp}`);
+  }
 
   res.json({ success: true, message: "OTP sent" });
 });
