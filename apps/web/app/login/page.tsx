@@ -1,470 +1,190 @@
 "use client";
-
-import Link from "next/link";
+import { Suspense, useState, useRef, useCallback, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Suspense, useCallback, useEffect, useRef, useState, type ClipboardEvent, type FormEvent, type KeyboardEvent } from "react";
-
+import { Navbar } from "@/components/Navbar";
 import api from "@/lib/api";
 import { useAuthStore, type AuthUser } from "@/lib/store";
-
-const phoneRegex = /^[6-9]\d{9}$/;
-const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-
-type AuthMode = "login" | "register" | "verify";
-
-type OtpContext = {
-  identifier: string;
-  displayText: string;
-  isRegistration: boolean;
-  returnMode: "login" | "register";
-  resendPayload?: { phone?: string; email?: string };
-  registrationPayload?: {
-    name: string;
-    phone: string;
-    email: string;
-  };
-};
-
-function getApiError(e: unknown, fallback: string): string {
-  if (
-    e &&
-    typeof e === "object" &&
-    "response" in e &&
-    e.response &&
-    typeof e.response === "object" &&
-    "data" in e.response &&
-    e.response.data &&
-    typeof e.response.data === "object" &&
-    "error" in e.response.data
-  ) {
-    return String((e.response.data as { error?: string }).error ?? fallback);
-  }
-  return fallback;
-}
+import Link from "next/link";
 
 function LoginContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const setUser = useAuthStore((state) => state.setUser);
-  const { user, isLoggedIn, token } = useAuthStore();
+  const setUser = useAuthStore((s) => s.setUser);
+  const { isLoggedIn, token, user } = useAuthStore();
+  const [mode, setMode] = useState<"login"|"register"|"verify">(
+    searchParams.get("tab") === "register" ? "register" : "login"
+  );
+  const [identifier, setIdentifier] = useState("");
+  const [name, setName] = useState("");
+  const [phone, setPhone] = useState("");
+  const [email, setEmail] = useState("");
+  const [otp, setOtp] = useState(["","","","","",""]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string|null>(null);
+  const [sentTo, setSentTo] = useState("");
+  const [isReg, setIsReg] = useState(false);
+  const [countdown, setCountdown] = useState(0);
+  const inputsRef = useRef<Array<HTMLInputElement|null>>([]);
   const redirectTarget = searchParams.get("redirect");
 
-  const [mode, setMode] = useState<AuthMode>("login");
-  const [loginIdentifier, setLoginIdentifier] = useState("");
-  const [registerName, setRegisterName] = useState("");
-  const [registerPhone, setRegisterPhone] = useState("");
-  const [registerEmail, setRegisterEmail] = useState("");
-  const [otpContext, setOtpContext] = useState<OtpContext | null>(null);
-  const [otp, setOtp] = useState(["", "", "", "", "", ""]);
-  const [cooldown, setCooldown] = useState(0);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  const inputsRef = useRef<Array<HTMLInputElement | null>>([]);
+  useEffect(() => {
+    if (isLoggedIn && token && user?.role === "astrologer") router.replace("/astrologer/dashboard");
+  }, [isLoggedIn, token, user?.role, router]);
 
   useEffect(() => {
-    if (isLoggedIn && token) {
-      if (user?.role === "astrologer") {
-        router.replace("/astrologer/dashboard");
-        return;
-      }
-      router.replace("/dashboard");
-    }
-  }, [isLoggedIn, router, token, user?.role]);
+    if (countdown > 0) { const t = setTimeout(() => setCountdown(c => c-1), 1000); return () => clearTimeout(t); }
+  }, [countdown]);
 
-  useEffect(() => {
-    if (mode !== "verify" || cooldown <= 0) {
-      return;
-    }
-    const timer = window.setInterval(() => {
-      setCooldown((previous) => (previous > 0 ? previous - 1 : 0));
-    }, 1000);
-    return () => window.clearInterval(timer);
-  }, [mode, cooldown]);
-
-  const startVerifyMode = (context: OtpContext) => {
-    setOtpContext(context);
-    setOtp(["", "", "", "", "", ""]);
-    setCooldown(30);
-    setMode("verify");
-    requestAnimationFrame(() => {
-      inputsRef.current[0]?.focus();
-    });
+  const sendOtp = async () => {
+    setError(null); setLoading(true);
+    try {
+      await api.post("/api/auth/send-otp", 
+        identifier.includes("@") ? { email: identifier } : { phone: identifier }
+      );
+      setSentTo(identifier); setIsReg(false);
+      setMode("verify"); setOtp(["","","","","",""]); setCountdown(30);
+      setTimeout(() => inputsRef.current[0]?.focus(), 100);
+    } catch(e: unknown) {
+      const err = e as {response?: {data?: {error?: string}}};
+      setError(err?.response?.data?.error ?? "Could not send OTP");
+    } finally { setLoading(false); }
   };
 
-  const normalizeLoginIdentifier = (value: string) => {
-    const trimmedValue = value.trim();
-    if (!trimmedValue) {
-      return { error: "Enter phone number or email" } as const;
-    }
-
-    const digitsOnly = trimmedValue.replace(/\D/g, "");
-    if (digitsOnly.length === 10 && phoneRegex.test(digitsOnly)) {
-      return { payload: { phone: digitsOnly }, displayText: `+91 ${digitsOnly}`, identifier: digitsOnly } as const;
-    }
-
-    const normalizedEmail = trimmedValue.toLowerCase();
-    if (emailRegex.test(normalizedEmail)) {
-      return { payload: { email: normalizedEmail }, displayText: normalizedEmail, identifier: normalizedEmail } as const;
-    }
-
-    return { error: "Enter a valid Indian phone number or email" } as const;
-  };
-
-  const submitLogin = async () => {
+  const sendRegisterOtp = async () => {
     setError(null);
-    const normalized = normalizeLoginIdentifier(loginIdentifier);
-    if ("error" in normalized) {
-      setError(normalized.error);
-      return;
-    }
-
+    if (!name.trim()) { setError("Enter your full name"); return; }
+    if (!/^[6-9]\d{9}$/.test(phone)) { setError("Enter valid 10-digit phone"); return; }
+    if (!/\S+@\S+\.\S+/.test(email)) { setError("Enter valid email"); return; }
     setLoading(true);
     try {
-      await api.post("/api/auth/send-otp", normalized.payload);
-      startVerifyMode({
-        identifier: normalized.identifier,
-        displayText: normalized.displayText,
-        isRegistration: false,
-        returnMode: "login",
-        resendPayload: normalized.payload,
-      });
-    } catch (e: unknown) {
-      setError(getApiError(e, "Could not send OTP"));
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const submitRegister = async () => {
-    setError(null);
-    const cleanedName = registerName.trim();
-    const cleanedPhone = registerPhone.replace(/\D/g, "").slice(0, 10);
-    const cleanedEmail = registerEmail.trim().toLowerCase();
-
-    if (cleanedName.length < 2) {
-      setError("Enter your full name");
-      return;
-    }
-    if (!phoneRegex.test(cleanedPhone)) {
-      setError("Enter a valid 10-digit Indian mobile number");
-      return;
-    }
-    if (!emailRegex.test(cleanedEmail)) {
-      setError("Enter a valid email address");
-      return;
-    }
-
-    const payload = {
-      name: cleanedName,
-      phone: cleanedPhone,
-      email: cleanedEmail,
-    };
-
-    setLoading(true);
-    try {
-      await api.post("/api/auth/register", payload);
-      startVerifyMode({
-        identifier: payload.phone,
-        displayText: `+91 ${payload.phone} and ${payload.email}`,
-        isRegistration: true,
-        returnMode: "register",
-        registrationPayload: payload,
-      });
-    } catch (e: unknown) {
-      setError(getApiError(e, "Could not send OTP"));
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const resendOtp = async () => {
-    if (!otpContext || cooldown > 0) {
-      return;
-    }
-    setError(null);
-    setLoading(true);
-    try {
-      if (otpContext.isRegistration) {
-        if (!otpContext.registrationPayload) {
-          throw new Error("Registration context missing");
-        }
-        await api.post("/api/auth/register", otpContext.registrationPayload);
-      } else {
-        if (!otpContext.resendPayload) {
-          throw new Error("Resend payload missing");
-        }
-        await api.post("/api/auth/send-otp", otpContext.resendPayload);
-      }
-      setCooldown(30);
-    } catch (e: unknown) {
-      setError(getApiError(e, "Could not resend OTP"));
-    } finally {
-      setLoading(false);
-    }
+      await api.post("/api/auth/register", { name, phone, email });
+      setSentTo(phone + " & " + email); setIsReg(true);
+      setMode("verify"); setOtp(["","","","","",""]); setCountdown(30);
+      setTimeout(() => inputsRef.current[0]?.focus(), 100);
+    } catch(e: unknown) {
+      const err = e as {response?: {data?: {error?: string}}};
+      setError(err?.response?.data?.error ?? "Registration failed");
+    } finally { setLoading(false); }
   };
 
   const verifyOtp = useCallback(async () => {
-    if (!otpContext) {
-      return;
-    }
-
     const code = otp.join("");
-    if (code.length !== 6) {
-      setError("Enter the 6-digit OTP");
-      return;
-    }
-
-    setError(null);
-    setLoading(true);
+    if (code.length !== 6) return;
+    setError(null); setLoading(true);
     try {
-      const response = await api.post("/api/auth/verify-otp", {
-        identifier: otpContext.identifier,
-        otp: code,
-        isRegistration: otpContext.isRegistration,
-      });
-
-      const data = response.data?.data as { token: string; user: AuthUser };
-      if (!data?.token || !data.user) {
-        throw new Error("Invalid response");
-      }
-
+      const id = isReg ? phone : identifier;
+      const res = await api.post("/api/auth/verify-otp", { identifier: id, otp: code, isRegistration: isReg });
+      const data = res.data?.data as { token: string; user: AuthUser };
       setUser({ ...data.user, role: "user" }, data.token);
-      const safeRedirect =
-        redirectTarget &&
-        redirectTarget.startsWith("/") &&
-        !redirectTarget.startsWith("//")
-          ? redirectTarget
-          : "/dashboard";
-      router.replace(safeRedirect);
-    } catch (e: unknown) {
-      setError(getApiError(e, "Verification failed"));
-    } finally {
-      setLoading(false);
-    }
-  }, [otp, otpContext, redirectTarget, router, setUser]);
+      const safe = redirectTarget?.startsWith("/") && !redirectTarget.startsWith("//") ? redirectTarget : "/dashboard";
+      router.replace(safe);
+    } catch(e: unknown) {
+      const err = e as {response?: {data?: {error?: string}}};
+      setError(err?.response?.data?.error ?? "Verification failed");
+    } finally { setLoading(false); }
+  }, [otp, phone, identifier, isReg, redirectTarget, router, setUser]);
 
-  const setDigit = (index: number, value: string) => {
-    const digit = value.replace(/\D/g, "").slice(-1);
-    setOtp((previous) => {
-      const next = [...previous];
-      next[index] = digit;
-      return next;
-    });
-
-    if (digit && index < 5) {
-      inputsRef.current[index + 1]?.focus();
-    }
-  };
-
-  const onOtpKeyDown = (index: number, event: KeyboardEvent<HTMLInputElement>) => {
-    if (event.key === "Backspace" && !otp[index] && index > 0) {
-      inputsRef.current[index - 1]?.focus();
-    }
-  };
-
-  const onOtpPaste = (event: ClipboardEvent<HTMLInputElement>) => {
-    event.preventDefault();
-    const pasted = event.clipboardData.getData("text").replace(/\D/g, "").slice(0, 6);
-    if (!pasted) {
-      return;
-    }
-    const filled = ["", "", "", "", "", ""];
-    pasted.split("").forEach((char, index) => {
-      filled[index] = char;
-    });
-    setOtp(filled);
-    inputsRef.current[Math.min(pasted.length, 5)]?.focus();
-  };
-
-  const switchMode = (targetMode: "login" | "register") => {
-    setMode(targetMode);
-    setError(null);
-  };
-
-  const onCardSubmit = (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    if (mode === "login") {
-      void submitLogin();
-      return;
-    }
-    if (mode === "register") {
-      void submitRegister();
-      return;
-    }
-    void verifyOtp();
+  const setDigit = (i: number, v: string) => {
+    const d = v.replace(/\D/g,"").slice(-1);
+    setOtp(p => { const n=[...p]; n[i]=d; return n; });
+    if (d && i < 5) inputsRef.current[i+1]?.focus();
   };
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-violet-100 via-purple-50 to-indigo-100 px-4 py-10">
-      <div className="w-full max-w-md rounded-3xl border border-violet-100 bg-white p-6 shadow-xl shadow-violet-200/60 sm:p-8">
-        <form onSubmit={onCardSubmit}>
-          {mode === "login" ? (
-            <div className="space-y-5">
-              <div className="space-y-2 text-center">
-                <h1 className="text-2xl font-bold text-slate-900">Welcome to DivineMarg ✨</h1>
-                <p className="text-sm text-slate-600">Login with your phone or email</p>
-              </div>
-
-              <input
-                type="text"
-                value={loginIdentifier}
-                onChange={(event) => setLoginIdentifier(event.target.value)}
-                placeholder="Phone number or Email"
-                className="w-full rounded-xl border border-violet-200 px-4 py-3 text-slate-900 outline-none ring-violet-500 focus:border-violet-500 focus:ring-2"
-              />
-
-              <button
-                type="submit"
-                disabled={loading}
-                className="w-full rounded-xl bg-gradient-to-r from-purple-600 to-indigo-600 py-3 text-sm font-semibold text-white transition hover:opacity-95 disabled:opacity-60"
-              >
-                {loading ? "Sending..." : "Send OTP"}
-              </button>
-
-              <div className="flex items-center gap-3">
-                <div className="h-px flex-1 bg-violet-100" />
-                <span className="text-xs font-semibold text-slate-500">OR</span>
-                <div className="h-px flex-1 bg-violet-100" />
-              </div>
-
-              <p className="text-center text-sm text-slate-600">
-                New here?{" "}
-                <button
-                  type="button"
-                  onClick={() => switchMode("register")}
-                  className="font-semibold text-violet-700 hover:underline"
-                >
+    <div className="min-h-screen bg-gradient-to-b from-violet-50 to-white">
+      <Navbar />
+      <div className="flex items-center justify-center px-4 py-16">
+        <div className="w-full max-w-md bg-white rounded-2xl shadow-lg border border-purple-100 p-8">
+          
+          {mode === "login" && (
+            <>
+              <h1 className="text-2xl font-bold text-slate-900 text-center">Welcome to DivineMarg ✨</h1>
+              <p className="text-sm text-slate-500 text-center mt-2 mb-8">Login with your phone number or email</p>
+              <div className="space-y-4">
+                <input
+                  type="text"
+                  value={identifier}
+                  onChange={e => setIdentifier(e.target.value)}
+                  placeholder="Phone number or Email"
+                  className="w-full border border-slate-200 rounded-xl px-4 py-3 text-slate-900 outline-none focus:ring-2 focus:ring-violet-500"
+                />
+                {error && <p className="text-red-600 text-sm">{error}</p>}
+                <button onClick={sendOtp} disabled={loading || !identifier}
+                  className="w-full py-3 rounded-xl bg-gradient-to-r from-purple-600 to-indigo-600 text-white font-semibold disabled:opacity-60">
+                  {loading ? "Sending..." : "Send OTP"}
+                </button>
+                <div className="flex items-center gap-3 my-2">
+                  <div className="flex-1 h-px bg-slate-200"/>
+                  <span className="text-slate-400 text-sm">OR</span>
+                  <div className="flex-1 h-px bg-slate-200"/>
+                </div>
+                <button onClick={() => { setMode("register"); setError(null); }}
+                  className="w-full py-3 rounded-xl border-2 border-purple-600 text-purple-600 font-semibold hover:bg-purple-50">
                   Create Account
                 </button>
-              </p>
-            </div>
-          ) : null}
-
-          {mode === "register" ? (
-            <div className="space-y-4">
-              <h1 className="text-center text-2xl font-bold text-slate-900">Create Account</h1>
-
-              <input
-                type="text"
-                value={registerName}
-                onChange={(event) => setRegisterName(event.target.value)}
-                placeholder="Full Name"
-                autoComplete="name"
-                className="w-full rounded-xl border border-violet-200 px-4 py-3 text-slate-900 outline-none ring-violet-500 focus:border-violet-500 focus:ring-2"
-              />
-
-              <div className="flex items-center rounded-xl border border-violet-200 focus-within:border-violet-500 focus-within:ring-2 focus-within:ring-violet-500">
-                <span className="border-r border-violet-200 px-3 text-sm font-medium text-slate-700">🇮🇳 +91</span>
-                <input
-                  type="tel"
-                  inputMode="numeric"
-                  maxLength={10}
-                  value={registerPhone}
-                  onChange={(event) =>
-                    setRegisterPhone(event.target.value.replace(/\D/g, "").slice(0, 10))
-                  }
-                  placeholder="Phone Number"
-                  autoComplete="tel-national"
-                  className="w-full rounded-r-xl px-4 py-3 text-slate-900 outline-none"
-                />
               </div>
+              <Link href="/" className="block text-center text-sm text-violet-600 hover:underline mt-6">← Back to home</Link>
+            </>
+          )}
 
-              <input
-                type="email"
-                value={registerEmail}
-                onChange={(event) => setRegisterEmail(event.target.value)}
-                placeholder="Email"
-                autoComplete="email"
-                className="w-full rounded-xl border border-violet-200 px-4 py-3 text-slate-900 outline-none ring-violet-500 focus:border-violet-500 focus:ring-2"
-              />
-
-              <button
-                type="submit"
-                disabled={loading}
-                className="w-full rounded-xl bg-gradient-to-r from-purple-600 to-indigo-600 py-3 text-sm font-semibold text-white transition hover:opacity-95 disabled:opacity-60"
-              >
-                {loading ? "Sending..." : "Send OTP & Register"}
-              </button>
-
-              <p className="text-center text-sm text-slate-600">
-                Already have account?{" "}
-                <button
-                  type="button"
-                  onClick={() => switchMode("login")}
-                  className="font-semibold text-violet-700 hover:underline"
-                >
-                  Sign In
+          {mode === "register" && (
+            <>
+              <h1 className="text-2xl font-bold text-slate-900 text-center">Create Account</h1>
+              <p className="text-sm text-slate-500 text-center mt-2 mb-8">Join DivineMarg today</p>
+              <div className="space-y-4">
+                <input type="text" value={name} onChange={e => setName(e.target.value)}
+                  placeholder="Full Name" className="w-full border border-slate-200 rounded-xl px-4 py-3 outline-none focus:ring-2 focus:ring-violet-500"/>
+                <div className="flex rounded-xl border border-slate-200 focus-within:ring-2 focus-within:ring-violet-500">
+                  <span className="flex items-center px-3 border-r border-slate-200">🇮🇳 +91</span>
+                  <input type="tel" value={phone} onChange={e => setPhone(e.target.value.replace(/\D/g,"").slice(0,10))}
+                    placeholder="Phone number" className="w-full px-3 py-3 outline-none rounded-r-xl"/>
+                </div>
+                <input type="email" value={email} onChange={e => setEmail(e.target.value)}
+                  placeholder="Email address" className="w-full border border-slate-200 rounded-xl px-4 py-3 outline-none focus:ring-2 focus:ring-violet-500"/>
+                {error && <p className="text-red-600 text-sm">{error}</p>}
+                <button onClick={sendRegisterOtp} disabled={loading}
+                  className="w-full py-3 rounded-xl bg-gradient-to-r from-purple-600 to-indigo-600 text-white font-semibold disabled:opacity-60">
+                  {loading ? "Sending..." : "Send OTP & Register"}
                 </button>
-              </p>
-            </div>
-          ) : null}
-
-          {mode === "verify" ? (
-            <div className="space-y-4">
-              <h1 className="text-center text-2xl font-bold text-slate-900">Enter OTP</h1>
-              <p className="text-center text-sm text-slate-600">
-                OTP sent to: <span className="font-semibold text-slate-900">{otpContext?.displayText}</span>
-              </p>
-
-              <div className="flex justify-between gap-2">
-                {otp.map((digit, index) => (
-                  <input
-                    key={index}
-                    ref={(element) => {
-                      inputsRef.current[index] = element;
-                    }}
-                    inputMode="numeric"
-                    maxLength={1}
-                    autoComplete="one-time-code"
-                    value={digit}
-                    onChange={(event) => setDigit(index, event.target.value)}
-                    onKeyDown={(event) => onOtpKeyDown(index, event)}
-                    onPaste={index === 0 ? onOtpPaste : undefined}
-                    className="h-12 w-12 rounded-xl border border-violet-200 text-center text-lg font-semibold text-slate-900 outline-none ring-violet-500 focus:border-violet-500 focus:ring-2"
-                  />
-                ))}
+                <button onClick={() => { setMode("login"); setError(null); }}
+                  className="w-full text-center text-sm text-violet-600 hover:underline">
+                  Already have account? Sign In
+                </button>
               </div>
+            </>
+          )}
 
-              <button
-                type="submit"
-                disabled={loading || otp.some((value) => value === "")}
-                className="w-full rounded-xl bg-gradient-to-r from-purple-600 to-indigo-600 py-3 text-sm font-semibold text-white transition hover:opacity-95 disabled:opacity-60"
-              >
-                {loading ? "Verifying..." : "Verify & Continue"}
-              </button>
-
-              <button
-                type="button"
-                onClick={() => void resendOtp()}
-                disabled={loading || cooldown > 0}
-                className="w-full rounded-xl border border-violet-200 py-3 text-sm font-semibold text-violet-700 transition hover:bg-violet-50 disabled:opacity-60"
-              >
-                {cooldown > 0 ? `Resend OTP in ${cooldown}s` : "Resend OTP"}
-              </button>
-
-              <button
-                type="button"
-                onClick={() => switchMode(otpContext?.returnMode ?? "login")}
-                className="w-full text-sm font-medium text-violet-700 hover:underline"
-              >
-                Change phone/email
-              </button>
-            </div>
-          ) : null}
-
-          {error ? (
-            <p className="mt-4 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700" role="alert">
-              {error}
-            </p>
-          ) : null}
-        </form>
-
-        <p className="mt-6 text-center text-xs text-slate-500">
-          <Link href="/" className="text-violet-700 hover:underline">
-            Back to home
-          </Link>
-        </p>
+          {mode === "verify" && (
+            <>
+              <h1 className="text-2xl font-bold text-slate-900 text-center">Enter OTP</h1>
+              <p className="text-sm text-slate-500 text-center mt-2 mb-8">OTP sent to: <span className="font-semibold text-slate-700">{sentTo}</span></p>
+              <div className="space-y-4">
+                <div className="flex justify-between gap-2">
+                  {otp.map((d,i) => (
+                    <input key={i} ref={el => { inputsRef.current[i]=el; }} inputMode="numeric" maxLength={1} value={d}
+                      onChange={e => setDigit(i, e.target.value)}
+                      onKeyDown={e => { if(e.key==="Backspace" && !otp[i] && i>0) inputsRef.current[i-1]?.focus(); }}
+                      className="h-12 w-full rounded-lg border border-slate-200 text-center text-lg font-bold outline-none focus:ring-2 focus:ring-violet-500"/>
+                  ))}
+                </div>
+                {error && <p className="text-red-600 text-sm">{error}</p>}
+                <button onClick={verifyOtp} disabled={loading || otp.some(x => x==="")}
+                  className="w-full py-3 rounded-xl bg-gradient-to-r from-purple-600 to-indigo-600 text-white font-semibold disabled:opacity-60">
+                  {loading ? "Verifying..." : "Verify & Continue"}
+                </button>
+                <div className="flex justify-between text-sm">
+                  <button onClick={() => { setMode(isReg ? "register" : "login"); setError(null); }}
+                    className="text-violet-600 hover:underline">← Change {isReg ? "details" : "phone/email"}</button>
+                  {countdown > 0 ? (
+                    <span className="text-slate-400">Resend in {countdown}s</span>
+                  ) : (
+                    <button onClick={isReg ? sendRegisterOtp : sendOtp} className="text-violet-600 hover:underline">Resend OTP</button>
+                  )}
+                </div>
+              </div>
+            </>
+          )}
+        </div>
       </div>
     </div>
   );
@@ -472,15 +192,8 @@ function LoginContent() {
 
 export default function LoginPage() {
   return (
-    <Suspense
-      fallback={
-        <div className="flex min-h-screen items-center justify-center">
-          <div className="h-8 w-8 animate-spin rounded-full border-b-2 border-purple-600" />
-        </div>
-      }
-    >
+    <Suspense fallback={<div className="min-h-screen flex items-center justify-center"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-600"></div></div>}>
       <LoginContent />
     </Suspense>
   );
 }
-
