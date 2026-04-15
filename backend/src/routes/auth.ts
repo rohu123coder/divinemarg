@@ -96,7 +96,7 @@ async function sendSmsOTP(phone: string, otp: string): Promise<void> {
         body: JSON.stringify({
           route: 'dlt',
           sender_id: 'egyans',
-          message: '1707177624658133300',
+          message: '213571',
           variables_values: otp,
           flash: 0,
           numbers: phone,
