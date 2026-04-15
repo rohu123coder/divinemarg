@@ -87,32 +87,33 @@ async function sendSmsOTP(phone: string, otp: string): Promise<void> {
   const fast2smsKey = process.env.FAST2SMS_API_KEY;
   if (fast2smsKey) {
     try {
-      const smsRes = await fetch("https://www.fast2sms.com/dev/bulkV2", {
-        method: "POST",
+      const smsRes = await fetch('https://www.fast2sms.com/dev/bulkV2', {
+        method: 'POST',
         headers: {
           authorization: fast2smsKey,
-          "Content-Type": "application/json",
+          'Content-Type': 'application/json'
         },
         body: JSON.stringify({
-          route: "otp",
+          route: 'dlt',
+          sender_id: 'EGYANS',
+          message: '1707177624658133300',
           variables_values: otp,
-          numbers: phone,
           flash: 0,
+          numbers: phone,
         }),
       });
-      const smsData = (await smsRes.json()) as { return: boolean; message?: string };
+      const smsData = await smsRes.json() as { return: boolean; message?: string };
       if (!smsData.return) {
-        console.error("Fast2SMS failed:", smsData);
+        console.error('Fast2SMS DLT failed:', JSON.stringify(smsData));
       } else {
-        console.log(`OTP sent to ${phone} via Fast2SMS`);
+        console.log(`SMS sent to ${phone} via Fast2SMS DLT`);
       }
     } catch (e) {
-      console.error("Fast2SMS error:", e);
+      console.error('Fast2SMS error:', e);
     }
-    return;
+  } else {
+    console.log(`[DEV] OTP for ${phone}: ${otp}`);
   }
-
-  console.log(`[DEV] OTP for ${phone}: ${otp}`);
 }
 
 router.post("/register", async (req: Request, res: Response) => {
