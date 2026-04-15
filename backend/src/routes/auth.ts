@@ -6,6 +6,7 @@ import jwt from "jsonwebtoken";
 import { z } from "zod";
 
 import { query } from "../db/index.js";
+import { sendEmailOTP } from "../lib/email.js";
 import { redis } from "../lib/redis.js";
 import { authMiddleware } from "../middleware/auth.js";
 
@@ -23,13 +24,30 @@ const phoneSchema = z
   .string()
   .regex(/^[6-9]\d{9}$/, "Must be a valid 10-digit Indian mobile number");
 
-const sendOtpBody = z.object({
+const emailSchema = z.string().email("Must be a valid email address");
+
+const registerBody = z.object({
+  name: z.string().min(2, "Name must be at least 2 characters"),
   phone: phoneSchema,
+  email: emailSchema,
+  password: z.string().min(6, "Password must be at least 6 characters").optional(),
+});
+
+const sendOtpBody = z.object({
+  phone: phoneSchema.optional(),
+  email: emailSchema.optional(),
+}).refine((data) => Boolean(data.phone || data.email), {
+  message: "Provide phone or email",
+  path: ["phone"],
+}).refine((data) => !(data.phone && data.email), {
+  message: "Provide either phone or email",
+  path: ["phone"],
 });
 
 const verifyOtpBody = z.object({
-  phone: phoneSchema,
+  identifier: z.string().min(1, "Identifier is required"),
   otp: z.string().regex(/^\d{6}$/, "OTP must be 6 digits"),
+  isRegistration: z.boolean().optional(),
 });
 
 const astrologerLoginBody = z.object({
@@ -61,19 +79,137 @@ function toPublicUser(row: {
   };
 }
 
+function generateOtp(): string {
+  return randomInt(0, 1_000_000).toString().padStart(6, "0");
+}
+
+async function sendSmsOTP(phone: string, otp: string): Promise<void> {
+  const fast2smsKey = process.env.FAST2SMS_API_KEY;
+  if (fast2smsKey) {
+    try {
+      const smsRes = await fetch("https://www.fast2sms.com/dev/bulkV2", {
+        method: "POST",
+        headers: {
+          authorization: fast2smsKey,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          route: "otp",
+          variables_values: otp,
+          numbers: phone,
+          flash: 0,
+        }),
+      });
+      const smsData = (await smsRes.json()) as { return: boolean; message?: string };
+      if (!smsData.return) {
+        console.error("Fast2SMS failed:", smsData);
+      } else {
+        console.log(`OTP sent to ${phone} via Fast2SMS`);
+      }
+    } catch (e) {
+      console.error("Fast2SMS error:", e);
+    }
+    return;
+  }
+
+  console.log(`[DEV] OTP for ${phone}: ${otp}`);
+}
+
+router.post("/register", async (req: Request, res: Response) => {
+  const parsed = registerBody.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({
+      success: false,
+      error: parsed.error.issues[0]?.message ?? "Invalid body",
+    });
+    return;
+  }
+
+  const { name, phone, email, password } = parsed.data;
+
+  type ExistingRow = { phone: string; email: string };
+  const existing = await query<ExistingRow>(
+    "SELECT phone, email FROM users WHERE phone = $1 OR email = $2 LIMIT 1",
+    [phone, email]
+  );
+
+  if (existing.rows[0]) {
+    res.status(400).json({ success: false, error: "Phone/Email already registered" });
+    return;
+  }
+
+  const otp = generateOtp();
+  const password_hash = password ? await bcrypt.hash(password, 10) : null;
+  const key = `otp:reg:${phone}`;
+
+  try {
+    await redis.set(
+      key,
+      JSON.stringify({ otp, name, phone, email, password_hash }),
+      { EX: 300 }
+    );
+  } catch (e) {
+    console.error("Redis set registration OTP failed:", e);
+    res.status(500).json({ success: false, error: "Failed to send OTP" });
+    return;
+  }
+
+  try {
+    await Promise.all([sendSmsOTP(phone, otp), sendEmailOTP(email, otp)]);
+  } catch (e) {
+    console.error("OTP delivery failed:", e);
+    res.status(500).json({ success: false, error: "Failed to send OTP" });
+    return;
+  }
+
+  res.json({
+    success: true,
+    message: "OTP sent to your phone and email",
+  });
+});
+
 router.post("/send-otp", async (req: Request, res: Response) => {
   const parsed = sendOtpBody.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({
       success: false,
-      error: parsed.error.flatten().fieldErrors.phone?.[0] ?? "Invalid body",
+      error:
+        parsed.error.issues[0]?.message ??
+        parsed.error.flatten().fieldErrors.phone?.[0] ??
+        "Invalid body",
     });
     return;
   }
 
-  const { phone } = parsed.data;
-  const otp = randomInt(0, 1_000_000).toString().padStart(6, "0");
-  const key = `otp:${phone}`;
+  type LoginUserRow = {
+    id: string;
+    name: string;
+    phone: string;
+    email: string;
+    avatar_url: string | null;
+    wallet_balance: string;
+  };
+
+  const identifier = parsed.data.phone ?? parsed.data.email ?? "";
+  const byPhone = Boolean(parsed.data.phone);
+  const userResult = byPhone
+    ? await query<LoginUserRow>(
+        "SELECT id, name, phone, email, avatar_url, wallet_balance FROM users WHERE phone = $1",
+        [identifier]
+      )
+    : await query<LoginUserRow>(
+        "SELECT id, name, phone, email, avatar_url, wallet_balance FROM users WHERE email = $1",
+        [identifier]
+      );
+
+  const user = userResult.rows[0];
+  if (!user) {
+    res.status(404).json({ success: false, error: "User not found" });
+    return;
+  }
+
+  const otp = generateOtp();
+  const key = `otp:${identifier}`;
 
   try {
     await redis.set(key, otp, { EX: 300 });
@@ -83,33 +219,16 @@ router.post("/send-otp", async (req: Request, res: Response) => {
     return;
   }
 
-  const fast2smsKey = process.env.FAST2SMS_API_KEY;
-  if (fast2smsKey) {
-    try {
-      const smsRes = await fetch('https://www.fast2sms.com/dev/bulkV2', {
-        method: 'POST',
-        headers: {
-          'authorization': fast2smsKey,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          route: 'otp',
-          variables_values: otp,
-          numbers: phone,
-          flash: 0
-        })
-      });
-      const smsData = await smsRes.json() as { return: boolean; message?: string };
-      if (!smsData.return) {
-        console.error('Fast2SMS failed:', smsData);
-      } else {
-        console.log(`OTP sent to ${phone} via Fast2SMS`);
-      }
-    } catch (e) {
-      console.error('Fast2SMS error:', e);
+  try {
+    if (byPhone) {
+      await Promise.all([sendSmsOTP(user.phone, otp), sendEmailOTP(user.email, otp)]);
+    } else {
+      await Promise.all([sendEmailOTP(user.email, otp), sendSmsOTP(user.phone, otp)]);
     }
-  } else {
-    console.log(`[DEV] OTP for ${phone}: ${otp}`);
+  } catch (e) {
+    console.error("OTP delivery failed:", e);
+    res.status(500).json({ success: false, error: "Failed to send OTP" });
+    return;
   }
 
   res.json({ success: true, message: "OTP sent" });
@@ -122,34 +241,13 @@ router.post("/verify-otp", async (req: Request, res: Response) => {
       success: false,
       error:
         parsed.error.issues[0]?.message ??
-        parsed.error.flatten().fieldErrors.phone?.[0] ??
+        parsed.error.flatten().fieldErrors.identifier?.[0] ??
         "Invalid body",
     });
     return;
   }
 
-  const { phone, otp } = parsed.data;
-  const key = `otp:${phone}`;
-
-  let stored: string | null;
-  try {
-    stored = await redis.get(key);
-  } catch (e) {
-    console.error("Redis get OTP failed:", e);
-    res.status(500).json({ success: false, error: "Verification failed" });
-    return;
-  }
-
-  if (!stored || stored !== otp) {
-    res.status(400).json({ success: false, error: "Invalid or expired OTP" });
-    return;
-  }
-
-  try {
-    await redis.del(key);
-  } catch (e) {
-    console.error("Redis del OTP failed:", e);
-  }
+  const { identifier, otp, isRegistration } = parsed.data;
 
   type UserRow = {
     id: string;
@@ -159,27 +257,114 @@ router.post("/verify-otp", async (req: Request, res: Response) => {
     wallet_balance: string;
   };
 
-  let user: UserRow | undefined;
-  const existing = await query<UserRow>(
-    `SELECT id, name, phone, avatar_url, wallet_balance FROM users WHERE phone = $1`,
-    [phone]
-  );
+  if (isRegistration) {
+    const key = `otp:reg:${identifier}`;
+    let storedRaw: string | null;
+    try {
+      storedRaw = await redis.get(key);
+    } catch (e) {
+      console.error("Redis get registration OTP failed:", e);
+      res.status(500).json({ success: false, error: "Verification failed" });
+      return;
+    }
 
-  if (existing.rows[0]) {
-    user = existing.rows[0];
-  } else {
-    const created = await query<UserRow>(
-      `INSERT INTO users (phone, name, email)
-       VALUES ($1, $2, $3)
-       RETURNING id, name, phone, avatar_url, wallet_balance`,
-      [phone, "User", `${phone}@otp.local`]
+    if (!storedRaw) {
+      res.status(400).json({ success: false, error: "Invalid or expired OTP" });
+      return;
+    }
+
+    type RegistrationPayload = {
+      otp: string;
+      name: string;
+      phone: string;
+      email: string;
+      password_hash: string | null;
+    };
+
+    let registration: RegistrationPayload;
+    try {
+      registration = JSON.parse(storedRaw) as RegistrationPayload;
+    } catch {
+      res.status(400).json({ success: false, error: "Invalid or expired OTP" });
+      return;
+    }
+
+    if (registration.otp !== otp) {
+      res.status(400).json({ success: false, error: "Invalid or expired OTP" });
+      return;
+    }
+
+    let createdUser: UserRow | undefined;
+    try {
+      const created = await query<UserRow>(
+        `INSERT INTO users (name, phone, email, password_hash)
+         VALUES ($1, $2, $3, $4)
+         RETURNING id, name, phone, avatar_url, wallet_balance`,
+        [registration.name, registration.phone, registration.email, registration.password_hash]
+      );
+      createdUser = created.rows[0];
+    } catch (e) {
+      console.error("User registration failed:", e);
+      res.status(400).json({ success: false, error: "Phone/Email already registered" });
+      return;
+    }
+
+    if (!createdUser) {
+      res.status(500).json({ success: false, error: "Could not create user" });
+      return;
+    }
+
+    try {
+      await redis.del(key);
+    } catch (e) {
+      console.error("Redis del registration OTP failed:", e);
+    }
+
+    const token = jwt.sign(
+      { userId: createdUser.id, phone: createdUser.phone },
+      jwtSecret(),
+      { expiresIn: "30d" }
     );
-    user = created.rows[0];
+
+    res.json({
+      success: true,
+      data: {
+        token,
+        user: toPublicUser(createdUser),
+      },
+    });
+    return;
   }
 
-  if (!user) {
-    res.status(500).json({ success: false, error: "Could not load user" });
+  const key = `otp:${identifier}`;
+  let storedOtp: string | null;
+  try {
+    storedOtp = await redis.get(key);
+  } catch (e) {
+    console.error("Redis get OTP failed:", e);
+    res.status(500).json({ success: false, error: "Verification failed" });
     return;
+  }
+
+  if (!storedOtp || storedOtp !== otp) {
+    res.status(400).json({ success: false, error: "Invalid or expired OTP" });
+    return;
+  }
+
+  const existing = await query<UserRow>(
+    "SELECT id, name, phone, avatar_url, wallet_balance FROM users WHERE phone = $1 OR email = $1",
+    [identifier]
+  );
+  const user = existing.rows[0];
+  if (!user) {
+    res.status(404).json({ success: false, error: "User not found" });
+    return;
+  }
+
+  try {
+    await redis.del(key);
+  } catch (e) {
+    console.error("Redis del OTP failed:", e);
   }
 
   const token = jwt.sign({ userId: user.id, phone: user.phone }, jwtSecret(), {

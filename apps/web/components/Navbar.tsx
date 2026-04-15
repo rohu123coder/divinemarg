@@ -126,7 +126,7 @@ export function Navbar() {
                 Sign In
               </Link>
               <Link
-                href="/login"
+                href="/login?tab=register"
                 className="rounded-full bg-gradient-to-r from-violet-600 to-indigo-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:opacity-95"
               >
                 Sign Up
@@ -251,7 +251,7 @@ export function Navbar() {
                   Sign In
                 </Link>
                 <Link
-                  href="/login"
+                  href="/login?tab=register"
                   className="rounded-full bg-gradient-to-r from-violet-600 to-indigo-600 px-4 py-2.5 text-center text-sm font-semibold text-white"
                   onClick={() => setMenuOpen(false)}
                 >
