@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Suspense, useCallback, useEffect, useRef, useState, type ClipboardEvent, type KeyboardEvent } from "react";
+import { Suspense, useCallback, useEffect, useRef, useState, type ClipboardEvent, type FormEvent, type KeyboardEvent } from "react";
 
 import api from "@/lib/api";
 import { useAuthStore, type AuthUser } from "@/lib/store";
@@ -282,48 +282,69 @@ function LoginContent() {
     setError(null);
   };
 
-  return (
-    <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-violet-100 via-purple-50 to-indigo-100 px-4 py-8">
-      <div className="w-full max-w-md rounded-3xl border border-violet-100 bg-white/95 p-6 shadow-xl shadow-violet-200/60 backdrop-blur">
-        {mode === "login" ? (
-          <>
-            <h1 className="text-center text-2xl font-bold text-slate-900">Welcome to DivineMarg</h1>
-            <p className="mt-2 text-center text-sm text-slate-600">
-              Login with phone (+91) or email.
-            </p>
-            <input
-              type="text"
-              value={loginIdentifier}
-              onChange={(event) => setLoginIdentifier(event.target.value)}
-              placeholder="+91 phone or you@example.com"
-              className="mt-5 w-full rounded-xl border border-violet-200 px-4 py-3 text-slate-900 outline-none ring-violet-500 focus:border-violet-500 focus:ring-2"
-            />
-            <button
-              type="button"
-              onClick={() => void submitLogin()}
-              disabled={loading}
-              className="mt-4 w-full rounded-xl bg-gradient-to-r from-purple-600 to-indigo-600 py-3 text-sm font-semibold text-white transition hover:opacity-95 disabled:opacity-60"
-            >
-              {loading ? "Sending..." : "Send OTP"}
-            </button>
-            <div className="my-5 h-px bg-violet-100" />
-            <p className="text-center text-sm text-slate-600">
-              New here?{" "}
-              <button
-                type="button"
-                onClick={() => switchMode("register")}
-                className="font-semibold text-violet-700 hover:underline"
-              >
-                Create Account
-              </button>
-            </p>
-          </>
-        ) : null}
+  const onCardSubmit = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (mode === "login") {
+      void submitLogin();
+      return;
+    }
+    if (mode === "register") {
+      void submitRegister();
+      return;
+    }
+    void verifyOtp();
+  };
 
-        {mode === "register" ? (
-          <>
-            <h1 className="text-center text-2xl font-bold text-slate-900">Create Account</h1>
-            <div className="mt-5 space-y-3">
+  return (
+    <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-violet-100 via-purple-50 to-indigo-100 px-4 py-10">
+      <div className="w-full max-w-md rounded-3xl border border-violet-100 bg-white p-6 shadow-xl shadow-violet-200/60 sm:p-8">
+        <form onSubmit={onCardSubmit}>
+          {mode === "login" ? (
+            <div className="space-y-5">
+              <div className="space-y-2 text-center">
+                <h1 className="text-2xl font-bold text-slate-900">Welcome to DivineMarg ✨</h1>
+                <p className="text-sm text-slate-600">Login with your phone or email</p>
+              </div>
+
+              <input
+                type="text"
+                value={loginIdentifier}
+                onChange={(event) => setLoginIdentifier(event.target.value)}
+                placeholder="Phone number or Email"
+                className="w-full rounded-xl border border-violet-200 px-4 py-3 text-slate-900 outline-none ring-violet-500 focus:border-violet-500 focus:ring-2"
+              />
+
+              <button
+                type="submit"
+                disabled={loading}
+                className="w-full rounded-xl bg-gradient-to-r from-purple-600 to-indigo-600 py-3 text-sm font-semibold text-white transition hover:opacity-95 disabled:opacity-60"
+              >
+                {loading ? "Sending..." : "Send OTP"}
+              </button>
+
+              <div className="flex items-center gap-3">
+                <div className="h-px flex-1 bg-violet-100" />
+                <span className="text-xs font-semibold text-slate-500">OR</span>
+                <div className="h-px flex-1 bg-violet-100" />
+              </div>
+
+              <p className="text-center text-sm text-slate-600">
+                New here?{" "}
+                <button
+                  type="button"
+                  onClick={() => switchMode("register")}
+                  className="font-semibold text-violet-700 hover:underline"
+                >
+                  Create Account
+                </button>
+              </p>
+            </div>
+          ) : null}
+
+          {mode === "register" ? (
+            <div className="space-y-4">
+              <h1 className="text-center text-2xl font-bold text-slate-900">Create Account</h1>
+
               <input
                 type="text"
                 value={registerName}
@@ -332,6 +353,7 @@ function LoginContent() {
                 autoComplete="name"
                 className="w-full rounded-xl border border-violet-200 px-4 py-3 text-slate-900 outline-none ring-violet-500 focus:border-violet-500 focus:ring-2"
               />
+
               <div className="flex items-center rounded-xl border border-violet-200 focus-within:border-violet-500 focus-within:ring-2 focus-within:ring-violet-500">
                 <span className="border-r border-violet-200 px-3 text-sm font-medium text-slate-700">🇮🇳 +91</span>
                 <input
@@ -347,6 +369,7 @@ function LoginContent() {
                   className="w-full rounded-r-xl px-4 py-3 text-slate-900 outline-none"
                 />
               </div>
+
               <input
                 type="email"
                 value={registerEmail}
@@ -355,83 +378,87 @@ function LoginContent() {
                 autoComplete="email"
                 className="w-full rounded-xl border border-violet-200 px-4 py-3 text-slate-900 outline-none ring-violet-500 focus:border-violet-500 focus:ring-2"
               />
+
+              <button
+                type="submit"
+                disabled={loading}
+                className="w-full rounded-xl bg-gradient-to-r from-purple-600 to-indigo-600 py-3 text-sm font-semibold text-white transition hover:opacity-95 disabled:opacity-60"
+              >
+                {loading ? "Sending..." : "Send OTP & Register"}
+              </button>
+
+              <p className="text-center text-sm text-slate-600">
+                Already have account?{" "}
+                <button
+                  type="button"
+                  onClick={() => switchMode("login")}
+                  className="font-semibold text-violet-700 hover:underline"
+                >
+                  Sign In
+                </button>
+              </p>
             </div>
-            <button
-              type="button"
-              onClick={() => void submitRegister()}
-              disabled={loading}
-              className="mt-4 w-full rounded-xl bg-gradient-to-r from-purple-600 to-indigo-600 py-3 text-sm font-semibold text-white transition hover:opacity-95 disabled:opacity-60"
-            >
-              {loading ? "Sending..." : "Send OTP & Register"}
-            </button>
-            <p className="mt-5 text-center text-sm text-slate-600">
-              Already have account?{" "}
+          ) : null}
+
+          {mode === "verify" ? (
+            <div className="space-y-4">
+              <h1 className="text-center text-2xl font-bold text-slate-900">Enter OTP</h1>
+              <p className="text-center text-sm text-slate-600">
+                OTP sent to: <span className="font-semibold text-slate-900">{otpContext?.displayText}</span>
+              </p>
+
+              <div className="flex justify-between gap-2">
+                {otp.map((digit, index) => (
+                  <input
+                    key={index}
+                    ref={(element) => {
+                      inputsRef.current[index] = element;
+                    }}
+                    inputMode="numeric"
+                    maxLength={1}
+                    autoComplete="one-time-code"
+                    value={digit}
+                    onChange={(event) => setDigit(index, event.target.value)}
+                    onKeyDown={(event) => onOtpKeyDown(index, event)}
+                    onPaste={index === 0 ? onOtpPaste : undefined}
+                    className="h-12 w-12 rounded-xl border border-violet-200 text-center text-lg font-semibold text-slate-900 outline-none ring-violet-500 focus:border-violet-500 focus:ring-2"
+                  />
+                ))}
+              </div>
+
+              <button
+                type="submit"
+                disabled={loading || otp.some((value) => value === "")}
+                className="w-full rounded-xl bg-gradient-to-r from-purple-600 to-indigo-600 py-3 text-sm font-semibold text-white transition hover:opacity-95 disabled:opacity-60"
+              >
+                {loading ? "Verifying..." : "Verify & Continue"}
+              </button>
+
               <button
                 type="button"
-                onClick={() => switchMode("login")}
-                className="font-semibold text-violet-700 hover:underline"
+                onClick={() => void resendOtp()}
+                disabled={loading || cooldown > 0}
+                className="w-full rounded-xl border border-violet-200 py-3 text-sm font-semibold text-violet-700 transition hover:bg-violet-50 disabled:opacity-60"
               >
-                Sign In
+                {cooldown > 0 ? `Resend OTP in ${cooldown}s` : "Resend OTP"}
               </button>
-            </p>
-          </>
-        ) : null}
 
-        {mode === "verify" ? (
-          <>
-            <h1 className="text-center text-2xl font-bold text-slate-900">Enter OTP</h1>
-            <p className="mt-2 text-center text-sm text-slate-600">
-              OTP sent to <span className="font-semibold text-slate-900">{otpContext?.displayText}</span>
-            </p>
-            <div className="mt-5 flex justify-between gap-2">
-              {otp.map((digit, index) => (
-                <input
-                  key={index}
-                  ref={(element) => {
-                    inputsRef.current[index] = element;
-                  }}
-                  inputMode="numeric"
-                  maxLength={1}
-                  autoComplete="one-time-code"
-                  value={digit}
-                  onChange={(event) => setDigit(index, event.target.value)}
-                  onKeyDown={(event) => onOtpKeyDown(index, event)}
-                  onPaste={index === 0 ? onOtpPaste : undefined}
-                  className="h-12 w-12 rounded-xl border border-violet-200 text-center text-lg font-semibold text-slate-900 outline-none ring-violet-500 focus:border-violet-500 focus:ring-2"
-                />
-              ))}
+              <button
+                type="button"
+                onClick={() => switchMode(otpContext?.returnMode ?? "login")}
+                className="w-full text-sm font-medium text-violet-700 hover:underline"
+              >
+                Change phone/email
+              </button>
             </div>
-            <button
-              type="button"
-              onClick={() => void verifyOtp()}
-              disabled={loading || otp.some((value) => value === "")}
-              className="mt-4 w-full rounded-xl bg-gradient-to-r from-purple-600 to-indigo-600 py-3 text-sm font-semibold text-white transition hover:opacity-95 disabled:opacity-60"
-            >
-              {loading ? "Verifying..." : "Verify"}
-            </button>
-            <button
-              type="button"
-              onClick={() => void resendOtp()}
-              disabled={loading || cooldown > 0}
-              className="mt-3 w-full rounded-xl border border-violet-200 py-3 text-sm font-semibold text-violet-700 transition hover:bg-violet-50 disabled:opacity-60"
-            >
-              {cooldown > 0 ? `Resend OTP in ${cooldown}s` : "Resend OTP"}
-            </button>
-            <button
-              type="button"
-              onClick={() => switchMode(otpContext?.returnMode ?? "login")}
-              className="mt-3 w-full text-sm font-medium text-violet-700 hover:underline"
-            >
-              Change number/email
-            </button>
-          </>
-        ) : null}
+          ) : null}
 
-        {error ? (
-          <p className="mt-4 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700" role="alert">
-            {error}
-          </p>
-        ) : null}
+          {error ? (
+            <p className="mt-4 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700" role="alert">
+              {error}
+            </p>
+          ) : null}
+        </form>
 
         <p className="mt-6 text-center text-xs text-slate-500">
           <Link href="/" className="text-violet-700 hover:underline">

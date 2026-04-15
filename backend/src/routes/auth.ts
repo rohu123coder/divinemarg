@@ -221,11 +221,11 @@ router.post("/send-otp", async (req: Request, res: Response) => {
   }
 
   try {
-    if (byPhone) {
-      await Promise.all([sendSmsOTP(user.phone, otp), sendEmailOTP(user.email, otp)]);
-    } else {
-      await Promise.all([sendEmailOTP(user.email, otp), sendSmsOTP(user.phone, otp)]);
+    const deliveryTasks: Array<Promise<void>> = [sendSmsOTP(user.phone, otp)];
+    if (user.email) {
+      deliveryTasks.push(sendEmailOTP(user.email, otp));
     }
+    await Promise.all(deliveryTasks);
   } catch (e) {
     console.error("OTP delivery failed:", e);
     res.status(500).json({ success: false, error: "Failed to send OTP" });
