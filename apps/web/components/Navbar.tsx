@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 
 import { useAuthStore } from "@/lib/store";
@@ -14,6 +15,7 @@ function formatMoney(n: number): string {
 }
 
 export function Navbar() {
+  const router = useRouter();
   const { user, isLoggedIn, logout } = useAuthStore();
   const [mounted, setMounted] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
@@ -122,12 +124,20 @@ export function Navbar() {
               <Link
                 href="/login"
                 className="rounded-full px-3 py-2 text-sm font-semibold text-slate-700 transition hover:bg-violet-50"
+                onClick={(event) => {
+                  event.preventDefault();
+                  router.push("/login");
+                }}
               >
                 Sign In
               </Link>
               <Link
                 href="/login?tab=register"
                 className="rounded-full bg-gradient-to-r from-violet-600 to-indigo-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:opacity-95"
+                onClick={(event) => {
+                  event.preventDefault();
+                  router.push("/login?tab=register");
+                }}
               >
                 Sign Up
               </Link>
@@ -246,14 +256,22 @@ export function Navbar() {
                 <Link
                   href="/login"
                   className="rounded-full border border-violet-200 px-4 py-2.5 text-center text-sm font-semibold text-violet-700"
-                  onClick={() => setMenuOpen(false)}
+                  onClick={(event) => {
+                    event.preventDefault();
+                    setMenuOpen(false);
+                    router.push("/login");
+                  }}
                 >
                   Sign In
                 </Link>
                 <Link
                   href="/login?tab=register"
                   className="rounded-full bg-gradient-to-r from-violet-600 to-indigo-600 px-4 py-2.5 text-center text-sm font-semibold text-white"
-                  onClick={() => setMenuOpen(false)}
+                  onClick={(event) => {
+                    event.preventDefault();
+                    setMenuOpen(false);
+                    router.push("/login?tab=register");
+                  }}
                 >
                   Sign Up
                 </Link>

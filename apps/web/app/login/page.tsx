@@ -11,8 +11,9 @@ function LoginContent() {
   const searchParams = useSearchParams();
   const setUser = useAuthStore((s) => s.setUser);
   const { isLoggedIn, token, user } = useAuthStore();
+  const tabParam = searchParams.get("tab");
   const [mode, setMode] = useState<"login"|"register"|"verify">(
-    searchParams.get("tab") === "register" ? "register" : "login"
+    tabParam === "register" ? "register" : "login"
   );
   const [identifier, setIdentifier] = useState("");
   const [name, setName] = useState("");
@@ -30,6 +31,14 @@ function LoginContent() {
   useEffect(() => {
     if (isLoggedIn && token && user?.role === "astrologer") router.replace("/astrologer/dashboard");
   }, [isLoggedIn, token, user?.role, router]);
+
+  useEffect(() => {
+    if (tabParam === "register") {
+      setMode("register");
+    } else if (tabParam === null || tabParam === "login") {
+      setMode("login");
+    }
+  }, [tabParam]);
 
   useEffect(() => {
     if (countdown > 0) { const t = setTimeout(() => setCountdown(c => c-1), 1000); return () => clearTimeout(t); }
