@@ -14,7 +14,8 @@ const geistMono = localFont({
 });
 
 export const metadata: Metadata = {
-  title: "DivineMarg — Talk to India's Best Astrologers",
+  title: "DivineMarg — Talk to India's Top Astrologers",
+  icons: { icon: "/logo.png" },
   description:
     "Get answers from India’s best astrologers. Wallet-powered live chat on DivineMarg.",
 };
