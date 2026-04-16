@@ -1,0 +1,29 @@
+commit 861ad37669d633fb9d31e369356cca1976fb6c2a
+Author: rohit <rohit@Mac.lan>
+Date:   Thu Apr 16 15:46:25 2026 +0530
+
+    feat: astrologer signup flow — register page, pending approval screen, navbar login button
+    
+    - Navbar: Astrologer Login link added (desktop + mobile)
+    - /astrologer/login: Register here link added
+    - /astrologer/register: 2-step signup form (account + profile details)
+    - /astrologer/pending: under review screen
+    - Backend: POST /api/auth/astrologer/register route
+    - Backend: login returns 403 with clear message if not approved yet
+    - Dashboard: redirects to /pending if not approved
+    
+    Made-with: Cursor
+
+diff --git a/apps/web/lib/store.ts b/apps/web/lib/store.ts
+index 9d4c7c5..2434f84 100644
+--- a/apps/web/lib/store.ts
++++ b/apps/web/lib/store.ts
+@@ -10,6 +10,8 @@ export type AuthUser = {
+   role?: "user" | "astrologer";
+   /** Set when `role === "astrologer"` — public astrologer row id for profile APIs */
+   astrologerId?: string;
++  /** Set when `role === "astrologer"` — approval status for dashboard access */
++  isApproved?: boolean;
+ };
+ 
+ type AuthState = {

@@ -1,0 +1,112 @@
+diff --git a/apps/web/app/astrologer/pending/page.tsx b/apps/web/app/astrologer/pending/page.tsx
+new file mode 100644
+index 0000000..5f68057
+--- /dev/null
++++ b/apps/web/app/astrologer/pending/page.tsx
+@@ -0,0 +1,106 @@
++"use client";
++
++import { useEffect, useState } from "react";
++import Link from "next/link";
++import { useRouter } from "next/navigation";
++
++import { useAuthStore } from "@/lib/store";
++
++const PENDING_KEY = "divinemarg_astrologer_pending";
++
++export default function AstrologerPendingPage() {
++  const router = useRouter();
++  const { user, isLoggedIn } = useAuthStore();
++
++  const [mounted, setMounted] = useState(false);
++  const [details, setDetails] = useState<{ name: string; email: string } | null>(
++    null
++  );
++
++  useEffect(() => {
++    setMounted(true);
++  }, []);
++
++  useEffect(() => {
++    if (!mounted) return;
++    try {
++      const raw = localStorage.getItem(PENDING_KEY);
++      if (!raw) return;
++      const parsed = JSON.parse(raw) as { name?: string; email?: string };
++      if (parsed?.name && parsed?.email) {
++        setDetails({ name: parsed.name, email: parsed.email });
++      }
++    } catch {
++      // Ignore malformed localStorage.
++    }
++  }, [mounted]);
++
++  useEffect(() => {
++    if (!mounted) return;
++    if (isLoggedIn && user?.role === "astrologer" && user?.isApproved) {
++      router.replace("/astrologer/dashboard");
++    }
++  }, [mounted, isLoggedIn, user?.role, user?.isApproved, router]);
++
++  if (!mounted) {
++    return (
++      <div className="flex min-h-screen items-center justify-center bg-slate-50">
++        <div className="h-10 w-10 animate-spin rounded-full border-2 border-violet-500 border-t-transparent" />
++      </div>
++    );
++  }
++
++  const name = details?.name ?? "Astrologer";
++  const email = details?.email ?? "your email";
++
++  return (
++    <div className="min-h-screen bg-gradient-to-b from-violet-50 to-white">
++      <div className="mx-auto flex max-w-xl flex-col px-4 py-12 sm:px-6">
++        <h1 className="text-2xl font-bold text-slate-900">
++          Application Submitted
++        </h1>
++
++        <p className="mt-3 text-sm text-slate-700">
++          Your application is under review. We&apos;ll notify you at{" "}
++          <span className="font-semibold text-slate-900">{email}</span> once approved.
++          This usually takes 24-48 hours.
++        </p>
++
++        <div className="mt-8 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
++          <h2 className="text-sm font-semibold text-slate-900">
++            Submitted details
++          </h2>
++
++          <div className="mt-4 grid gap-3 sm:grid-cols-2">
++            <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
++              <p className="text-xs font-medium uppercase tracking-wide text-slate-500">
++                Name
++              </p>
++              <p className="mt-1 text-sm font-semibold text-slate-900">
++                {name}
++              </p>
++            </div>
++            <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
++              <p className="text-xs font-medium uppercase tracking-wide text-slate-500">
++                Email
++              </p>
++              <p className="mt-1 text-sm font-semibold text-slate-900">
++                {email}
++              </p>
++            </div>
++          </div>
++        </div>
++
++        <div className="mt-8 flex items-center justify-center">
++          <Link
++            href="/"
++            className="rounded-xl bg-gradient-to-r from-purple-600 to-orange-500 px-6 py-3 text-sm font-semibold text-white shadow-md transition hover:opacity-95"
++          >
++            Go to Home
++          </Link>
++        </div>
++      </div>
++    </div>
++  );
++}
++

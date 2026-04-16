@@ -29,6 +29,8 @@ type AstrologerListRow = {
   total_reviews: number;
   price_per_minute: string | null;
   is_available: boolean;
+  is_online: boolean;
+  is_verified: boolean;
   experience_years: number | null;
   name: string;
   avatar_url: string | null;
@@ -50,33 +52,6 @@ function listOrderClause(sort: z.infer<typeof listQuerySchema>["sort"]): string 
   }
 }
 
-async function buildPublicVisibilityConditions(alias: string): Promise<string[]> {
-  const columnsResult = await query<{ column_name: string }>(
-    `SELECT column_name
-     FROM information_schema.columns
-     WHERE table_schema = 'public'
-       AND table_name = 'astrologers'
-       AND column_name = ANY($1::text[])`,
-    [["is_verified", "is_approved", "is_active", "status"]]
-  );
-  const columns = new Set(columnsResult.rows.map((row) => row.column_name));
-  const conditions: string[] = [];
-
-  if (columns.has("is_active")) {
-    conditions.push(`${alias}.is_active = true`);
-  }
-
-  if (columns.has("is_approved")) {
-    conditions.push(`${alias}.is_approved = true`);
-  } else if (columns.has("status")) {
-    conditions.push(`LOWER(COALESCE(${alias}.status::text, '')) = 'verified'`);
-  } else if (columns.has("is_verified")) {
-    conditions.push(`${alias}.is_verified = true`);
-  }
-
-  return conditions;
-}
-
 router.get("/", async (req: Request, res: Response) => {
   const parsed = listQuerySchema.safeParse(req.query);
   if (!parsed.success) {
@@ -91,7 +66,7 @@ router.get("/", async (req: Request, res: Response) => {
   const offset = (page - 1) * limit;
   const orderBy = listOrderClause(sort);
 
-  const conditions = await buildPublicVisibilityConditions("a");
+  const conditions: string[] = ["(a.is_verified = true OR a.is_approved = true)"];
   const params: unknown[] = [];
   let p = 1;
 
@@ -130,6 +105,8 @@ router.get("/", async (req: Request, res: Response) => {
        a.total_reviews,
        a.price_per_minute,
        a.is_available,
+       a.is_online,
+       a.is_verified,
        a.experience_years,
        u.name,
        u.avatar_url,
@@ -163,6 +140,8 @@ router.get("/", async (req: Request, res: Response) => {
     price_per_minute:
       row.price_per_minute != null ? Number(row.price_per_minute) : null,
     is_available: row.is_available,
+    is_online: row.is_online,
+    is_verified: row.is_verified,
     experience_years: row.experience_years,
     name: row.name,
     avatar_url: row.avatar_url,
@@ -380,7 +359,8 @@ router.put(
 );
 
 const availabilityBody = z.object({
-  is_available: z.boolean(),
+  is_online: z.boolean().optional(),
+  is_available: z.boolean().optional(),
 });
 
 router.put(
@@ -403,10 +383,25 @@ router.put(
       return;
     }
 
-    const result = await query<{ is_available: boolean }>(
-      `UPDATE astrologers SET is_available = $1 WHERE user_id = $2
-       RETURNING is_available`,
-      [parsed.data.is_available, userId]
+    const nextOnline =
+      typeof parsed.data.is_online === "boolean"
+        ? parsed.data.is_online
+        : parsed.data.is_available;
+    if (typeof nextOnline !== "boolean") {
+      res.status(400).json({
+        success: false,
+        error: "is_online (or is_available) is required",
+      });
+      return;
+    }
+
+    const result = await query<{ is_available: boolean; is_online: boolean }>(
+      `UPDATE astrologers
+       SET is_online = $1,
+           is_available = $1
+       WHERE user_id = $2
+       RETURNING is_available, is_online`,
+      [nextOnline, userId]
     );
 
     const row = result.rows[0];
@@ -415,7 +410,10 @@ router.put(
       return;
     }
 
-    res.json({ success: true, data: { is_available: row.is_available } });
+    res.json({
+      success: true,
+      data: { is_available: row.is_available, is_online: row.is_online },
+    });
   }
 );
 
@@ -453,10 +451,7 @@ router.get("/:id", optionalAuthMiddleware, async (req: Request, res: Response) =
   }
   const id = idParse.data;
   const viewerId = req.user?.userId ?? null;
-  const publicVisibilityConditions = await buildPublicVisibilityConditions("a");
-  const publicVisibilitySql = publicVisibilityConditions.length
-    ? publicVisibilityConditions.join(" AND ")
-    : "TRUE";
+  const publicVisibilitySql = "(a.is_verified = true OR a.is_approved = true)";
 
   const result = await query<DetailRow>(
     `SELECT

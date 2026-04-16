@@ -17,6 +17,7 @@ type DashboardData = {
   rating: number | null;
   total_reviews: number;
   is_available: boolean;
+  is_online?: boolean;
 };
 
 type IncomingRequest = {
@@ -200,8 +201,21 @@ export default function AstrologerDashboardPage() {
     }
     setAvailLoading(true);
     try {
-      await api.put(`/api/astrologers/availability`, { is_available });
-      setDash({ ...dash, is_available });
+      const res = await api.put(`/api/astrologers/availability`, {
+        is_online: is_available,
+      });
+      const next = res.data?.data as
+        | { is_available?: boolean; is_online?: boolean }
+        | undefined;
+      setDash({
+        ...dash,
+        is_available:
+          typeof next?.is_available === "boolean"
+            ? next.is_available
+            : is_available,
+        is_online:
+          typeof next?.is_online === "boolean" ? next.is_online : is_available,
+      });
     } finally {
       setAvailLoading(false);
     }

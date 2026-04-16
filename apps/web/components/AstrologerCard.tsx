@@ -20,6 +20,8 @@ export type AstrologerCardProps = {
   rating: number | null;
   price_per_minute: number | null;
   is_available: boolean;
+  is_online?: boolean;
+  is_verified?: boolean;
   is_busy?: boolean;
   waiting_count?: number;
   experience_years: number | null;
@@ -37,6 +39,7 @@ export function AstrologerCard({
   rating,
   price_per_minute,
   is_available,
+  is_online = false,
   is_busy = false,
   waiting_count = 0,
   experience_years,
@@ -79,12 +82,12 @@ export function AstrologerCard({
               className={`inline-flex rounded-full px-2 py-0.5 text-xs font-semibold ${
                 is_busy
                   ? "bg-amber-50 text-amber-700 ring-1 ring-amber-200"
-                  : is_available
+                  : is_available || is_online
                   ? "bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200"
                   : "bg-slate-100 text-slate-500 ring-1 ring-slate-200"
               }`}
             >
-              {is_busy ? "Busy" : is_available ? "Online" : "Offline"}
+              {is_busy ? "Busy" : is_available || is_online ? "Online" : "Offline"}
             </span>
             {is_busy ? (
               <span className="inline-flex rounded-full bg-orange-50 px-2 py-0.5 text-xs font-semibold text-orange-700 ring-1 ring-orange-100">
@@ -121,7 +124,7 @@ export function AstrologerCard({
       </p>
 
       <div className="mt-auto pt-4">
-        {is_available || is_busy ? (
+        {is_available || is_online || is_busy ? (
           <div className="flex items-center gap-2">
             {onChatNow ? (
               <button
@@ -141,7 +144,7 @@ export function AstrologerCard({
               </Link>
             )}
 
-            {is_available && !is_busy ? (
+            {(is_available || is_online) && !is_busy ? (
               <>
                 <button
                   type="button"

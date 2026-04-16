@@ -17,6 +17,8 @@ type Astro = {
   rating: number | null;
   price_per_minute: number | null;
   is_available: boolean;
+  is_online: boolean;
+  is_verified: boolean;
   is_busy: boolean;
   waiting_count: number;
   experience_years: number | null;
@@ -385,6 +387,8 @@ export default function AstrologersPage() {
                     key={a.id}
                     {...a}
                     languages={a.languages}
+                    is_online={a.is_online}
+                    is_verified={a.is_verified}
                     actionLoading={actionLoadingKey?.startsWith(a.id) ?? false}
                     onChatNow={() => handleCardAction(a, "chat")}
                     onVoiceCall={() => handleCardAction(a, "voice")}

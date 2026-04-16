@@ -1,0 +1,78 @@
+commit 861ad37669d633fb9d31e369356cca1976fb6c2a
+Author: rohit <rohit@Mac.lan>
+Date:   Thu Apr 16 15:46:25 2026 +0530
+
+    feat: astrologer signup flow — register page, pending approval screen, navbar login button
+    
+    - Navbar: Astrologer Login link added (desktop + mobile)
+    - /astrologer/login: Register here link added
+    - /astrologer/register: 2-step signup form (account + profile details)
+    - /astrologer/pending: under review screen
+    - Backend: POST /api/auth/astrologer/register route
+    - Backend: login returns 403 with clear message if not approved yet
+    - Dashboard: redirects to /pending if not approved
+    
+    Made-with: Cursor
+
+diff --git a/apps/web/app/astrologer/login/page.tsx b/apps/web/app/astrologer/login/page.tsx
+index 56224ca..9fbe984 100644
+--- a/apps/web/app/astrologer/login/page.tsx
++++ b/apps/web/app/astrologer/login/page.tsx
+@@ -10,6 +10,9 @@ import { useAuthStore, type AuthUser } from "@/lib/store";
+ type AstrologerLoginPayload = {
+   id: string;
+   user_id: string;
++  is_approved?: boolean;
++  /** Back-compat with existing backend column naming */
++  is_verified?: boolean;
+   user: {
+     name: string;
+     phone: string;
+@@ -37,12 +40,16 @@ export default function AstrologerLoginPage() {
+       return;
+     }
+     if (isLoggedIn && token && user?.role === "astrologer") {
+-      router.replace("/astrologer/dashboard");
++      if (user.isApproved === false) {
++        router.replace("/astrologer/pending");
++      } else {
++        router.replace("/astrologer/dashboard");
++      }
+     }
+     if (isLoggedIn && token && user?.role === "user") {
+       router.replace("/dashboard");
+     }
+-  }, [mounted, isLoggedIn, token, user?.role, router]);
++  }, [mounted, isLoggedIn, token, user?.role, user?.isApproved, router]);
+ 
+   const submit = async () => {
+     setError(null);
+@@ -72,9 +79,14 @@ export default function AstrologerLoginPage() {
+         wallet_balance: 0,
+         role: "astrologer",
+         astrologerId: a.id,
++        isApproved: Boolean(a.is_approved ?? a.is_verified ?? false),
+       };
+       setUser(authUser, data.token);
+-      router.replace("/astrologer/dashboard");
++      if (authUser.isApproved === false) {
++        router.replace("/astrologer/pending");
++      } else {
++        router.replace("/astrologer/dashboard");
++      }
+     } catch (e: unknown) {
+       const msg =
+         e &&
+@@ -147,6 +159,12 @@ export default function AstrologerLoginPage() {
+           >
+             {loading ? "Signing in…" : "Sign in"}
+           </button>
++          <Link
++            href="/astrologer/register"
++            className="block pt-2 text-center text-sm font-semibold text-slate-600 hover:text-violet-700"
++          >
++            New astrologer? Register here →
++          </Link>
+         </div>
+ 
+         <p className="mt-10 text-center text-sm text-slate-500">

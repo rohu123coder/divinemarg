@@ -1,0 +1,13 @@
+diff --git a/apps/web/lib/store.ts b/apps/web/lib/store.ts
+index 9d4c7c5..2434f84 100644
+--- a/apps/web/lib/store.ts
++++ b/apps/web/lib/store.ts
+@@ -10,6 +10,8 @@ export type AuthUser = {
+   role?: "user" | "astrologer";
+   /** Set when `role === "astrologer"` — public astrologer row id for profile APIs */
+   astrologerId?: string;
++  /** Set when `role === "astrologer"` — approval status for dashboard access */
++  isApproved?: boolean;
+ };
+ 
+ type AuthState = {

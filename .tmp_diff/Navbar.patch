@@ -1,0 +1,103 @@
+commit 861ad37669d633fb9d31e369356cca1976fb6c2a
+Author: rohit <rohit@Mac.lan>
+Date:   Thu Apr 16 15:46:25 2026 +0530
+
+    feat: astrologer signup flow — register page, pending approval screen, navbar login button
+    
+    - Navbar: Astrologer Login link added (desktop + mobile)
+    - /astrologer/login: Register here link added
+    - /astrologer/register: 2-step signup form (account + profile details)
+    - /astrologer/pending: under review screen
+    - Backend: POST /api/auth/astrologer/register route
+    - Backend: login returns 403 with clear message if not approved yet
+    - Dashboard: redirects to /pending if not approved
+    
+    Made-with: Cursor
+
+diff --git a/apps/web/components/Navbar.tsx b/apps/web/components/Navbar.tsx
+index 431d103..d26a564 100644
+--- a/apps/web/components/Navbar.tsx
++++ b/apps/web/components/Navbar.tsx
+@@ -141,6 +141,12 @@ export function Navbar() {
+               >
+                 Sign Up
+               </Link>
++              <Link
++                href="/astrologer/login"
++                className="text-sm font-semibold text-slate-600 transition hover:text-violet-700"
++              >
++                Astrologer Login
++              </Link>
+             </>
+           )}
+         </div>
+@@ -252,30 +258,45 @@ export function Navbar() {
+                 </button>
+               </>
+             ) : (
+-              <div className="grid grid-cols-2 gap-2">
+-                <Link
+-                  href="/login"
+-                  className="rounded-full border border-violet-200 px-4 py-2.5 text-center text-sm font-semibold text-violet-700"
+-                  onClick={(event) => {
+-                    event.preventDefault();
+-                    setMenuOpen(false);
+-                    router.push("/login");
+-                  }}
+-                >
+-                  Sign In
+-                </Link>
+-                <Link
+-                  href="/login?tab=register"
+-                  className="rounded-full bg-gradient-to-r from-violet-600 to-indigo-600 px-4 py-2.5 text-center text-sm font-semibold text-white"
+-                  onClick={(event) => {
+-                    event.preventDefault();
+-                    setMenuOpen(false);
+-                    router.push("/login?tab=register");
+-                  }}
+-                >
+-                  Sign Up
+-                </Link>
+-              </div>
++              <>
++                <div className="grid grid-cols-2 gap-2">
++                  <Link
++                    href="/login"
++                    className="rounded-full border border-violet-200 px-4 py-2.5 text-center text-sm font-semibold text-violet-700"
++                    onClick={(event) => {
++                      event.preventDefault();
++                      setMenuOpen(false);
++                      router.push("/login");
++                    }}
++                  >
++                    Sign In
++                  </Link>
++                  <Link
++                    href="/login?tab=register"
++                    className="rounded-full bg-gradient-to-r from-violet-600 to-indigo-600 px-4 py-2.5 text-center text-sm font-semibold text-white"
++                    onClick={(event) => {
++                      event.preventDefault();
++                      setMenuOpen(false);
++                      router.push("/login?tab=register");
++                    }}
++                  >
++                    Sign Up
++                  </Link>
++                </div>
++                <div className="mt-2">
++                  <Link
++                    href="/astrologer/login"
++                    className="block rounded-lg px-3 py-2 text-center text-sm font-semibold text-slate-600 transition hover:bg-violet-50 hover:text-violet-700"
++                    onClick={(event) => {
++                      event.preventDefault();
++                      setMenuOpen(false);
++                      router.push("/astrologer/login");
++                    }}
++                  >
++                    Astrologer Login
++                  </Link>
++                </div>
++              </>
+             )}
+           </div>
+         </div>
