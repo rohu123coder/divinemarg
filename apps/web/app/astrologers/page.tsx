@@ -12,6 +12,7 @@ type Astro = {
   id: string;
   name: string;
   avatar_url: string | null;
+  profile_photo_url: string | null;
   specializations: string[];
   languages: string[];
   rating: number | null;
@@ -19,6 +20,9 @@ type Astro = {
   is_available: boolean;
   is_online: boolean;
   is_verified: boolean;
+  chat_available: boolean;
+  voice_available: boolean;
+  video_available: boolean;
   is_busy: boolean;
   waiting_count: number;
   experience_years: number | null;
@@ -228,7 +232,15 @@ export default function AstrologersPage() {
       try {
         const rows = await fetchAllAstrologers(sort);
         if (!cancelled) {
-          setAll(rows);
+          setAll(
+            rows.map((a) => ({
+              ...a,
+              profile_photo_url: a.profile_photo_url ?? null,
+              chat_available: a.chat_available ?? true,
+              voice_available: a.voice_available ?? false,
+              video_available: a.video_available ?? false,
+            }))
+          );
         }
       } catch {
         if (!cancelled) {

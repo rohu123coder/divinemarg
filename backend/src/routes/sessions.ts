@@ -9,6 +9,51 @@ const router = Router();
 router.use(authMiddleware);
 
 router.get(
+  "/:sessionId/context",
+  async (req, res) => {
+    const userId = req.user?.userId;
+    if (!userId) {
+      res.status(401).json({ success: false, error: "Unauthorized" });
+      return;
+    }
+
+    const idParse = z.string().uuid().safeParse(req.params.sessionId);
+    if (!idParse.success) {
+      res.status(400).json({ success: false, error: "Invalid session id" });
+      return;
+    }
+    const sessionId = idParse.data;
+
+    const row = await pool.query<{
+      astrologer_name: string;
+      photo: string | null;
+    }>(
+      `SELECT u.name AS astrologer_name,
+              COALESCE(NULLIF(TRIM(a.profile_photo_url), ''), NULLIF(TRIM(u.profile_photo_url), ''), u.avatar_url) AS photo
+       FROM chat_sessions cs
+       INNER JOIN astrologers a ON a.id = cs.astrologer_id
+       INNER JOIN users u ON u.id = a.user_id
+       WHERE cs.id = $1 AND cs.user_id = $2`,
+      [sessionId, userId]
+    );
+
+    const data = row.rows[0];
+    if (!data) {
+      res.status(404).json({ success: false, error: "Session not found" });
+      return;
+    }
+
+    res.json({
+      success: true,
+      data: {
+        astrologer_name: data.astrologer_name,
+        profile_photo_url: data.photo,
+      },
+    });
+  }
+);
+
+router.get(
   "/:sessionId/call-token",
   async (req, res) => {
     const userId = req.user?.userId;

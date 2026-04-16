@@ -1,3 +1,6 @@
+import { mkdirSync } from "node:fs";
+import path from "node:path";
+
 import cors from "cors";
 import dotenv from "dotenv";
 import express from "express";
@@ -24,6 +27,10 @@ if (!process.env.JWT_SECRET) {
 const app = express();
 app.use(cors({ origin: "*" }));
 app.use(express.json());
+
+const uploadDir = path.join(process.cwd(), "uploads");
+mkdirSync(uploadDir, { recursive: true });
+app.use("/uploads", express.static(uploadDir));
 
 app.get("/health", (_req, res) => {
   res.json({ ok: true });

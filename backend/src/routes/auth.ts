@@ -582,6 +582,8 @@ router.post("/astrologer/login", async (req: Request, res: Response) => {
     u_name: string;
     u_phone: string;
     u_avatar_url: string | null;
+    u_profile_photo_url: string | null;
+    a_profile_photo_url: string | null;
   };
 
   const result = await query<LoginRow>(
@@ -601,7 +603,9 @@ router.post("/astrologer/login", async (req: Request, res: Response) => {
        u.email AS u_email,
        u.name AS u_name,
        u.phone AS u_phone,
-       u.avatar_url AS u_avatar_url
+       u.avatar_url AS u_avatar_url,
+       u.profile_photo_url AS u_profile_photo_url,
+       a.profile_photo_url AS a_profile_photo_url
      FROM users u
      INNER JOIN astrologers a ON a.user_id = u.id
      WHERE u.email = $1`,
@@ -654,6 +658,8 @@ router.post("/astrologer/login", async (req: Request, res: Response) => {
       name: row.u_name,
       phone: row.u_phone,
       avatar_url: row.u_avatar_url,
+      profile_photo_url:
+        row.a_profile_photo_url ?? row.u_profile_photo_url ?? null,
     },
   };
 

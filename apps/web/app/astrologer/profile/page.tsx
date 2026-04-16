@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { AstrologerNavbar } from "@/components/AstrologerNavbar";
 import api from "@/lib/api";
@@ -32,11 +32,12 @@ type ProfileDetail = {
   languages: string[];
   price_per_minute: number | null;
   experience_years: number | null;
+  profile_photo_url: string | null;
 };
 
 export default function AstrologerProfilePage() {
   const router = useRouter();
-  const { user, token, isLoggedIn } = useAuthStore();
+  const { user, token, isLoggedIn, setUser } = useAuthStore();
   const [mounted, setMounted] = useState(false);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -46,6 +47,19 @@ export default function AstrologerProfilePage() {
   const [langs, setLangs] = useState<Set<string>>(new Set());
   const [price, setPrice] = useState<number>(5);
   const [experienceYears, setExperienceYears] = useState<number>(0);
+  const [profilePhotoUrl, setProfilePhotoUrl] = useState<string | null>(null);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [pendingFile, setPendingFile] = useState<File | null>(null);
+  const [photoUploading, setPhotoUploading] = useState(false);
+  const [photoMessage, setPhotoMessage] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const photoInitials = useMemo(() => {
+    const parts = (user?.name ?? "").trim().split(/\s+/).filter(Boolean);
+    const a = parts[0]?.[0] ?? "?";
+    const b = parts[1]?.[0] ?? "";
+    return (a + b).toUpperCase();
+  }, [user?.name]);
 
   const load = useCallback(async (astroId: string) => {
     setLoading(true);
@@ -60,6 +74,9 @@ export default function AstrologerProfilePage() {
       setLangs(new Set(a.languages ?? []));
       setPrice(Math.max(5, a.price_per_minute ?? 5));
       setExperienceYears(a.experience_years ?? 0);
+      setProfilePhotoUrl(a.profile_photo_url ?? null);
+      setPreviewUrl(null);
+      setPendingFile(null);
     } finally {
       setLoading(false);
     }
@@ -100,6 +117,62 @@ export default function AstrologerProfilePage() {
       n.delete(key);
     }
     return n;
+  };
+
+  const onPhotoChosen = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const f = e.target.files?.[0];
+    if (!f) {
+      return;
+    }
+    if (f.size > 2 * 1024 * 1024) {
+      setPhotoMessage("Image must be 2MB or smaller.");
+      return;
+    }
+    if (!/^image\/(jpeg|png|webp)$/i.test(f.type)) {
+      setPhotoMessage("Use JPG, PNG, or WebP.");
+      return;
+    }
+    setPhotoMessage(null);
+    setPendingFile(f);
+    setPreviewUrl((prev) => {
+      if (prev?.startsWith("blob:")) {
+        URL.revokeObjectURL(prev);
+      }
+      return URL.createObjectURL(f);
+    });
+  };
+
+  const savePhoto = async () => {
+    if (!pendingFile || !token || !user) {
+      return;
+    }
+    setPhotoUploading(true);
+    setPhotoMessage(null);
+    try {
+      const fd = new FormData();
+      fd.append("photo", pendingFile);
+      const res = await api.post(`/api/astrologers/photo`, fd);
+      const url = res.data?.data?.photo_url as string | undefined;
+      if (url) {
+        setProfilePhotoUrl(url);
+        setPendingFile(null);
+        setPreviewUrl((prev) => {
+          if (prev?.startsWith("blob:")) {
+            URL.revokeObjectURL(prev);
+          }
+          return null;
+        });
+        setPhotoMessage("Photo saved.");
+        setUser({ ...user, profile_photo_url: url }, token);
+        if (fileInputRef.current) {
+          fileInputRef.current.value = "";
+        }
+      }
+    } catch {
+      setPhotoMessage("Could not upload photo.");
+    } finally {
+      setPhotoUploading(false);
+    }
   };
 
   const save = async () => {
@@ -153,7 +226,60 @@ export default function AstrologerProfilePage() {
             <div className="h-10 w-10 animate-spin rounded-full border-2 border-violet-500 border-t-transparent" />
           </div>
         ) : (
-          <form
+          <>
+            <section className="mt-8 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+              <h2 className="text-lg font-semibold text-slate-900">
+                Profile photo
+              </h2>
+              <p className="mt-1 text-sm text-slate-600">
+                JPG, PNG, or WebP. Maximum size 2MB.
+              </p>
+              <div className="mt-4 flex flex-col items-start gap-4 sm:flex-row sm:items-center">
+                {previewUrl || profilePhotoUrl ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={previewUrl ?? profilePhotoUrl ?? ""}
+                    alt=""
+                    className="h-24 w-24 rounded-full object-cover ring-2 ring-violet-100"
+                  />
+                ) : (
+                  <div className="flex h-24 w-24 items-center justify-center rounded-full bg-gradient-to-br from-violet-500 to-orange-400 text-2xl font-bold text-white ring-2 ring-violet-100">
+                    {photoInitials}
+                  </div>
+                )}
+                <div className="flex flex-col gap-2">
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept="image/jpeg,image/png,image/webp,image/*"
+                    className="hidden"
+                    onChange={onPhotoChosen}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => fileInputRef.current?.click()}
+                    className="rounded-xl border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-800 hover:bg-slate-50"
+                  >
+                    Change Photo
+                  </button>
+                  {pendingFile ? (
+                    <button
+                      type="button"
+                      disabled={photoUploading}
+                      onClick={() => void savePhoto()}
+                      className="rounded-xl bg-gradient-to-r from-purple-600 to-orange-500 px-4 py-2 text-sm font-semibold text-white shadow-md disabled:opacity-60"
+                    >
+                      {photoUploading ? "Uploading…" : "Save Photo"}
+                    </button>
+                  ) : null}
+                  {photoMessage ? (
+                    <p className="text-sm text-slate-600">{photoMessage}</p>
+                  ) : null}
+                </div>
+              </div>
+            </section>
+
+            <form
             className="mt-8 space-y-8 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm"
             onSubmit={(e) => {
               e.preventDefault();
@@ -263,6 +389,7 @@ export default function AstrologerProfilePage() {
               {saving ? "Saving…" : "Save profile"}
             </button>
           </form>
+          </>
         )}
       </main>
     </div>

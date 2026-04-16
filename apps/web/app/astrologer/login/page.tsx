@@ -17,6 +17,7 @@ type AstrologerLoginPayload = {
     name: string;
     phone: string;
     avatar_url: string | null;
+    profile_photo_url?: string | null;
     email: string;
   };
 };
@@ -76,6 +77,7 @@ export default function AstrologerLoginPage() {
         name: a.user.name,
         phone: a.user.phone,
         avatar_url: a.user.avatar_url,
+        profile_photo_url: a.user.profile_photo_url ?? null,
         wallet_balance: 0,
         role: "astrologer",
         astrologerId: a.id,

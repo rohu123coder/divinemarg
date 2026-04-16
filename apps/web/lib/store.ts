@@ -6,6 +6,8 @@ export type AuthUser = {
   name: string;
   phone: string;
   avatar_url: string | null;
+  /** Profile image (astrologer uploads); falls back to avatar_url in UI when absent */
+  profile_photo_url?: string | null;
   wallet_balance: number;
   role?: "user" | "astrologer";
   /** Set when `role === "astrologer"` — public astrologer row id for profile APIs */

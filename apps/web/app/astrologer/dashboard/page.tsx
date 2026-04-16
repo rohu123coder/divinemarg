@@ -17,7 +17,10 @@ type DashboardData = {
   rating: number | null;
   total_reviews: number;
   is_available: boolean;
-  is_online?: boolean;
+  is_online: boolean;
+  chat_available: boolean;
+  voice_available: boolean;
+  video_available: boolean;
 };
 
 type IncomingRequest = {
@@ -40,7 +43,7 @@ export default function AstrologerDashboardPage() {
   const [dash, setDash] = useState<DashboardData | null>(null);
   const [dashLoading, setDashLoading] = useState(true);
   const [dashError, setDashError] = useState<string | null>(null);
-  const [availLoading, setAvailLoading] = useState(false);
+  const [availField, setAvailField] = useState<string | null>(null);
   const [incoming, setIncoming] = useState<IncomingRequest | null>(null);
   const [countdown, setCountdown] = useState(30);
   const [waitlistNotice, setWaitlistNotice] = useState<WaitlistEntry | null>(null);
@@ -56,10 +59,26 @@ export default function AstrologerDashboardPage() {
     setDashError(null);
     try {
       const res = await api.get(`/api/astrologers/dashboard`);
-      const d = res.data?.data as DashboardData | undefined;
-      if (!d) {
+      const raw = res.data?.data as Omit<
+        DashboardData,
+        "is_online" | "chat_available" | "voice_available" | "video_available"
+      > &
+        Partial<
+          Pick<
+            DashboardData,
+            "is_online" | "chat_available" | "voice_available" | "video_available"
+          >
+        >;
+      if (!raw) {
         throw new Error("Invalid response");
       }
+      const d: DashboardData = {
+        ...raw,
+        is_online: raw.is_online ?? raw.is_available ?? false,
+        chat_available: raw.chat_available ?? true,
+        voice_available: raw.voice_available ?? false,
+        video_available: raw.video_available ?? false,
+      };
       setDash(d);
     } catch {
       setDashError("Could not load dashboard");
@@ -195,31 +214,59 @@ export default function AstrologerDashboardPage() {
     };
   }, [incoming]);
 
-  const setAvailability = async (is_available: boolean) => {
-    if (!dash) {
-      return;
-    }
-    setAvailLoading(true);
-    try {
-      const res = await api.put(`/api/astrologers/availability`, {
-        is_online: is_available,
-      });
-      const next = res.data?.data as
-        | { is_available?: boolean; is_online?: boolean }
-        | undefined;
-      setDash({
-        ...dash,
-        is_available:
-          typeof next?.is_available === "boolean"
-            ? next.is_available
-            : is_available,
-        is_online:
-          typeof next?.is_online === "boolean" ? next.is_online : is_available,
-      });
-    } finally {
-      setAvailLoading(false);
-    }
-  };
+  const patchAvailability = useCallback(
+    async (
+      patch: {
+        is_online?: boolean;
+        chat_available?: boolean;
+        voice_available?: boolean;
+        video_available?: boolean;
+      },
+      fieldKey: string
+    ) => {
+      if (!dash) {
+        return;
+      }
+      const prev = dash;
+      setDash({ ...dash, ...patch });
+      setAvailField(fieldKey);
+      setDashError(null);
+      try {
+        const res = await api.patch(`/api/astrologers/availability`, patch);
+        const next = res.data?.data as
+          | {
+              is_available: boolean;
+              is_online: boolean;
+              chat_available: boolean;
+              voice_available: boolean;
+              video_available: boolean;
+            }
+          | undefined;
+        if (next) {
+          setDash((cur) =>
+            cur
+              ? {
+                  ...cur,
+                  is_available: next.is_available,
+                  is_online: next.is_online,
+                  chat_available: next.chat_available,
+                  voice_available: next.voice_available,
+                  video_available: next.video_available,
+                }
+              : null
+          );
+        }
+      } catch {
+        setDash(prev);
+        setDashError("Could not update availability");
+      } finally {
+        setAvailField(null);
+      }
+    },
+    [dash]
+  );
+
+  const availBusy = Boolean(availField);
 
   const onAccept = () => {
     if (!incoming || !socketRef.current) {
@@ -307,40 +354,153 @@ export default function AstrologerDashboardPage() {
         </p>
 
         <section className="mt-8 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-          <div className="flex flex-wrap items-center justify-between gap-4">
-            <div>
-              <h2 className="text-lg font-semibold text-slate-900">
-                Availability
-              </h2>
-              <p className="text-sm text-slate-600">
-                {dash?.is_available
-                  ? "You appear online to new chat requests."
-                  : "You are offline — users won’t reach you for new chats."}
-              </p>
-            </div>
-            <button
-              type="button"
-              disabled={dashLoading || availLoading || !dash}
-              onClick={() => {
-                if (dash) {
-                  void setAvailability(!dash.is_available);
-                }
-              }}
-              className={`relative h-14 w-28 shrink-0 rounded-full transition ${
-                dash?.is_available
-                  ? "bg-emerald-500 shadow-inner"
-                  : "bg-slate-300"
-              } disabled:opacity-50`}
-              aria-pressed={dash?.is_available ?? false}
-            >
-              <span
-                className={`absolute top-1 flex h-12 w-12 items-center justify-center rounded-full bg-white text-xs font-bold shadow-md transition-all ${
-                  dash?.is_available ? "left-[calc(100%-3.25rem)]" : "left-1"
-                }`}
+          <h2 className="text-lg font-semibold text-slate-900">
+            Availability Settings
+          </h2>
+          <p className="mt-1 text-sm text-slate-500">
+            Control whether you appear online and which services you accept.
+          </p>
+
+          <div className="mt-6 space-y-6">
+            <div className="flex flex-wrap items-center justify-between gap-4 border-b border-slate-100 pb-6">
+              <div className="min-w-0">
+                <h3 className="font-semibold text-slate-900">Online</h3>
+                <p className="text-sm text-slate-600">
+                  {dash?.is_online
+                    ? "You are online — users can see you when services are enabled."
+                    : "You are offline — all services are hidden from users."}
+                </p>
+              </div>
+              <button
+                type="button"
+                disabled={dashLoading || availBusy || !dash}
+                onClick={() => {
+                  if (dash) {
+                    void patchAvailability(
+                      { is_online: !dash.is_online },
+                      "online"
+                    );
+                  }
+                }}
+                className={`relative h-14 w-28 shrink-0 rounded-full transition ${
+                  dash?.is_online ? "bg-emerald-500 shadow-inner" : "bg-slate-300"
+                } disabled:opacity-50`}
+                aria-pressed={dash?.is_online ?? false}
               >
-                {dash?.is_available ? "ON" : "OFF"}
-              </span>
-            </button>
+                <span
+                  className={`absolute top-1 flex h-12 w-12 items-center justify-center rounded-full bg-white text-xs font-bold shadow-md transition-all ${
+                    dash?.is_online ? "left-[calc(100%-3.25rem)]" : "left-1"
+                  }`}
+                >
+                  {dash?.is_online ? "ON" : "OFF"}
+                </span>
+              </button>
+            </div>
+
+            <div className="flex flex-wrap items-center justify-between gap-4 border-b border-slate-100 pb-6">
+              <div className="min-w-0">
+                <h3 className="font-semibold text-slate-900">Chat</h3>
+                <p className="text-sm text-slate-600">Accept chat requests</p>
+              </div>
+              <button
+                type="button"
+                disabled={dashLoading || availBusy || !dash}
+                onClick={() => {
+                  if (dash) {
+                    void patchAvailability(
+                      { chat_available: !dash.chat_available },
+                      "chat"
+                    );
+                  }
+                }}
+                className={`relative h-14 w-28 shrink-0 rounded-full transition ${
+                  dash?.chat_available
+                    ? "bg-emerald-500 shadow-inner"
+                    : "bg-slate-300"
+                } disabled:opacity-50`}
+                aria-pressed={dash?.chat_available ?? false}
+              >
+                <span
+                  className={`absolute top-1 flex h-12 w-12 items-center justify-center rounded-full bg-white text-xs font-bold shadow-md transition-all ${
+                    dash?.chat_available
+                      ? "left-[calc(100%-3.25rem)]"
+                      : "left-1"
+                  }`}
+                >
+                  {dash?.chat_available ? "ON" : "OFF"}
+                </span>
+              </button>
+            </div>
+
+            <div className="flex flex-wrap items-center justify-between gap-4 border-b border-slate-100 pb-6">
+              <div className="min-w-0">
+                <h3 className="font-semibold text-slate-900">Voice Call</h3>
+                <p className="text-sm text-slate-600">Accept voice calls</p>
+              </div>
+              <button
+                type="button"
+                disabled={dashLoading || availBusy || !dash}
+                onClick={() => {
+                  if (dash) {
+                    void patchAvailability(
+                      { voice_available: !dash.voice_available },
+                      "voice"
+                    );
+                  }
+                }}
+                className={`relative h-14 w-28 shrink-0 rounded-full transition ${
+                  dash?.voice_available
+                    ? "bg-emerald-500 shadow-inner"
+                    : "bg-slate-300"
+                } disabled:opacity-50`}
+                aria-pressed={dash?.voice_available ?? false}
+              >
+                <span
+                  className={`absolute top-1 flex h-12 w-12 items-center justify-center rounded-full bg-white text-xs font-bold shadow-md transition-all ${
+                    dash?.voice_available
+                      ? "left-[calc(100%-3.25rem)]"
+                      : "left-1"
+                  }`}
+                >
+                  {dash?.voice_available ? "ON" : "OFF"}
+                </span>
+              </button>
+            </div>
+
+            <div className="flex flex-wrap items-center justify-between gap-4">
+              <div className="min-w-0">
+                <h3 className="font-semibold text-slate-900">Video Call</h3>
+                <p className="text-sm text-slate-600">Accept video calls</p>
+              </div>
+              <button
+                type="button"
+                disabled={dashLoading || availBusy || !dash}
+                onClick={() => {
+                  if (dash) {
+                    void patchAvailability(
+                      { video_available: !dash.video_available },
+                      "video"
+                    );
+                  }
+                }}
+                className={`relative h-14 w-28 shrink-0 rounded-full transition ${
+                  dash?.video_available
+                    ? "bg-emerald-500 shadow-inner"
+                    : "bg-slate-300"
+                } disabled:opacity-50`}
+                aria-pressed={dash?.video_available ?? false}
+              >
+                <span
+                  className={`absolute top-1 flex h-12 w-12 items-center justify-center rounded-full bg-white text-xs font-bold shadow-md transition-all ${
+                    dash?.video_available
+                      ? "left-[calc(100%-3.25rem)]"
+                      : "left-1"
+                  }`}
+                >
+                  {dash?.video_available ? "ON" : "OFF"}
+                </span>
+              </button>
+            </div>
           </div>
         </section>
 

@@ -12,6 +12,7 @@ import {
 import { io, type Socket } from "socket.io-client";
 
 import { Navbar } from "@/components/Navbar";
+import api from "@/lib/api";
 import { useAuthStore } from "@/lib/store";
 
 const AgoraCallScreen = dynamic(
@@ -46,6 +47,15 @@ export function ChatSessionClient({ sessionId }: ChatSessionClientProps) {
   const astrologerName = rawName
     ? decodeURIComponent(rawName)
     : "Astrologer";
+
+  const headerInitials = useMemo(() => {
+    const parts = astrologerName.trim().split(/\s+/).filter(Boolean);
+    const a = parts[0]?.[0] ?? "?";
+    const b = parts[1]?.[0] ?? "";
+    return (a + b).toUpperCase();
+  }, [astrologerName]);
+
+  const [headerPhoto, setHeaderPhoto] = useState<string | null>(null);
 
   const { user, token, isLoggedIn, refreshWalletBalance } = useAuthStore();
   const [mounted, setMounted] = useState(false);
@@ -122,6 +132,25 @@ export function ChatSessionClient({ sessionId }: ChatSessionClientProps) {
     setCallInitiated(false);
     callInitiatedRef.current = false;
     autoInitiateDoneRef.current = false;
+  }, [sessionId]);
+
+  useEffect(() => {
+    setHeaderPhoto(null);
+    let cancelled = false;
+    void (async () => {
+      try {
+        const res = await api.get(`/api/sessions/${sessionId}/context`);
+        const url = res.data?.data?.profile_photo_url as string | undefined;
+        if (!cancelled && url) {
+          setHeaderPhoto(url);
+        }
+      } catch {
+        // optional
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
   }, [sessionId]);
 
   useEffect(() => {
@@ -468,18 +497,32 @@ export function ChatSessionClient({ sessionId }: ChatSessionClientProps) {
 
       <header className="sticky top-16 z-10 border-b border-slate-200 bg-white px-4 py-3 shadow-sm sm:px-6">
         <div className="mx-auto flex max-w-3xl flex-wrap items-center justify-between gap-3">
-          <div>
-            <h1 className="text-lg font-bold text-slate-900">
-              {astrologerName}
-            </h1>
-            <div className="mt-1 flex flex-wrap items-center gap-2 text-sm text-slate-600">
-              <span className={statusBadge}>{status}</span>
-              <span>
-                Timer:{" "}
-                <span className="font-semibold text-slate-900">
-                  {status === "active" ? formatTimer(elapsedSec) : "—"}
+          <div className="flex min-w-0 items-center gap-3">
+            {headerPhoto ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={headerPhoto}
+                alt=""
+                className="h-11 w-11 shrink-0 rounded-full object-cover ring-2 ring-violet-100"
+              />
+            ) : (
+              <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-violet-500 to-orange-400 text-sm font-bold text-white ring-2 ring-violet-100">
+                {headerInitials}
+              </div>
+            )}
+            <div className="min-w-0">
+              <h1 className="truncate text-lg font-bold text-slate-900">
+                {astrologerName}
+              </h1>
+              <div className="mt-1 flex flex-wrap items-center gap-2 text-sm text-slate-600">
+                <span className={statusBadge}>{status}</span>
+                <span>
+                  Timer:{" "}
+                  <span className="font-semibold text-slate-900">
+                    {status === "active" ? formatTimer(elapsedSec) : "—"}
+                  </span>
                 </span>
-              </span>
+              </div>
             </div>
           </div>
           <div className="flex items-center gap-2">

@@ -1,3 +1,7 @@
+import { randomUUID } from "node:crypto";
+import path from "node:path";
+
+import multer from "multer";
 import { Router, type Request, type Response } from "express";
 import { z } from "zod";
 
@@ -9,6 +13,29 @@ import {
 } from "../middleware/auth.js";
 
 const router = Router();
+
+const UPLOAD_DIR = path.join(process.cwd(), "uploads");
+
+const photoUpload = multer({
+  storage: multer.diskStorage({
+    destination: (_req, _file, cb) => {
+      cb(null, UPLOAD_DIR);
+    },
+    filename: (_req, file, cb) => {
+      const ext = path.extname(file.originalname).toLowerCase();
+      const safe =
+        ext === ".jpg" || ext === ".jpeg" || ext === ".png" || ext === ".webp"
+          ? ext
+          : ".jpg";
+      cb(null, `${randomUUID()}${safe}`);
+    },
+  }),
+  limits: { fileSize: 2 * 1024 * 1024 },
+  fileFilter: (_req, file, cb) => {
+    const ok = /^image\/(jpeg|png|webp)$/i.test(file.mimetype);
+    cb(null, ok);
+  },
+});
 
 const listQuerySchema = z.object({
   page: z.coerce.number().int().min(1).default(1),
@@ -34,6 +61,10 @@ type AstrologerListRow = {
   experience_years: number | null;
   name: string;
   avatar_url: string | null;
+  profile_photo_url: string | null;
+  chat_available: boolean;
+  voice_available: boolean;
+  video_available: boolean;
   waiting_count: number;
   is_busy: boolean;
 };
@@ -108,6 +139,10 @@ router.get("/", async (req: Request, res: Response) => {
        a.is_online,
        a.is_verified,
        a.experience_years,
+       a.profile_photo_url,
+       a.chat_available,
+       a.voice_available,
+       a.video_available,
        u.name,
        u.avatar_url,
        (
@@ -145,6 +180,10 @@ router.get("/", async (req: Request, res: Response) => {
     experience_years: row.experience_years,
     name: row.name,
     avatar_url: row.avatar_url,
+    profile_photo_url: row.profile_photo_url,
+    chat_available: row.chat_available,
+    voice_available: row.voice_available,
+    video_available: row.video_available,
     waiting_count: row.waiting_count,
     is_busy: row.is_busy,
   }));
@@ -171,8 +210,13 @@ router.get(
       rating: string | null;
       total_reviews: number;
       is_available: boolean;
+      is_online: boolean;
+      chat_available: boolean;
+      voice_available: boolean;
+      video_available: boolean;
     }>(
-      `SELECT id, rating, total_reviews, is_available
+      `SELECT id, rating, total_reviews, is_available, is_online,
+              chat_available, voice_available, video_available
        FROM astrologers WHERE user_id = $1`,
       [userId]
     );
@@ -252,6 +296,10 @@ router.get(
         total_reviews: astrologer.total_reviews,
         last_7_days_earnings: last7,
         is_available: astrologer.is_available,
+        is_online: astrologer.is_online,
+        chat_available: astrologer.chat_available,
+        voice_available: astrologer.voice_available,
+        video_available: astrologer.video_available,
       },
     });
   }
@@ -358,61 +406,156 @@ router.put(
   }
 );
 
-const availabilityBody = z.object({
+const availabilityUpdateBody = z.object({
   is_online: z.boolean().optional(),
   is_available: z.boolean().optional(),
+  chat_available: z.boolean().optional(),
+  voice_available: z.boolean().optional(),
+  video_available: z.boolean().optional(),
 });
+
+async function updateAvailability(req: Request, res: Response): Promise<void> {
+  const userId = req.user?.userId;
+  if (!userId) {
+    res.status(401).json({ success: false, error: "Unauthorized" });
+    return;
+  }
+
+  const parsed = availabilityUpdateBody.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({
+      success: false,
+      error: parsed.error.issues[0]?.message ?? "Invalid body",
+    });
+    return;
+  }
+
+  const b = parsed.data;
+  const online =
+    typeof b.is_online === "boolean"
+      ? b.is_online
+      : typeof b.is_available === "boolean"
+        ? b.is_available
+        : undefined;
+
+  const sets: string[] = [];
+  const params: unknown[] = [];
+  let i = 1;
+
+  if (typeof online === "boolean") {
+    sets.push(`is_online = $${i++}`);
+    sets.push(`is_available = $${i++}`);
+    params.push(online, online);
+  }
+  if (typeof b.chat_available === "boolean") {
+    sets.push(`chat_available = $${i++}`);
+    params.push(b.chat_available);
+  }
+  if (typeof b.voice_available === "boolean") {
+    sets.push(`voice_available = $${i++}`);
+    params.push(b.voice_available);
+  }
+  if (typeof b.video_available === "boolean") {
+    sets.push(`video_available = $${i++}`);
+    params.push(b.video_available);
+  }
+
+  if (sets.length === 0) {
+    res.status(400).json({
+      success: false,
+      error: "At least one availability field is required",
+    });
+    return;
+  }
+
+  params.push(userId);
+  const result = await query<{
+    is_available: boolean;
+    is_online: boolean;
+    chat_available: boolean;
+    voice_available: boolean;
+    video_available: boolean;
+  }>(
+    `UPDATE astrologers SET ${sets.join(", ")}
+     WHERE user_id = $${i}
+     RETURNING is_available, is_online, chat_available, voice_available, video_available`,
+    params
+  );
+
+  const row = result.rows[0];
+  if (!row) {
+    res.status(404).json({ success: false, error: "Astrologer not found" });
+    return;
+  }
+
+  res.json({
+    success: true,
+    data: {
+      is_available: row.is_available,
+      is_online: row.is_online,
+      chat_available: row.chat_available,
+      voice_available: row.voice_available,
+      video_available: row.video_available,
+    },
+  });
+}
 
 router.put(
   "/availability",
   authMiddleware,
   requireAstrologer,
+  updateAvailability
+);
+
+router.patch(
+  "/availability",
+  authMiddleware,
+  requireAstrologer,
+  updateAvailability
+);
+
+router.post(
+  "/photo",
+  authMiddleware,
+  requireAstrologer,
+  photoUpload.single("photo"),
   async (req: Request, res: Response) => {
     const userId = req.user?.userId;
     if (!userId) {
       res.status(401).json({ success: false, error: "Unauthorized" });
       return;
     }
-
-    const parsed = availabilityBody.safeParse(req.body);
-    if (!parsed.success) {
+    if (!req.file) {
       res.status(400).json({
         success: false,
-        error: parsed.error.issues[0]?.message ?? "Invalid body",
+        error: "Image required (jpg, png, webp, max 2MB)",
       });
       return;
     }
 
-    const nextOnline =
-      typeof parsed.data.is_online === "boolean"
-        ? parsed.data.is_online
-        : parsed.data.is_available;
-    if (typeof nextOnline !== "boolean") {
-      res.status(400).json({
-        success: false,
-        error: "is_online (or is_available) is required",
-      });
-      return;
-    }
+    const publicPath = `/uploads/${req.file.filename}`;
+    const host = req.get("host") ?? `localhost:${process.env.PORT ?? "4000"}`;
+    const proto =
+      req.get("x-forwarded-proto")?.split(",")[0]?.trim() ?? req.protocol;
+    const photoUrl = `${proto}://${host}${publicPath}`;
 
-    const result = await query<{ is_available: boolean; is_online: boolean }>(
-      `UPDATE astrologers
-       SET is_online = $1,
-           is_available = $1
-       WHERE user_id = $2
-       RETURNING is_available, is_online`,
-      [nextOnline, userId]
+    const aUp = await query(
+      `UPDATE astrologers SET profile_photo_url = $1 WHERE user_id = $2`,
+      [photoUrl, userId]
     );
-
-    const row = result.rows[0];
-    if (!row) {
+    if (aUp.rowCount === 0) {
       res.status(404).json({ success: false, error: "Astrologer not found" });
       return;
     }
 
+    await query(`UPDATE users SET profile_photo_url = $1 WHERE id = $2`, [
+      photoUrl,
+      userId,
+    ]);
+
     res.json({
       success: true,
-      data: { is_available: row.is_available, is_online: row.is_online },
+      data: { photo_url: photoUrl },
     });
   }
 );
@@ -434,11 +577,17 @@ type DetailRow = {
   total_reviews: number;
   price_per_minute: string | null;
   is_available: boolean;
+  is_online: boolean;
+  chat_available: boolean;
+  voice_available: boolean;
+  video_available: boolean;
   experience_years: number | null;
   name: string;
   email: string;
   phone: string;
   avatar_url: string | null;
+  profile_photo_url: string | null;
+  user_profile_photo_url: string | null;
   waiting_count: number;
   is_busy: boolean;
 };
@@ -463,11 +612,17 @@ router.get("/:id", optionalAuthMiddleware, async (req: Request, res: Response) =
           a.total_reviews,
           a.price_per_minute,
           a.is_available,
+          a.is_online,
+          a.chat_available,
+          a.voice_available,
+          a.video_available,
           a.experience_years,
+          a.profile_photo_url,
           u.name,
           u.email,
           u.phone,
           u.avatar_url,
+          u.profile_photo_url AS user_profile_photo_url,
           (
             SELECT COUNT(*)::int
             FROM astrologer_waitlist w
@@ -518,6 +673,12 @@ router.get("/:id", optionalAuthMiddleware, async (req: Request, res: Response) =
         price_per_minute:
           row.price_per_minute != null ? Number(row.price_per_minute) : null,
         is_available: row.is_available,
+        is_online: row.is_online,
+        chat_available: row.chat_available,
+        voice_available: row.voice_available,
+        video_available: row.video_available,
+        profile_photo_url:
+          row.profile_photo_url ?? row.user_profile_photo_url ?? null,
         waiting_count: row.waiting_count,
         is_busy: row.is_busy,
         experience_years: row.experience_years,
@@ -526,6 +687,7 @@ router.get("/:id", optionalAuthMiddleware, async (req: Request, res: Response) =
           email: row.email,
           phone: row.phone,
           avatar_url: row.avatar_url,
+          profile_photo_url: row.user_profile_photo_url,
         },
       },
       reviews: reviewsResult.rows,

@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 import { useAuthStore } from "@/lib/store";
 
@@ -9,6 +9,18 @@ export function AstrologerNavbar() {
   const { user, logout } = useAuthStore();
   const [mounted, setMounted] = useState(false);
   const [open, setOpen] = useState(false);
+
+  const photo =
+    user?.profile_photo_url && user.profile_photo_url.length > 0
+      ? user.profile_photo_url
+      : user?.avatar_url;
+
+  const initials = useMemo(() => {
+    const parts = (user?.name ?? "").trim().split(/\s+/).filter(Boolean);
+    const a = parts[0]?.[0] ?? "?";
+    const b = parts[1]?.[0] ?? "";
+    return (a + b).toUpperCase();
+  }, [user?.name]);
 
   useEffect(() => {
     setMounted(true);
@@ -43,6 +55,18 @@ export function AstrologerNavbar() {
           >
             Earnings
           </Link>
+          {mounted && photo ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={photo}
+              alt=""
+              className="h-9 w-9 rounded-full object-cover ring-2 ring-violet-100"
+            />
+          ) : mounted ? (
+            <div className="flex h-9 w-9 items-center justify-center rounded-full bg-gradient-to-br from-violet-500 to-orange-400 text-xs font-bold text-white ring-2 ring-violet-100">
+              {initials}
+            </div>
+          ) : null}
           {mounted ? (
             <button
               type="button"
