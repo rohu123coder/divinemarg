@@ -5,7 +5,7 @@ import { Router, type Request, type Response } from "express";
 import jwt from "jsonwebtoken";
 import { z } from "zod";
 
-import { query } from "../db/index.js";
+import { pool, query } from "../db/index.js";
 import { sendEmailOTP } from "../lib/email.js";
 import { redis } from "../lib/redis.js";
 import { authMiddleware } from "../middleware/auth.js";
@@ -53,6 +53,47 @@ const verifyOtpBody = z.object({
 const astrologerLoginBody = z.object({
   email: z.string().email(),
   password: z.string().min(1, "Password is required"),
+});
+
+const astrologerSpecializationOptions = [
+  "Love & Relationship",
+  "Career",
+  "Finance",
+  "Vastu",
+  "Numerology",
+  "Tarot",
+  "Palmistry",
+  "Vedic Astrology",
+] as const;
+
+const astrologerLanguageOptions = [
+  "Hindi",
+  "English",
+  "Tamil",
+  "Telugu",
+  "Bengali",
+  "Marathi",
+  "Gujarati",
+] as const;
+
+const astrologerRegisterBody = z.object({
+  name: z.string().min(2, "Name must be at least 2 characters"),
+  email: emailSchema,
+  phone: phoneSchema,
+  password: z.string().min(8, "Password must be at least 8 characters"),
+  experience: z.coerce.number().int().min(0, "Experience must be >= 0"),
+  specializations: z
+    .array(z.enum(astrologerSpecializationOptions))
+    .min(1, "Select at least one specialization"),
+  languages: z
+    .array(z.enum(astrologerLanguageOptions))
+    .min(1, "Select at least one language"),
+  ratePerMinute: z
+    .coerce.number()
+    .int()
+    .min(5, "Rate per minute must be at least 5")
+    .max(500, "Rate per minute must be at most 500"),
+  bio: z.string().max(300).optional(),
 });
 
 type UserPublic = {
@@ -448,8 +489,17 @@ router.post("/astrologer/login", async (req: Request, res: Response) => {
     return;
   }
 
+  if (!row.is_verified) {
+    res.status(403).json({
+      success: false,
+      error:
+        "Your account is pending approval. Please wait for admin review.",
+    });
+    return;
+  }
+
   const token = jwt.sign(
-    { userId: row.user_id, role: "astrologer" },
+    { userId: row.user_id, role: "astrologer", is_approved: row.is_verified },
     jwtSecret(),
     { expiresIn: "30d", }
   );
@@ -465,6 +515,7 @@ router.post("/astrologer/login", async (req: Request, res: Response) => {
     price_per_minute:
       row.price_per_minute != null ? Number(row.price_per_minute) : null,
     is_available: row.is_available,
+    is_approved: row.is_verified,
     is_verified: row.is_verified,
     experience_years: row.experience_years,
     user: {
@@ -479,6 +530,95 @@ router.post("/astrologer/login", async (req: Request, res: Response) => {
     success: true,
     data: { token, astrologer },
   });
+});
+
+router.post("/astrologer/register", async (req: Request, res: Response) => {
+  const parsed = astrologerRegisterBody.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({
+      success: false,
+      error: parsed.error.issues[0]?.message ?? "Invalid body",
+    });
+    return;
+  }
+
+  const {
+    name,
+    email,
+    phone,
+    password,
+    experience,
+    specializations,
+    languages,
+    ratePerMinute,
+    bio,
+  } = parsed.data;
+
+  const existing = await query<{ id: string }>(
+    `SELECT id FROM users WHERE email = $1 LIMIT 1`,
+    [email]
+  );
+
+  if (existing.rows[0]) {
+    res.status(409).json({ success: false, error: "Email already registered" });
+    return;
+  }
+
+  const password_hash = await bcrypt.hash(password, 10);
+
+  const client = await pool.connect();
+  try {
+    await client.query("BEGIN");
+
+    const created = await client.query<{ id: string }>(
+      `INSERT INTO users (name, email, phone, password_hash)
+       VALUES ($1, $2, $3, $4)
+       RETURNING id`,
+      [name, email, phone, password_hash]
+    );
+
+    const userId = created.rows[0]?.id;
+    if (!userId) {
+      await client.query("ROLLBACK");
+      res.status(500).json({ success: false, error: "Could not create user" });
+      return;
+    }
+
+    await client.query(
+      `INSERT INTO astrologers (
+         user_id,
+         price_per_minute,
+         experience_years,
+         specializations,
+         languages,
+         bio,
+         is_verified,
+         is_available
+       )
+       VALUES ($1, $2, $3, $4, $5, $6, false, false)`,
+      [
+        userId,
+        ratePerMinute,
+        experience,
+        specializations,
+        languages,
+        bio && bio.trim().length > 0 ? bio.trim() : null,
+      ]
+    );
+
+    await client.query("COMMIT");
+    res.json({
+      success: true,
+      message: "Application submitted",
+      userId,
+    });
+  } catch (e) {
+    await client.query("ROLLBACK");
+    console.error("astrologer register failed:", e);
+    res.status(500).json({ success: false, error: "Could not submit application" });
+  } finally {
+    client.release();
+  }
 });
 
 router.get("/me", authMiddleware, async (req: Request, res: Response) => {

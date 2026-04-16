@@ -10,6 +10,8 @@ export type AuthUser = {
   role?: "user" | "astrologer";
   /** Set when `role === "astrologer"` — public astrologer row id for profile APIs */
   astrologerId?: string;
+  /** Set when `role === "astrologer"` — approval status for dashboard access */
+  isApproved?: boolean;
 };
 
 type AuthState = {

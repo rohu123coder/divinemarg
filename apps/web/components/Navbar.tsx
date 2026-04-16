@@ -141,6 +141,12 @@ export function Navbar() {
               >
                 Sign Up
               </Link>
+              <Link
+                href="/astrologer/login"
+                className="text-sm font-semibold text-slate-600 transition hover:text-violet-700"
+              >
+                Astrologer Login
+              </Link>
             </>
           )}
         </div>
@@ -252,30 +258,45 @@ export function Navbar() {
                 </button>
               </>
             ) : (
-              <div className="grid grid-cols-2 gap-2">
-                <Link
-                  href="/login"
-                  className="rounded-full border border-violet-200 px-4 py-2.5 text-center text-sm font-semibold text-violet-700"
-                  onClick={(event) => {
-                    event.preventDefault();
-                    setMenuOpen(false);
-                    router.push("/login");
-                  }}
-                >
-                  Sign In
-                </Link>
-                <Link
-                  href="/login?tab=register"
-                  className="rounded-full bg-gradient-to-r from-violet-600 to-indigo-600 px-4 py-2.5 text-center text-sm font-semibold text-white"
-                  onClick={(event) => {
-                    event.preventDefault();
-                    setMenuOpen(false);
-                    router.push("/login?tab=register");
-                  }}
-                >
-                  Sign Up
-                </Link>
-              </div>
+              <>
+                <div className="grid grid-cols-2 gap-2">
+                  <Link
+                    href="/login"
+                    className="rounded-full border border-violet-200 px-4 py-2.5 text-center text-sm font-semibold text-violet-700"
+                    onClick={(event) => {
+                      event.preventDefault();
+                      setMenuOpen(false);
+                      router.push("/login");
+                    }}
+                  >
+                    Sign In
+                  </Link>
+                  <Link
+                    href="/login?tab=register"
+                    className="rounded-full bg-gradient-to-r from-violet-600 to-indigo-600 px-4 py-2.5 text-center text-sm font-semibold text-white"
+                    onClick={(event) => {
+                      event.preventDefault();
+                      setMenuOpen(false);
+                      router.push("/login?tab=register");
+                    }}
+                  >
+                    Sign Up
+                  </Link>
+                </div>
+                <div className="mt-2">
+                  <Link
+                    href="/astrologer/login"
+                    className="block rounded-lg px-3 py-2 text-center text-sm font-semibold text-slate-600 transition hover:bg-violet-50 hover:text-violet-700"
+                    onClick={(event) => {
+                      event.preventDefault();
+                      setMenuOpen(false);
+                      router.push("/astrologer/login");
+                    }}
+                  >
+                    Astrologer Login
+                  </Link>
+                </div>
+              </>
             )}
           </div>
         </div>

@@ -79,15 +79,23 @@ export default function AstrologerDashboardPage() {
       router.replace("/astrologer/login");
       return;
     }
+    if (user?.role === "astrologer" && user?.isApproved === false) {
+      router.replace("/astrologer/pending");
+      return;
+    }
     if (user?.role !== "astrologer") {
       router.replace("/dashboard");
       return;
     }
     void loadDashboard();
-  }, [mounted, isLoggedIn, token, user?.role, router, loadDashboard]);
+  }, [mounted, isLoggedIn, token, user?.role, user?.isApproved, router, loadDashboard]);
 
   useEffect(() => {
     if (!mounted || !token || !isLoggedIn || user?.role !== "astrologer") {
+      return;
+    }
+    if (user?.isApproved === false) {
+      router.replace("/astrologer/pending");
       return;
     }
 
@@ -153,7 +161,7 @@ export default function AstrologerDashboardPage() {
       socket.disconnect();
       socketRef.current = null;
     };
-  }, [mounted, token, isLoggedIn, user?.role, router]);
+  }, [mounted, token, isLoggedIn, user?.role, user?.isApproved, router]);
 
   useEffect(() => {
     if (!incoming) {
@@ -261,7 +269,12 @@ export default function AstrologerDashboardPage() {
     return `${r.toFixed(1)} ★`;
   }, [dash?.rating]);
 
-  if (!mounted || !isLoggedIn || user?.role !== "astrologer") {
+  if (
+    !mounted ||
+    !isLoggedIn ||
+    user?.role !== "astrologer" ||
+    user?.isApproved === false
+  ) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-slate-50">
         <div className="h-10 w-10 animate-spin rounded-full border-2 border-violet-500 border-t-transparent" />

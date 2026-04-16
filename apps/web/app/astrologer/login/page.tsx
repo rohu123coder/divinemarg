@@ -10,6 +10,9 @@ import { useAuthStore, type AuthUser } from "@/lib/store";
 type AstrologerLoginPayload = {
   id: string;
   user_id: string;
+  is_approved?: boolean;
+  /** Back-compat with existing backend column naming */
+  is_verified?: boolean;
   user: {
     name: string;
     phone: string;
@@ -37,12 +40,16 @@ export default function AstrologerLoginPage() {
       return;
     }
     if (isLoggedIn && token && user?.role === "astrologer") {
-      router.replace("/astrologer/dashboard");
+      if (user.isApproved === false) {
+        router.replace("/astrologer/pending");
+      } else {
+        router.replace("/astrologer/dashboard");
+      }
     }
     if (isLoggedIn && token && user?.role === "user") {
       router.replace("/dashboard");
     }
-  }, [mounted, isLoggedIn, token, user?.role, router]);
+  }, [mounted, isLoggedIn, token, user?.role, user?.isApproved, router]);
 
   const submit = async () => {
     setError(null);
@@ -72,9 +79,14 @@ export default function AstrologerLoginPage() {
         wallet_balance: 0,
         role: "astrologer",
         astrologerId: a.id,
+        isApproved: Boolean(a.is_approved ?? a.is_verified ?? false),
       };
       setUser(authUser, data.token);
-      router.replace("/astrologer/dashboard");
+      if (authUser.isApproved === false) {
+        router.replace("/astrologer/pending");
+      } else {
+        router.replace("/astrologer/dashboard");
+      }
     } catch (e: unknown) {
       const msg =
         e &&
@@ -147,6 +159,12 @@ export default function AstrologerLoginPage() {
           >
             {loading ? "Signing in…" : "Sign in"}
           </button>
+          <Link
+            href="/astrologer/register"
+            className="block pt-2 text-center text-sm font-semibold text-slate-600 hover:text-violet-700"
+          >
+            New astrologer? Register here →
+          </Link>
         </div>
 
         <p className="mt-10 text-center text-sm text-slate-500">
