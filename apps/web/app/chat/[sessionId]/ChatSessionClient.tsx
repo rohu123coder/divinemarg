@@ -95,6 +95,7 @@ export function ChatSessionClient({ sessionId }: ChatSessionClientProps) {
   };
 
   const [callUi, setCallUi] = useState<CallUiState | null>(null);
+  const [callInitiated, setCallInitiated] = useState(false);
   const callInitiatedRef = useRef(false);
 
   const autoInitiateDoneRef = useRef(false);
@@ -113,6 +114,7 @@ export function ChatSessionClient({ sessionId }: ChatSessionClientProps) {
     setElapsedSec(0);
     cancelledRef.current = false;
     setCallUi(null);
+    setCallInitiated(false);
     callInitiatedRef.current = false;
     autoInitiateDoneRef.current = false;
   }, [sessionId]);
@@ -251,6 +253,7 @@ export function ChatSessionClient({ sessionId }: ChatSessionClientProps) {
 
     socket.on("incoming_call", (data: IncomingCallPayload) => {
       if (!data || data.sessionId !== sessionId) return;
+      setCallInitiated(false);
       callInitiatedRef.current = false;
       setCallUi({
         phase: "incoming",
@@ -265,6 +268,7 @@ export function ChatSessionClient({ sessionId }: ChatSessionClientProps) {
     socket.on("call_ready", (data: CallReadyPayload) => {
       if (!data) return;
       const nextPhase = callInitiatedRef.current ? "calling" : "active";
+      setCallInitiated(callInitiatedRef.current);
       setCallUi({
         phase: nextPhase,
         callType: (data.callType ?? "voice") as CallType,
@@ -278,6 +282,7 @@ export function ChatSessionClient({ sessionId }: ChatSessionClientProps) {
 
     socket.on("call_accepted", () => {
       setToast("Call accepted");
+      setCallInitiated(false);
       setCallUi((prev) => {
         if (!prev) return prev;
         if (prev.phase !== "calling") return prev;
@@ -287,11 +292,13 @@ export function ChatSessionClient({ sessionId }: ChatSessionClientProps) {
 
     socket.on("call_declined", () => {
       setToast("Call declined");
+      setCallInitiated(false);
       callInitiatedRef.current = false;
       setCallUi(null);
     });
 
     socket.on("call_ended", () => {
+      setCallInitiated(false);
       callInitiatedRef.current = false;
       setCallUi(null);
     });
@@ -311,14 +318,16 @@ export function ChatSessionClient({ sessionId }: ChatSessionClientProps) {
     };
   }, [mounted, token, sessionId, isLoggedIn, user?.id, refreshWalletBalance]);
 
-  const callTypeQuery = searchParams.get("callType");
+  const autoCall =
+    searchParams.get("autoCall") ?? searchParams.get("callType");
 
   const initiateCall = useCallback(
     (callType: CallType) => {
       if (!socketRef.current) return;
       if (status !== "active") return;
-      if (callUi) return;
+      if (callUi || callInitiatedRef.current) return;
       socketRef.current.emit("initiate_call", { sessionId, callType });
+      setCallInitiated(true);
       callInitiatedRef.current = true;
     },
     [callUi, sessionId, status]
@@ -337,6 +346,7 @@ export function ChatSessionClient({ sessionId }: ChatSessionClientProps) {
   const endCall = useCallback(() => {
     if (!socketRef.current) return;
     socketRef.current.emit("end_call", { sessionId });
+    setCallInitiated(false);
     callInitiatedRef.current = false;
     setCallUi(null);
   }, [sessionId]);
@@ -345,13 +355,16 @@ export function ChatSessionClient({ sessionId }: ChatSessionClientProps) {
     if (!mounted) return;
     if (status !== "active") return;
     if (autoInitiateDoneRef.current) return;
-    if (!callTypeQuery) return;
+    if (!autoCall) return;
 
-    if (callTypeQuery === "voice" || callTypeQuery === "video") {
+    if (autoCall === "voice" || autoCall === "video") {
       autoInitiateDoneRef.current = true;
-      initiateCall(callTypeQuery);
+      const t = setTimeout(() => {
+        initiateCall(autoCall);
+      }, 1000);
+      return () => clearTimeout(t);
     }
-  }, [mounted, status, callTypeQuery, initiateCall]);
+  }, [mounted, status, autoCall, initiateCall]);
 
   useEffect(() => {
     if (!mounted) {
@@ -470,7 +483,7 @@ export function ChatSessionClient({ sessionId }: ChatSessionClientProps) {
                 <button
                   type="button"
                   onClick={() => initiateCall("voice")}
-                  disabled={!!callUi}
+                  disabled={!!callUi || callInitiated}
                   className="rounded-xl border border-slate-200 bg-white/70 px-3 py-2 text-sm font-semibold text-slate-700 transition hover:bg-white disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   <span className="mr-2" aria-hidden>
@@ -481,7 +494,7 @@ export function ChatSessionClient({ sessionId }: ChatSessionClientProps) {
                 <button
                   type="button"
                   onClick={() => initiateCall("video")}
-                  disabled={!!callUi}
+                  disabled={!!callUi || callInitiated}
                   className="rounded-xl border border-slate-200 bg-white/70 px-3 py-2 text-sm font-semibold text-slate-700 transition hover:bg-white disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   <span className="mr-2" aria-hidden>
@@ -490,6 +503,9 @@ export function ChatSessionClient({ sessionId }: ChatSessionClientProps) {
                   Video
                 </button>
               </>
+            ) : null}
+            {callInitiated ? (
+              <span className="text-xs font-semibold text-violet-700">Calling...</span>
             ) : null}
             <button
               type="button"

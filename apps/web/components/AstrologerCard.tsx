@@ -23,6 +23,10 @@ export type AstrologerCardProps = {
   is_busy?: boolean;
   waiting_count?: number;
   experience_years: number | null;
+  onChatNow?: () => void;
+  onVoiceCall?: () => void;
+  onVideoCall?: () => void;
+  actionLoading?: boolean;
 };
 
 export function AstrologerCard({
@@ -36,6 +40,10 @@ export function AstrologerCard({
   is_busy = false,
   waiting_count = 0,
   experience_years,
+  onChatNow,
+  onVoiceCall,
+  onVideoCall,
+  actionLoading = false,
 }: AstrologerCardProps) {
   const initials = useMemo(() => {
     const parts = name.trim().split(/\s+/).filter(Boolean);
@@ -114,12 +122,46 @@ export function AstrologerCard({
 
       <div className="mt-auto pt-4">
         {is_available || is_busy ? (
-          <Link
-            href={`/astrologers/${id}`}
-            className="block w-full rounded-xl bg-gradient-to-r from-purple-600 to-orange-500 py-2.5 text-center text-sm font-semibold text-white shadow-md transition group-hover:opacity-95"
-          >
-            {is_busy ? "Join Waitlist" : "Chat Now"}
-          </Link>
+          <div className="flex items-center gap-2">
+            {onChatNow ? (
+              <button
+                type="button"
+                disabled={actionLoading}
+                onClick={onChatNow}
+                className="flex-1 rounded-lg bg-gradient-to-r from-purple-600 to-orange-500 px-3 py-2 text-center text-sm font-semibold text-white shadow-md transition group-hover:opacity-95 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {actionLoading ? "Starting..." : is_busy ? "Join Waitlist" : "Chat Now"}
+              </button>
+            ) : (
+              <Link
+                href={`/astrologers/${id}`}
+                className="block flex-1 rounded-xl bg-gradient-to-r from-purple-600 to-orange-500 py-2.5 text-center text-sm font-semibold text-white shadow-md transition group-hover:opacity-95"
+              >
+                {is_busy ? "Join Waitlist" : "Chat Now"}
+              </Link>
+            )}
+
+            {is_available && !is_busy ? (
+              <>
+                <button
+                  type="button"
+                  onClick={onVoiceCall}
+                  disabled={actionLoading}
+                  className="rounded-lg border border-green-500 px-3 py-2 text-sm font-semibold text-green-600 transition hover:bg-green-50 disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  📞 Voice
+                </button>
+                <button
+                  type="button"
+                  onClick={onVideoCall}
+                  disabled={actionLoading}
+                  className="rounded-lg border border-blue-500 px-3 py-2 text-sm font-semibold text-blue-600 transition hover:bg-blue-50 disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  📹 Video
+                </button>
+              </>
+            ) : null}
+          </div>
         ) : (
           <button
             type="button"

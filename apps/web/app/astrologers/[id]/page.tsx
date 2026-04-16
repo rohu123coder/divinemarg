@@ -250,7 +250,7 @@ export default function AstrologerProfilePage() {
       }
       const name = encodeURIComponent(data.astrologer.user.name);
       router.push(
-        `/chat/${sessionId}?name=${name}${callType ? `&callType=${callType}` : ""}`
+        `/chat/${sessionId}?name=${name}${callType ? `&autoCall=${callType}` : ""}`
       );
     } catch (e: unknown) {
       const maybeStatus =

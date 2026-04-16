@@ -92,6 +92,7 @@ export function AstrologerChatClient({ sessionId }: Props) {
   };
 
   const [callUi, setCallUi] = useState<CallUiState | null>(null);
+  const [callInitiated, setCallInitiated] = useState(false);
   const callInitiatedRef = useRef(false);
   const [waitlistNotice, setWaitlistNotice] = useState<WaitlistEntry | null>(null);
   const [waitlistQueue, setWaitlistQueue] = useState<WaitlistEntry[]>([]);
@@ -111,6 +112,7 @@ export function AstrologerChatClient({ sessionId }: Props) {
     setElapsedSec(0);
     cancelledRef.current = false;
     setCallUi(null);
+    setCallInitiated(false);
     callInitiatedRef.current = false;
   }, [sessionId]);
 
@@ -250,6 +252,7 @@ export function AstrologerChatClient({ sessionId }: Props) {
 
     socket.on("incoming_call", (data: IncomingCallPayload) => {
       if (!data || data.sessionId !== sessionId) return;
+      setCallInitiated(false);
       callInitiatedRef.current = false;
       setCallUi({
         phase: "incoming",
@@ -264,6 +267,7 @@ export function AstrologerChatClient({ sessionId }: Props) {
     socket.on("call_ready", (data: CallReadyPayload) => {
       if (!data) return;
       const nextPhase = callInitiatedRef.current ? "calling" : "active";
+      setCallInitiated(callInitiatedRef.current);
       setCallUi({
         phase: nextPhase,
         callType: (data.callType ?? "voice") as CallType,
@@ -277,6 +281,7 @@ export function AstrologerChatClient({ sessionId }: Props) {
 
     socket.on("call_accepted", () => {
       setToast("Call accepted");
+      setCallInitiated(false);
       setCallUi((prev) => {
         if (!prev) return prev;
         if (prev.phase !== "calling") return prev;
@@ -286,11 +291,13 @@ export function AstrologerChatClient({ sessionId }: Props) {
 
     socket.on("call_declined", () => {
       setToast("Call declined");
+      setCallInitiated(false);
       callInitiatedRef.current = false;
       setCallUi(null);
     });
 
     socket.on("call_ended", () => {
+      setCallInitiated(false);
       callInitiatedRef.current = false;
       setCallUi(null);
     });
@@ -339,8 +346,9 @@ export function AstrologerChatClient({ sessionId }: Props) {
     (callType: CallType) => {
       if (!socketRef.current) return;
       if (status !== "active") return;
-      if (callUi) return;
+      if (callUi || callInitiatedRef.current) return;
       socketRef.current.emit("initiate_call", { sessionId, callType });
+      setCallInitiated(true);
       callInitiatedRef.current = true;
     },
     [callUi, sessionId, status]
@@ -359,6 +367,7 @@ export function AstrologerChatClient({ sessionId }: Props) {
   const endCall = useCallback(() => {
     if (!socketRef.current) return;
     socketRef.current.emit("end_call", { sessionId });
+    setCallInitiated(false);
     callInitiatedRef.current = false;
     setCallUi(null);
   }, [sessionId]);
@@ -509,7 +518,7 @@ export function AstrologerChatClient({ sessionId }: Props) {
                 <button
                   type="button"
                   onClick={() => initiateCall("voice")}
-                  disabled={!!callUi}
+                  disabled={!!callUi || callInitiated}
                   className="rounded-xl border border-slate-200 bg-white/70 px-3 py-2 text-sm font-semibold text-slate-700 transition hover:bg-white disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   <span className="mr-2" aria-hidden>
@@ -520,7 +529,7 @@ export function AstrologerChatClient({ sessionId }: Props) {
                 <button
                   type="button"
                   onClick={() => initiateCall("video")}
-                  disabled={!!callUi}
+                  disabled={!!callUi || callInitiated}
                   className="rounded-xl border border-slate-200 bg-white/70 px-3 py-2 text-sm font-semibold text-slate-700 transition hover:bg-white disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   <span className="mr-2" aria-hidden>
@@ -529,6 +538,9 @@ export function AstrologerChatClient({ sessionId }: Props) {
                   Video
                 </button>
               </>
+            ) : null}
+            {callInitiated ? (
+              <span className="text-xs font-semibold text-violet-700">Calling...</span>
             ) : null}
             <button
               type="button"

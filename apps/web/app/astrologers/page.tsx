@@ -1,10 +1,12 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 
 import { AstrologerCard } from "@/components/AstrologerCard";
 import { Navbar } from "@/components/Navbar";
 import api from "@/lib/api";
+import { useAuthStore } from "@/lib/store";
 
 type Astro = {
   id: string;
@@ -174,6 +176,8 @@ function SkeletonGrid() {
 }
 
 export default function AstrologersPage() {
+  const router = useRouter();
+  const { isLoggedIn, user } = useAuthStore();
   const [sort, setSort] = useState<ApiSort>("rating_desc");
   const [specs, setSpecs] = useState<Set<string>>(new Set());
   const [langs, setLangs] = useState<Set<string>>(new Set());
@@ -181,6 +185,13 @@ export default function AstrologersPage() {
   const [loading, setLoading] = useState(true);
   const [page, setPage] = useState(1);
   const [sheetOpen, setSheetOpen] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [pendingAction, setPendingAction] = useState<{
+    astrologer: Astro;
+    callType: "voice" | "video";
+    required: number;
+  } | null>(null);
+  const [actionLoadingKey, setActionLoadingKey] = useState<string | null>(null);
 
   const toggleSpec = useCallback((s: string) => {
     setSpecs((prev) => {
@@ -252,6 +263,79 @@ export default function AstrologersPage() {
     return filtered.slice(start, start + PAGE_SIZE);
   }, [filtered, page]);
 
+  const startSession = useCallback(
+    async (astrologer: Astro, callType: "chat" | "voice" | "video") => {
+      const actionKey = `${astrologer.id}:${callType}`;
+      setActionLoadingKey(actionKey);
+      setError(null);
+      try {
+        let res;
+        try {
+          res = await api.post(`/api/sessions/request`, {
+            astrologerId: astrologer.id,
+            sessionType: callType === "chat" ? undefined : callType,
+          });
+        } catch (e: unknown) {
+          const status =
+            e &&
+            typeof e === "object" &&
+            "response" in e &&
+            e.response &&
+            typeof e.response === "object" &&
+            "status" in e.response
+              ? Number(e.response.status)
+              : null;
+          if (status !== 404) {
+            throw e;
+          }
+          res = await api.post(`/api/chat/request`, {
+            astrologer_id: astrologer.id,
+          });
+        }
+
+        const sessionId = (res.data?.data?.session_id ??
+          res.data?.data?.sessionId) as string | undefined;
+        if (!sessionId) {
+          throw new Error("No session returned");
+        }
+
+        const name = encodeURIComponent(astrologer.name);
+        const autoCallQuery =
+          callType === "voice" || callType === "video"
+            ? `&autoCall=${callType}`
+            : "";
+        router.push(`/chat/${sessionId}?name=${name}${autoCallQuery}`);
+      } catch {
+        setError("Could not start session. Please try again.");
+      } finally {
+        setActionLoadingKey(null);
+      }
+    },
+    [router]
+  );
+
+  const handleCardAction = useCallback(
+    (astrologer: Astro, callType: "chat" | "voice" | "video") => {
+      if (!isLoggedIn) {
+        router.push(`/login?redirect=${encodeURIComponent("/astrologers")}`);
+        return;
+      }
+
+      if (callType === "voice" || callType === "video") {
+        const rate = Number(astrologer.price_per_minute ?? 0);
+        const required = Math.max(0, rate * 3);
+        const balance = Number(user?.wallet_balance ?? 0);
+        if (balance < required) {
+          setPendingAction({ astrologer, callType, required });
+          return;
+        }
+      }
+
+      void startSession(astrologer, callType);
+    },
+    [isLoggedIn, router, startSession, user?.wallet_balance]
+  );
+
   return (
     <div className="min-h-screen bg-slate-50">
       <Navbar />
@@ -287,6 +371,9 @@ export default function AstrologersPage() {
               ? "Loading…"
               : `${totalFiltered} astrologer${totalFiltered === 1 ? "" : "s"} found`}
           </p>
+          {error ? (
+            <p className="mt-2 text-sm font-medium text-red-600">{error}</p>
+          ) : null}
 
           <div className="mt-8">
             {loading ? (
@@ -294,7 +381,15 @@ export default function AstrologersPage() {
             ) : (
               <div className="grid gap-6 sm:grid-cols-2 xl:grid-cols-3">
                 {slice.map((a) => (
-                  <AstrologerCard key={a.id} {...a} languages={a.languages} />
+                  <AstrologerCard
+                    key={a.id}
+                    {...a}
+                    languages={a.languages}
+                    actionLoading={actionLoadingKey?.startsWith(a.id) ?? false}
+                    onChatNow={() => handleCardAction(a, "chat")}
+                    onVoiceCall={() => handleCardAction(a, "voice")}
+                    onVideoCall={() => handleCardAction(a, "video")}
+                  />
                 ))}
               </div>
             )}
@@ -369,6 +464,37 @@ export default function AstrologersPage() {
             >
               Apply
             </button>
+          </div>
+        </div>
+      ) : null}
+
+      {pendingAction ? (
+        <div className="fixed inset-0 z-[80] flex items-end justify-center bg-black/40 p-4 sm:items-center">
+          <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl">
+            <h2 className="text-lg font-bold text-slate-900">Wallet balance low</h2>
+            <p className="mt-2 text-sm text-slate-600">
+              Minimum ₹{pendingAction.required.toFixed(0)} required to start a{" "}
+              {pendingAction.callType} call. Recharge now?
+            </p>
+            <div className="mt-5 flex gap-3">
+              <button
+                type="button"
+                className="flex-1 rounded-xl border border-slate-200 py-2.5 text-sm font-semibold text-slate-700"
+                onClick={() => setPendingAction(null)}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                className="flex-1 rounded-xl bg-gradient-to-r from-purple-600 to-orange-500 py-2.5 text-sm font-semibold text-white"
+                onClick={() => {
+                  setPendingAction(null);
+                  router.push("/dashboard");
+                }}
+              >
+                Recharge
+              </button>
+            </div>
           </div>
         </div>
       ) : null}
