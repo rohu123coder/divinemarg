@@ -1,6 +1,6 @@
 -- PostgreSQL schema for divinemarg-platform (run on an empty database first)
 
-CREATE TYPE chat_session_status AS ENUM ('waiting', 'active', 'ended');
+CREATE TYPE chat_session_status AS ENUM ('waiting', 'active', 'ended', 'cancelled');
 
 CREATE TYPE message_sender_type AS ENUM ('user', 'astrologer');
 

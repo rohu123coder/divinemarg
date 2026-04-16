@@ -58,6 +58,7 @@ export function ChatSessionClient({ sessionId }: ChatSessionClientProps) {
   const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const listRef = useRef<HTMLDivElement | null>(null);
   const summaryShownRef = useRef(false);
+  const cancelledRef = useRef(false);
 
   useEffect(() => {
     summaryShownRef.current = false;
@@ -65,6 +66,7 @@ export function ChatSessionClient({ sessionId }: ChatSessionClientProps) {
     setMessages([]);
     setStatus("connecting");
     setElapsedSec(0);
+    cancelledRef.current = false;
   }, [sessionId]);
 
   useEffect(() => {
@@ -111,6 +113,7 @@ export function ChatSessionClient({ sessionId }: ChatSessionClientProps) {
           return;
         }
         setStatus("active");
+        cancelledRef.current = false;
       }
     );
 
@@ -152,6 +155,23 @@ export function ChatSessionClient({ sessionId }: ChatSessionClientProps) {
     );
 
     socket.on(
+      "session_cancelled",
+      (payload: { sessionId?: string; reason?: string }) => {
+        if (payload.sessionId && payload.sessionId !== sessionId) {
+          return;
+        }
+        if (payload.reason === "astrologer_unavailable") {
+          cancelledRef.current = true;
+          summaryShownRef.current = true;
+          setSummary(null);
+          setStatus("cancelled");
+          setToast("Astrologer unavailable, no charge deducted");
+          void refreshWalletBalance();
+        }
+      }
+    );
+
+    socket.on(
       "session_ended",
       (payload: {
         sessionId: string;
@@ -162,6 +182,9 @@ export function ChatSessionClient({ sessionId }: ChatSessionClientProps) {
         totalCharged: number;
       }) => {
         if (payload.sessionId !== sessionId) {
+          return;
+        }
+        if (cancelledRef.current) {
           return;
         }
         setStatus("ended");
@@ -264,6 +287,9 @@ export function ChatSessionClient({ sessionId }: ChatSessionClientProps) {
     if (status === "ended") {
       return `${base} bg-slate-100 text-slate-600 ring-1 ring-slate-200`;
     }
+    if (status === "cancelled") {
+      return `${base} bg-rose-50 text-rose-700 ring-1 ring-rose-100`;
+    }
     return `${base} bg-violet-50 text-violet-800 ring-1 ring-violet-100`;
   }, [status]);
 
@@ -304,7 +330,9 @@ export function ChatSessionClient({ sessionId }: ChatSessionClientProps) {
           <button
             type="button"
             onClick={endChat}
-            disabled={status === "ended" || status === "connecting"}
+            disabled={
+              status === "ended" || status === "cancelled" || status === "connecting"
+            }
             className="rounded-xl border border-red-200 bg-red-50 px-4 py-2 text-sm font-semibold text-red-700 transition hover:bg-red-100 disabled:cursor-not-allowed disabled:opacity-50"
           >
             End Chat
