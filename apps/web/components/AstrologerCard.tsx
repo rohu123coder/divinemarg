@@ -43,7 +43,6 @@ export function AstrologerCard({
   specializations,
   rating,
   price_per_minute,
-  is_available: _isAvailable,
   is_online = false,
   chat_available = true,
   voice_available = false,
