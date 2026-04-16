@@ -11,6 +11,7 @@ import { authRouter } from "./routes/auth.js";
 import { chatRouter } from "./routes/chat.js";
 import { setSocketServer } from "./socket/io.js";
 import { registerSocketHandlers } from "./socket/index.js";
+import { sessionsRouter } from "./routes/sessions.js";
 import { usersRouter } from "./routes/users.js";
 import { walletRouter } from "./routes/wallet.js";
 
@@ -33,6 +34,7 @@ app.use("/api/auth", authRouter);
 app.use("/api/users", usersRouter);
 app.use("/api/astrologers", astrologersRouter);
 app.use("/api/chat", chatRouter);
+app.use("/api/sessions", sessionsRouter);
 app.use("/api/wallet", walletRouter);
 
 const httpServer = createServer(app);

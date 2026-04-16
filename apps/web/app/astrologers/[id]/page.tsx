@@ -222,7 +222,8 @@ export default function AstrologerProfilePage() {
     };
   }, [data?.astrologer.user.name, id, isLoggedIn, router, token, user?.role]);
 
-  const startChat = useCallback(async () => {
+  const startChat = useCallback(
+    async (callType?: "voice" | "video") => {
     if (!data) {
       return;
     }
@@ -248,7 +249,9 @@ export default function AstrologerProfilePage() {
         throw new Error("No session");
       }
       const name = encodeURIComponent(data.astrologer.user.name);
-      router.push(`/chat/${sessionId}?name=${name}`);
+      router.push(
+        `/chat/${sessionId}?name=${name}${callType ? `&callType=${callType}` : ""}`
+      );
     } catch (e: unknown) {
       const maybeStatus =
         e &&
@@ -295,7 +298,9 @@ export default function AstrologerProfilePage() {
     } finally {
       setChatLoading(false);
     }
-  }, [data, id, isLoggedIn, router, user?.wallet_balance]);
+    },
+    [data, id, isLoggedIn, router, user?.wallet_balance]
+  );
 
   const joinWaitlist = useCallback(() => {
     if (!data || !socketRef.current) {
@@ -429,20 +434,70 @@ export default function AstrologerProfilePage() {
                 ) : null}
               </div>
               <div className="hidden lg:block">
-                <button
-                  type="button"
-                  disabled={(!astrologer.is_available && !astrologer.is_busy) || chatLoading}
-                  onClick={() => void startChat()}
-                  className="rounded-xl bg-white px-6 py-3 text-sm font-bold text-violet-700 shadow-md transition hover:bg-white/95 disabled:cursor-not-allowed disabled:bg-white/50 disabled:text-violet-400"
-                >
-                  {chatLoading
-                    ? "Starting…"
-                    : astrologer.is_busy
-                      ? `Join Waitlist (${astrologer.waiting_count})`
-                      : astrologer.is_available
-                      ? "Chat Now"
-                      : "Offline"}
-                </button>
+                <div className="flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    disabled={chatLoading}
+                    onClick={() => {
+                      if (!astrologer.is_available && !astrologer.is_busy) {
+                        setError("Astrologer is offline");
+                        return;
+                      }
+                      void startChat();
+                    }}
+                    className="rounded-xl bg-white px-4 py-3 text-sm font-bold text-violet-700 shadow-md transition hover:bg-white/95 disabled:cursor-not-allowed disabled:bg-white/50 disabled:text-violet-400"
+                  >
+                    {chatLoading
+                      ? "Starting…"
+                      : astrologer.is_busy
+                        ? `Join Waitlist (${astrologer.waiting_count})`
+                        : astrologer.is_available
+                          ? `Chat — ₹${price.toFixed(0)}/min`
+                          : "Chat"}
+                  </button>
+
+                  <button
+                    type="button"
+                    disabled={chatLoading}
+                    onClick={() => {
+                      if (!astrologer.is_available && !astrologer.is_busy) {
+                        setError("Astrologer is offline");
+                        return;
+                      }
+                      void startChat("voice");
+                    }}
+                    className="rounded-xl border border-white/40 bg-white/80 px-4 py-3 text-sm font-bold text-violet-700 shadow-md transition hover:bg-white/95 disabled:cursor-not-allowed disabled:bg-white/50 disabled:text-violet-400"
+                  >
+                    {chatLoading
+                      ? "Starting…"
+                      : astrologer.is_busy
+                        ? `Join Waitlist (${astrologer.waiting_count})`
+                        : astrologer.is_available
+                          ? `Voice — ₹${price.toFixed(0)}/min`
+                          : "Voice"}
+                  </button>
+
+                  <button
+                    type="button"
+                    disabled={chatLoading}
+                    onClick={() => {
+                      if (!astrologer.is_available && !astrologer.is_busy) {
+                        setError("Astrologer is offline");
+                        return;
+                      }
+                      void startChat("video");
+                    }}
+                    className="rounded-xl border border-white/40 bg-white/80 px-4 py-3 text-sm font-bold text-violet-700 shadow-md transition hover:bg-white/95 disabled:cursor-not-allowed disabled:bg-white/50 disabled:text-violet-400"
+                  >
+                    {chatLoading
+                      ? "Starting…"
+                      : astrologer.is_busy
+                        ? `Join Waitlist (${astrologer.waiting_count})`
+                        : astrologer.is_available
+                          ? `Video — ₹${price.toFixed(0)}/min`
+                          : "Video"}
+                  </button>
+                </div>
               </div>
             </div>
           </div>
@@ -492,20 +547,50 @@ export default function AstrologerProfilePage() {
       </div>
 
       <div className="fixed bottom-0 left-0 right-0 border-t border-slate-200 bg-white/95 p-4 backdrop-blur lg:hidden">
-        <button
-          type="button"
-          disabled={(!astrologer.is_available && !astrologer.is_busy) || chatLoading}
-          onClick={() => void startChat()}
-          className="w-full rounded-xl bg-gradient-to-r from-purple-600 to-orange-500 py-3.5 text-sm font-bold text-white shadow-lg transition hover:opacity-95 disabled:cursor-not-allowed disabled:opacity-50"
-        >
-          {chatLoading
-            ? "Starting…"
-            : astrologer.is_busy
-              ? `Join Waitlist (${astrologer.waiting_count})`
-              : astrologer.is_available
-              ? "Chat Now"
-              : "Offline"}
-        </button>
+        <div className="grid grid-cols-3 gap-2">
+          <button
+            type="button"
+            disabled={chatLoading}
+            onClick={() => {
+              if (!astrologer.is_available && !astrologer.is_busy) {
+                setError("Astrologer is offline");
+                return;
+              }
+              void startChat();
+            }}
+            className="rounded-xl bg-gradient-to-r from-purple-600 to-orange-500 py-3.5 text-sm font-bold text-white shadow-lg transition hover:opacity-95 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            {chatLoading ? "…" : "Chat"}
+          </button>
+          <button
+            type="button"
+            disabled={chatLoading}
+            onClick={() => {
+              if (!astrologer.is_available && !astrologer.is_busy) {
+                setError("Astrologer is offline");
+                return;
+              }
+              void startChat("voice");
+            }}
+            className="rounded-xl border border-purple-200 bg-white/70 py-3.5 text-sm font-bold text-violet-700 shadow-sm transition hover:bg-white disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            {chatLoading ? "…" : "Voice"}
+          </button>
+          <button
+            type="button"
+            disabled={chatLoading}
+            onClick={() => {
+              if (!astrologer.is_available && !astrologer.is_busy) {
+                setError("Astrologer is offline");
+                return;
+              }
+              void startChat("video");
+            }}
+            className="rounded-xl border border-purple-200 bg-white/70 py-3.5 text-sm font-bold text-violet-700 shadow-sm transition hover:bg-white disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            {chatLoading ? "…" : "Video"}
+          </button>
+        </div>
       </div>
 
       {busyPromptOpen ? (

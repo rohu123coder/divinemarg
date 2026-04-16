@@ -18,5 +18,8 @@
   },
   "devDependencies": {
     "ajv": "^8.18.0"
+  },
+  "dependencies": {
+    "agora-rtc-sdk-ng": "^4.24.3"
   }
 }

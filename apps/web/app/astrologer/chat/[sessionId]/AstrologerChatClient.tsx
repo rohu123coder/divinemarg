@@ -11,6 +11,7 @@ import {
 import { io, type Socket } from "socket.io-client";
 
 import { AstrologerNavbar } from "@/components/AstrologerNavbar";
+import { AgoraCallScreen } from "@/components/AgoraCallScreen";
 import { getSocketApiBase } from "@/lib/socketBase";
 import { useAuthStore } from "@/lib/store";
 
@@ -52,6 +53,46 @@ export function AstrologerChatClient({ sessionId }: Props) {
     totalCharged: number;
   } | null>(null);
   const [toast, setToast] = useState<string | null>(null);
+  type CallType = "voice" | "video";
+  type CallUiState =
+    | {
+        phase: "incoming";
+        callType: CallType;
+        channelName: string;
+        appId: string;
+        callerName: string;
+        pricePerMinute?: number;
+      }
+    | {
+        phase: "calling" | "active";
+        callType: CallType;
+        channelName: string;
+        token: string;
+        uid: number;
+        appId: string;
+        pricePerMinute?: number;
+      };
+
+  type IncomingCallPayload = {
+    sessionId: string;
+    callType: CallType;
+    channelName: string;
+    callerName: string;
+    appId: string;
+    pricePerMinute?: number;
+  };
+
+  type CallReadyPayload = {
+    channelName: string;
+    token: string;
+    uid: number;
+    appId: string;
+    callType?: CallType;
+    pricePerMinute?: number;
+  };
+
+  const [callUi, setCallUi] = useState<CallUiState | null>(null);
+  const callInitiatedRef = useRef(false);
   const [waitlistNotice, setWaitlistNotice] = useState<WaitlistEntry | null>(null);
   const [waitlistQueue, setWaitlistQueue] = useState<WaitlistEntry[]>([]);
   const [waitlistCollapsed, setWaitlistCollapsed] = useState(true);
@@ -69,6 +110,8 @@ export function AstrologerChatClient({ sessionId }: Props) {
     setStatus("connecting");
     setElapsedSec(0);
     cancelledRef.current = false;
+    setCallUi(null);
+    callInitiatedRef.current = false;
   }, [sessionId]);
 
   useEffect(() => {
@@ -205,6 +248,53 @@ export function AstrologerChatClient({ sessionId }: Props) {
       }
     );
 
+    socket.on("incoming_call", (data: IncomingCallPayload) => {
+      if (!data || data.sessionId !== sessionId) return;
+      callInitiatedRef.current = false;
+      setCallUi({
+        phase: "incoming",
+        callType: data.callType as CallType,
+        channelName: data.channelName,
+        appId: data.appId,
+        callerName: data.callerName,
+        pricePerMinute: data.pricePerMinute,
+      });
+    });
+
+    socket.on("call_ready", (data: CallReadyPayload) => {
+      if (!data) return;
+      const nextPhase = callInitiatedRef.current ? "calling" : "active";
+      setCallUi({
+        phase: nextPhase,
+        callType: (data.callType ?? "voice") as CallType,
+        channelName: data.channelName,
+        token: data.token,
+        uid: data.uid,
+        appId: data.appId,
+        pricePerMinute: data.pricePerMinute,
+      });
+    });
+
+    socket.on("call_accepted", () => {
+      setToast("Call accepted");
+      setCallUi((prev) => {
+        if (!prev) return prev;
+        if (prev.phase !== "calling") return prev;
+        return { ...prev, phase: "active" };
+      });
+    });
+
+    socket.on("call_declined", () => {
+      setToast("Call declined");
+      callInitiatedRef.current = false;
+      setCallUi(null);
+    });
+
+    socket.on("call_ended", () => {
+      callInitiatedRef.current = false;
+      setCallUi(null);
+    });
+
     socket.on("insufficient_balance", () => {
       setToast(
         "The user’s wallet balance is too low to continue. This session may end shortly."
@@ -244,6 +334,34 @@ export function AstrologerChatClient({ sessionId }: Props) {
       socketRef.current = null;
     };
   }, [mounted, token, sessionId, isLoggedIn, user?.id, user?.role, router]);
+
+  const initiateCall = useCallback(
+    (callType: CallType) => {
+      if (!socketRef.current) return;
+      if (status !== "active") return;
+      if (callUi) return;
+      socketRef.current.emit("initiate_call", { sessionId, callType });
+      callInitiatedRef.current = true;
+    },
+    [callUi, sessionId, status]
+  );
+
+  const acceptIncomingCall = useCallback(() => {
+    if (!socketRef.current) return;
+    socketRef.current.emit("accept_call", { sessionId });
+  }, [sessionId]);
+
+  const declineIncomingCall = useCallback(() => {
+    if (!socketRef.current) return;
+    socketRef.current.emit("decline_call", { sessionId });
+  }, [sessionId]);
+
+  const endCall = useCallback(() => {
+    if (!socketRef.current) return;
+    socketRef.current.emit("end_call", { sessionId });
+    callInitiatedRef.current = false;
+    setCallUi(null);
+  }, [sessionId]);
 
   useEffect(() => {
     if (!mounted) {
@@ -385,16 +503,46 @@ export function AstrologerChatClient({ sessionId }: Props) {
               </span>
             </div>
           </div>
-          <button
-            type="button"
-            onClick={endSession}
-            disabled={
-              status === "ended" || status === "cancelled" || status === "connecting"
-            }
-            className="rounded-xl border border-red-200 bg-red-50 px-4 py-2 text-sm font-semibold text-red-700 transition hover:bg-red-100 disabled:cursor-not-allowed disabled:opacity-50"
-          >
-            End Session
-          </button>
+          <div className="flex items-center gap-2">
+            {status === "active" ? (
+              <>
+                <button
+                  type="button"
+                  onClick={() => initiateCall("voice")}
+                  disabled={!!callUi}
+                  className="rounded-xl border border-slate-200 bg-white/70 px-3 py-2 text-sm font-semibold text-slate-700 transition hover:bg-white disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  <span className="mr-2" aria-hidden>
+                    📞
+                  </span>
+                  Voice
+                </button>
+                <button
+                  type="button"
+                  onClick={() => initiateCall("video")}
+                  disabled={!!callUi}
+                  className="rounded-xl border border-slate-200 bg-white/70 px-3 py-2 text-sm font-semibold text-slate-700 transition hover:bg-white disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  <span className="mr-2" aria-hidden>
+                    📹
+                  </span>
+                  Video
+                </button>
+              </>
+            ) : null}
+            <button
+              type="button"
+              onClick={endSession}
+              disabled={
+                status === "ended" ||
+                status === "cancelled" ||
+                status === "connecting"
+              }
+              className="rounded-xl border border-red-200 bg-red-50 px-4 py-2 text-sm font-semibold text-red-700 transition hover:bg-red-100 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              End Session
+            </button>
+          </div>
         </div>
       </header>
 
@@ -551,6 +699,27 @@ export function AstrologerChatClient({ sessionId }: Props) {
             </button>
           </div>
         </div>
+      ) : null}
+
+      {callUi ? (
+        <AgoraCallScreen
+          phase={callUi.phase}
+          channelName={callUi.channelName}
+          token={"token" in callUi ? callUi.token : ""}
+          uid={"uid" in callUi ? callUi.uid : 0}
+          appId={callUi.appId}
+          callType={callUi.callType}
+          astrologerName={peerName}
+          callerName={"callerName" in callUi ? callUi.callerName : undefined}
+          elapsedSeconds={elapsedSec}
+          pricePerMinute={callUi.pricePerMinute}
+          autoDeclineSeconds={30}
+          onAcceptCall={callUi.phase === "incoming" ? acceptIncomingCall : undefined}
+          onDeclineCall={
+            callUi.phase === "incoming" ? declineIncomingCall : undefined
+          }
+          onEndCall={endCall}
+        />
       ) : null}
 
       {waitlistNotice ? (
