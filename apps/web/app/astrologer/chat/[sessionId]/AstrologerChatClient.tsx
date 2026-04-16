@@ -39,7 +39,6 @@ export function AstrologerChatClient({ sessionId }: Props) {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState("");
   const [typing, setTyping] = useState(false);
-  const [elapsedMin, setElapsedMin] = useState(0);
   const [elapsedSec, setElapsedSec] = useState(0);
   const [summary, setSummary] = useState<{
     totalMinutes: number;
@@ -57,7 +56,6 @@ export function AstrologerChatClient({ sessionId }: Props) {
     setSummary(null);
     setMessages([]);
     setStatus("connecting");
-    setElapsedMin(0);
     setElapsedSec(0);
   }, [sessionId]);
 
@@ -114,13 +112,10 @@ export function AstrologerChatClient({ sessionId }: Props) {
     socket.on(
       "session_tick",
       ({
-        elapsedMinutes,
         elapsedSeconds,
       }: {
-        elapsedMinutes: number;
         elapsedSeconds: number;
       }) => {
-        setElapsedMin(Math.max(0, elapsedMinutes ?? 0));
         setElapsedSec(Math.max(0, elapsedSeconds ?? 0));
       }
     );
