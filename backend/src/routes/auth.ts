@@ -1,4 +1,4 @@
-import { randomInt } from "node:crypto";
+import { randomBytes, randomInt } from "node:crypto";
 
 import bcrypt from "bcryptjs";
 import { Router, type Request, type Response } from "express";
@@ -6,7 +6,7 @@ import jwt from "jsonwebtoken";
 import { z } from "zod";
 
 import { pool, query } from "../db/index.js";
-import { sendEmailOTP } from "../lib/email.js";
+import { sendEmailOTP, sendPasswordResetEmail } from "../lib/email.js";
 import { redis } from "../lib/redis.js";
 import { authMiddleware } from "../middleware/auth.js";
 
@@ -53,6 +53,15 @@ const verifyOtpBody = z.object({
 const astrologerLoginBody = z.object({
   email: z.string().email(),
   password: z.string().min(1, "Password is required"),
+});
+
+const forgotPasswordBody = z.object({
+  email: emailSchema,
+});
+
+const resetPasswordBody = z.object({
+  token: z.string().length(64, "Invalid token"),
+  newPassword: z.string().min(8, "Password must be at least 8 characters"),
 });
 
 const astrologerSpecializationOptions = [
@@ -122,6 +131,28 @@ function toPublicUser(row: {
 
 function generateOtp(): string {
   return randomInt(0, 1_000_000).toString().padStart(6, "0");
+}
+
+function frontendUrl(): string {
+  return (process.env.FRONTEND_URL ?? "http://localhost:3000").replace(/\/$/, "");
+}
+
+async function createPasswordResetToken(userId: string): Promise<string> {
+  const token = randomBytes(32).toString("hex");
+
+  await query(
+    `INSERT INTO password_reset_tokens (user_id, token, expires_at)
+     VALUES ($1, $2, NOW() + INTERVAL '1 hour')`,
+    [userId, token]
+  );
+
+  return token;
+}
+
+async function sendResetLinkEmail(email: string, path: string, userId: string): Promise<void> {
+  const token = await createPasswordResetToken(userId);
+  const resetLink = `${frontendUrl()}${path}?token=${token}`;
+  await sendPasswordResetEmail(email, resetLink);
 }
 
 async function sendSmsOTP(phone: string, otp: string): Promise<void> {
@@ -422,6 +453,106 @@ router.post("/verify-otp", async (req: Request, res: Response) => {
   });
 });
 
+router.post("/forgot-password", async (req: Request, res: Response) => {
+  const parsed = forgotPasswordBody.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({
+      success: false,
+      error: parsed.error.issues[0]?.message ?? "Invalid body",
+    });
+    return;
+  }
+
+  type UserResetRow = {
+    id: string;
+    email: string;
+  };
+
+  const result = await query<UserResetRow>(
+    `SELECT u.id, u.email
+     FROM users u
+     LEFT JOIN astrologers a ON a.user_id = u.id
+     WHERE lower(u.email) = lower($1) AND a.user_id IS NULL
+     LIMIT 1`,
+    [parsed.data.email]
+  );
+
+  const user = result.rows[0];
+  if (!user) {
+    res.status(404).json({ success: false, error: "No account found" });
+    return;
+  }
+
+  try {
+    await sendResetLinkEmail(user.email, "/reset-password", user.id);
+  } catch (e) {
+    console.error("User password reset email failed:", e);
+    res.status(500).json({ success: false, error: "Failed to send reset link" });
+    return;
+  }
+
+  res.json({ success: true, message: "Reset link sent" });
+});
+
+router.post("/reset-password", async (req: Request, res: Response) => {
+  const parsed = resetPasswordBody.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({
+      success: false,
+      error: parsed.error.issues[0]?.message ?? "Invalid body",
+    });
+    return;
+  }
+
+  type ResetTokenRow = {
+    id: string;
+    user_id: string;
+  };
+
+  const tokenResult = await query<ResetTokenRow>(
+    `SELECT id, user_id
+     FROM password_reset_tokens
+     WHERE token = $1 AND used = false AND expires_at > NOW()
+     LIMIT 1`,
+    [parsed.data.token]
+  );
+
+  const resetToken = tokenResult.rows[0];
+  if (!resetToken) {
+    res.status(400).json({ success: false, error: "Invalid or expired token" });
+    return;
+  }
+
+  const passwordHash = await bcrypt.hash(parsed.data.newPassword, 10);
+  const client = await pool.connect();
+
+  try {
+    await client.query("BEGIN");
+    await client.query(
+      `UPDATE users
+       SET password_hash = $1
+       WHERE id = $2`,
+      [passwordHash, resetToken.user_id]
+    );
+    await client.query(
+      `UPDATE password_reset_tokens
+       SET used = true
+       WHERE id = $1`,
+      [resetToken.id]
+    );
+    await client.query("COMMIT");
+  } catch (e) {
+    await client.query("ROLLBACK");
+    console.error("User password reset failed:", e);
+    res.status(500).json({ success: false, error: "Could not reset password" });
+    return;
+  } finally {
+    client.release();
+  }
+
+  res.json({ success: true, message: "Password reset successfully" });
+});
+
 router.post("/astrologer/login", async (req: Request, res: Response) => {
   const parsed = astrologerLoginBody.safeParse(req.body);
   if (!parsed.success) {
@@ -530,6 +661,107 @@ router.post("/astrologer/login", async (req: Request, res: Response) => {
     success: true,
     data: { token, astrologer },
   });
+});
+
+router.post("/astrologer/forgot-password", async (req: Request, res: Response) => {
+  const parsed = forgotPasswordBody.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({
+      success: false,
+      error: parsed.error.issues[0]?.message ?? "Invalid body",
+    });
+    return;
+  }
+
+  type AstrologerResetRow = {
+    id: string;
+    email: string;
+  };
+
+  const result = await query<AstrologerResetRow>(
+    `SELECT u.id, u.email
+     FROM users u
+     INNER JOIN astrologers a ON a.user_id = u.id
+     WHERE lower(u.email) = lower($1)
+     LIMIT 1`,
+    [parsed.data.email]
+  );
+
+  const user = result.rows[0];
+  if (!user) {
+    res.status(404).json({ success: false, error: "No account found" });
+    return;
+  }
+
+  try {
+    await sendResetLinkEmail(user.email, "/astrologer/reset-password", user.id);
+  } catch (e) {
+    console.error("Astrologer password reset email failed:", e);
+    res.status(500).json({ success: false, error: "Failed to send reset link" });
+    return;
+  }
+
+  res.json({ success: true, message: "Reset link sent" });
+});
+
+router.post("/astrologer/reset-password", async (req: Request, res: Response) => {
+  const parsed = resetPasswordBody.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({
+      success: false,
+      error: parsed.error.issues[0]?.message ?? "Invalid body",
+    });
+    return;
+  }
+
+  type ResetTokenRow = {
+    id: string;
+    user_id: string;
+  };
+
+  const tokenResult = await query<ResetTokenRow>(
+    `SELECT prt.id, prt.user_id
+     FROM password_reset_tokens prt
+     INNER JOIN astrologers a ON a.user_id = prt.user_id
+     WHERE prt.token = $1 AND prt.used = false AND prt.expires_at > NOW()
+     LIMIT 1`,
+    [parsed.data.token]
+  );
+
+  const resetToken = tokenResult.rows[0];
+  if (!resetToken) {
+    res.status(400).json({ success: false, error: "Invalid or expired token" });
+    return;
+  }
+
+  const passwordHash = await bcrypt.hash(parsed.data.newPassword, 10);
+  const client = await pool.connect();
+
+  try {
+    await client.query("BEGIN");
+    await client.query(
+      `UPDATE users
+       SET password_hash = $1
+       WHERE id = $2`,
+      [passwordHash, resetToken.user_id]
+    );
+    await client.query(
+      `UPDATE password_reset_tokens
+       SET used = true
+       WHERE id = $1`,
+      [resetToken.id]
+    );
+    await client.query("COMMIT");
+  } catch (e) {
+    await client.query("ROLLBACK");
+    console.error("Astrologer password reset failed:", e);
+    res.status(500).json({ success: false, error: "Could not reset password" });
+    return;
+  } finally {
+    client.release();
+  }
+
+  res.json({ success: true, message: "Password reset successfully" });
 });
 
 router.post("/astrologer/register", async (req: Request, res: Response) => {

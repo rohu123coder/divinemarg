@@ -146,6 +146,14 @@ export default function AstrologerLoginPage() {
             onChange={(e) => setPassword(e.target.value)}
             className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-slate-900 shadow-sm outline-none ring-violet-500 focus:ring-2"
           />
+          <div className="text-right">
+            <Link
+              href="/astrologer/forgot-password"
+              className="text-secondary text-[13px] hover:underline"
+            >
+              Forgot password?
+            </Link>
+          </div>
           {error ? (
             <p className="text-sm text-red-600" role="alert">
               {error}

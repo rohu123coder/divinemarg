@@ -21,6 +21,10 @@ body {
 }
 
 @layer utilities {
+  .text-secondary {
+    color: #64748b;
+  }
+
   .text-balance {
     text-wrap: balance;
   }

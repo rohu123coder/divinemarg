@@ -117,6 +117,14 @@ function LoginContent() {
                   placeholder="Phone number or Email"
                   className="w-full border border-slate-200 rounded-xl px-4 py-3 text-slate-900 outline-none focus:ring-2 focus:ring-violet-500"
                 />
+                <div className="text-right">
+                  <Link
+                    href="/forgot-password"
+                    className="text-secondary text-[13px] hover:underline"
+                  >
+                    Forgot password?
+                  </Link>
+                </div>
                 {error && <p className="text-red-600 text-sm">{error}</p>}
                 <button onClick={sendOtp} disabled={loading || !identifier}
                   className="w-full py-3 rounded-xl bg-gradient-to-r from-purple-600 to-indigo-600 text-white font-semibold disabled:opacity-60">
