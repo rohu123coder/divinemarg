@@ -61,6 +61,35 @@ router.post(
       return;
     }
 
+    const activeSessionResult = await query<{ id: string }>(
+      `SELECT id
+       FROM chat_sessions
+       WHERE astrologer_id = $1
+         AND status = 'active'
+       LIMIT 1`,
+      [astrologer_id]
+    );
+    if (activeSessionResult.rows[0]) {
+      const queueResult = await query<{ count: string }>(
+        `SELECT COUNT(*)::text AS count
+         FROM astrologer_waitlist
+         WHERE astrologer_id = $1
+           AND status = 'waiting'`,
+        [astrologer_id]
+      );
+      const queueLength = Number(queueResult.rows[0]?.count ?? 0);
+      res.status(409).json({
+        success: false,
+        error: "Astrologer is busy",
+        data: {
+          busy: true,
+          astrologer_id,
+          queue_length: queueLength,
+        },
+      });
+      return;
+    }
+
     const price = Number(astro.price_per_minute ?? 0);
     const minimumBalance = price * 5;
 

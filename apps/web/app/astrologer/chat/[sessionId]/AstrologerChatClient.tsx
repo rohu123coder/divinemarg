@@ -23,6 +23,13 @@ type ChatMessage = {
   createdAt: string;
 };
 
+type WaitlistEntry = {
+  waitlistId: string;
+  userId: string;
+  userName: string;
+  position: number;
+};
+
 type Props = { sessionId: string };
 
 export function AstrologerChatClient({ sessionId }: Props) {
@@ -45,6 +52,9 @@ export function AstrologerChatClient({ sessionId }: Props) {
     totalCharged: number;
   } | null>(null);
   const [toast, setToast] = useState<string | null>(null);
+  const [waitlistNotice, setWaitlistNotice] = useState<WaitlistEntry | null>(null);
+  const [waitlistQueue, setWaitlistQueue] = useState<WaitlistEntry[]>([]);
+  const [waitlistCollapsed, setWaitlistCollapsed] = useState(true);
 
   const socketRef = useRef<Socket | null>(null);
   const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -85,6 +95,7 @@ export function AstrologerChatClient({ sessionId }: Props) {
 
     socket.on("connect", () => {
       socket.emit("join_session", { sessionId });
+      socket.emit("get_waitlist");
     });
 
     socket.on("connect_error", () => {
@@ -200,6 +211,31 @@ export function AstrologerChatClient({ sessionId }: Props) {
       );
     });
 
+    socket.on("waitlist_request", (payload: WaitlistEntry) => {
+      setWaitlistNotice(payload);
+    });
+
+    socket.on("waitlist_updated", (payload: { queue: WaitlistEntry[] }) => {
+      setWaitlistQueue(payload.queue ?? []);
+    });
+
+    socket.on("waitlist_data", (payload: { queue: WaitlistEntry[] }) => {
+      setWaitlistQueue(payload.queue ?? []);
+    });
+
+    socket.on("waitlist_ready", (payload: { queue: WaitlistEntry[] }) => {
+      setWaitlistQueue(payload.queue ?? []);
+      setWaitlistCollapsed(false);
+    });
+
+    socket.on(
+      "waitlist_session_started",
+      (payload: { sessionId: string; userName: string }) => {
+        const q = encodeURIComponent(payload.userName);
+        router.push(`/astrologer/chat/${payload.sessionId}?name=${q}`);
+      }
+    );
+
     return () => {
       if (typingTimeoutRef.current) {
         clearTimeout(typingTimeoutRef.current);
@@ -207,7 +243,7 @@ export function AstrologerChatClient({ sessionId }: Props) {
       socket.disconnect();
       socketRef.current = null;
     };
-  }, [mounted, token, sessionId, isLoggedIn, user?.id, user?.role]);
+  }, [mounted, token, sessionId, isLoggedIn, user?.id, user?.role, router]);
 
   useEffect(() => {
     if (!mounted) {
@@ -267,6 +303,31 @@ export function AstrologerChatClient({ sessionId }: Props) {
     }
     socketRef.current.emit("end_session", { sessionId });
   }, [sessionId]);
+
+  const sendWaitlistAction = useCallback(
+    (waitlistId: string, action: "accept" | "decline" | "already_added") => {
+      if (!socketRef.current) {
+        return;
+      }
+      socketRef.current.emit("waitlist_action", { waitlistId, action });
+      if (action !== "accept") {
+        setWaitlistNotice((prev) =>
+          prev?.waitlistId === waitlistId ? null : prev
+        );
+      }
+    },
+    []
+  );
+
+  const acceptFromQueue = useCallback((entry: WaitlistEntry) => {
+    if (!socketRef.current) {
+      return;
+    }
+    socketRef.current.emit("accept_from_waitlist", {
+      waitlistId: entry.waitlistId,
+      userId: entry.userId,
+    });
+  }, []);
 
   function formatTimer(totalSeconds: number): string {
     const m = Math.floor(totalSeconds / 60);
@@ -338,6 +399,47 @@ export function AstrologerChatClient({ sessionId }: Props) {
       </header>
 
       <main className="mx-auto flex w-full max-w-3xl flex-1 flex-col px-2 pb-28 pt-4 sm:px-4">
+        <section className="mb-3 rounded-2xl border border-slate-200 bg-white p-3 shadow-sm">
+          <button
+            type="button"
+            onClick={() => setWaitlistCollapsed((prev) => !prev)}
+            className="flex w-full items-center justify-between text-left"
+          >
+            <h2 className="text-sm font-semibold text-slate-900">
+              Waiting Queue ({waitlistQueue.length})
+            </h2>
+            <span className="text-xs text-slate-500">
+              {waitlistCollapsed ? "Show" : "Hide"}
+            </span>
+          </button>
+          {!waitlistCollapsed ? (
+            waitlistQueue.length > 0 ? (
+              <ul className="mt-2 space-y-2">
+                {waitlistQueue.map((entry) => (
+                  <li
+                    key={entry.waitlistId}
+                    className="flex items-center justify-between rounded-xl border border-slate-200 px-3 py-2"
+                  >
+                    <p className="text-xs font-semibold text-slate-900">
+                      #{entry.position} {entry.userName}
+                    </p>
+                    <button
+                      type="button"
+                      onClick={() => acceptFromQueue(entry)}
+                      disabled={status === "active"}
+                      className="rounded-lg bg-gradient-to-r from-purple-600 to-orange-500 px-3 py-1 text-xs font-semibold text-white disabled:opacity-50"
+                    >
+                      Accept
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p className="mt-2 text-xs text-slate-600">No users in queue.</p>
+            )
+          ) : null}
+        </section>
+
         {status === "waiting" ? (
           <p className="mb-3 text-center text-sm text-slate-600">
             Waiting for the user to connect…
@@ -446,6 +548,42 @@ export function AstrologerChatClient({ sessionId }: Props) {
               onClick={() => router.replace("/astrologer/dashboard")}
             >
               Back to dashboard
+            </button>
+          </div>
+        </div>
+      ) : null}
+
+      {waitlistNotice ? (
+        <div className="fixed left-1/2 top-24 z-[95] w-[min(92vw,40rem)] -translate-x-1/2 rounded-2xl border border-violet-200 bg-white p-4 shadow-xl">
+          <p className="text-sm font-semibold text-slate-900">
+            {waitlistNotice.userName} wants to chat
+          </p>
+          <p className="mt-1 text-xs text-slate-600">
+            Queue position #{waitlistNotice.position}
+          </p>
+          <div className="mt-3 flex flex-wrap gap-2">
+            <button
+              type="button"
+              onClick={() => sendWaitlistAction(waitlistNotice.waitlistId, "accept")}
+              className="rounded-lg bg-gradient-to-r from-purple-600 to-orange-500 px-3 py-1.5 text-xs font-semibold text-white"
+            >
+              Accept
+            </button>
+            <button
+              type="button"
+              onClick={() =>
+                sendWaitlistAction(waitlistNotice.waitlistId, "already_added")
+              }
+              className="rounded-lg border border-slate-300 px-3 py-1.5 text-xs font-semibold text-slate-800"
+            >
+              Add to Waitlist
+            </button>
+            <button
+              type="button"
+              onClick={() => sendWaitlistAction(waitlistNotice.waitlistId, "decline")}
+              className="rounded-lg border border-red-200 bg-red-50 px-3 py-1.5 text-xs font-semibold text-red-700"
+            >
+              Decline
             </button>
           </div>
         </div>

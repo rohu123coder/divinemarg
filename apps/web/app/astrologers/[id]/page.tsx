@@ -2,11 +2,13 @@
 
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { io, type Socket } from "socket.io-client";
 
 import { Navbar } from "@/components/Navbar";
 import { WalletWidget } from "@/components/WalletWidget";
 import api from "@/lib/api";
+import { getSocketApiBase } from "@/lib/socketBase";
 import { useAuthStore } from "@/lib/store";
 
 type Review = {
@@ -26,6 +28,8 @@ type AstrologerDetail = {
   total_reviews: number;
   price_per_minute: number | null;
   is_available: boolean;
+  is_busy: boolean;
+  waiting_count: number;
   experience_years: number | null;
   user: {
     name: string;
@@ -50,7 +54,7 @@ export default function AstrologerProfilePage() {
   const params = useParams();
   const id = typeof params.id === "string" ? params.id : "";
   const router = useRouter();
-  const { isLoggedIn, user } = useAuthStore();
+  const { isLoggedIn, user, token } = useAuthStore();
   const [data, setData] = useState<{
     astrologer: AstrologerDetail;
     reviews: Review[];
@@ -58,7 +62,17 @@ export default function AstrologerProfilePage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [chatLoading, setChatLoading] = useState(false);
+  const [joinWaitlistLoading, setJoinWaitlistLoading] = useState(false);
   const [rechargeOpen, setRechargeOpen] = useState(false);
+  const [busyPromptOpen, setBusyPromptOpen] = useState(false);
+  const [busyQueueLength, setBusyQueueLength] = useState(0);
+  const [waitlistState, setWaitlistState] = useState<{
+    waitlistId: string;
+    position: number;
+    queueLength: number;
+  } | null>(null);
+
+  const socketRef = useRef<Socket | null>(null);
 
   useEffect(() => {
     if (!id) {
@@ -91,6 +105,123 @@ export default function AstrologerProfilePage() {
     };
   }, [id]);
 
+  useEffect(() => {
+    if (!token || !isLoggedIn || user?.role === "astrologer") {
+      return;
+    }
+    const socket = io(getSocketApiBase(), {
+      auth: { token },
+      reconnection: true,
+      reconnectionAttempts: 10,
+      reconnectionDelay: 1000,
+      timeout: 20000,
+      transports: ["websocket", "polling"],
+    });
+    socketRef.current = socket;
+
+    socket.on(
+      "waitlist_joined",
+      (payload: {
+        waitlistId: string;
+        position: number;
+        queueLength: number;
+        astrologerId: string;
+      }) => {
+        if (payload.astrologerId !== id) {
+          return;
+        }
+        setBusyPromptOpen(false);
+        setWaitlistState({
+          waitlistId: payload.waitlistId,
+          position: payload.position,
+          queueLength: payload.queueLength,
+        });
+      }
+    );
+
+    socket.on(
+      "queue_position_update",
+      (payload: {
+        waitlistId?: string;
+        astrologerId: string;
+        newPosition: number;
+        queueLength: number;
+      }) => {
+        if (payload.astrologerId !== id) {
+          return;
+        }
+        setWaitlistState((prev) => {
+          if (!prev) {
+            return prev;
+          }
+          if (payload.waitlistId && payload.waitlistId !== prev.waitlistId) {
+            return prev;
+          }
+          return {
+            ...prev,
+            position: payload.newPosition,
+            queueLength: payload.queueLength,
+          };
+        });
+      }
+    );
+
+    socket.on(
+      "waitlist_declined",
+      (payload: { waitlistId?: string; astrologerId?: string }) => {
+        if (payload.astrologerId && payload.astrologerId !== id) {
+          return;
+        }
+        setWaitlistState((prev) => {
+          if (!prev) {
+            return prev;
+          }
+          if (payload.waitlistId && payload.waitlistId !== prev.waitlistId) {
+            return prev;
+          }
+          return null;
+        });
+        setError("Astrologer is unavailable. Try another astrologer.");
+      }
+    );
+
+    socket.on(
+      "waitlist_cancelled",
+      (payload: { waitlistId?: string; astrologerId?: string; ok?: boolean }) => {
+        if (payload.astrologerId && payload.astrologerId !== id) {
+          return;
+        }
+        setWaitlistState((prev) => {
+          if (!prev) {
+            return prev;
+          }
+          if (payload.waitlistId && payload.waitlistId !== prev.waitlistId) {
+            return prev;
+          }
+          return null;
+        });
+      }
+    );
+
+    socket.on(
+      "session_starting",
+      (payload: { sessionId: string; astrologerName?: string; astrologerId?: string }) => {
+        if (payload.astrologerId && payload.astrologerId !== id) {
+          return;
+        }
+        const astrologerName = encodeURIComponent(
+          payload.astrologerName ?? data?.astrologer.user.name ?? "Astrologer"
+        );
+        router.push(`/chat/${payload.sessionId}?name=${astrologerName}`);
+      }
+    );
+
+    return () => {
+      socket.disconnect();
+      socketRef.current = null;
+    };
+  }, [data?.astrologer.user.name, id, isLoggedIn, router, token, user?.role]);
+
   const startChat = useCallback(async () => {
     if (!data) {
       return;
@@ -119,6 +250,35 @@ export default function AstrologerProfilePage() {
       const name = encodeURIComponent(data.astrologer.user.name);
       router.push(`/chat/${sessionId}?name=${name}`);
     } catch (e: unknown) {
+      const maybeStatus =
+        e &&
+        typeof e === "object" &&
+        "response" in e &&
+        e.response &&
+        typeof e.response === "object" &&
+        "status" in e.response
+          ? Number(e.response.status)
+          : null;
+      const responseData =
+        e &&
+        typeof e === "object" &&
+        "response" in e &&
+        e.response &&
+        typeof e.response === "object" &&
+        "data" in e.response &&
+        e.response.data &&
+        typeof e.response.data === "object"
+          ? (e.response.data as {
+              data?: { queue_length?: number };
+              error?: string;
+            })
+          : undefined;
+      if (maybeStatus === 409 && responseData?.data) {
+        setBusyQueueLength(Number(responseData.data.queue_length ?? 0));
+        setBusyPromptOpen(true);
+        setError(null);
+        return;
+      }
       const msg =
         e &&
         typeof e === "object" &&
@@ -135,7 +295,29 @@ export default function AstrologerProfilePage() {
     } finally {
       setChatLoading(false);
     }
-  }, [data, isLoggedIn, router, user?.wallet_balance]);
+  }, [data, id, isLoggedIn, router, user?.wallet_balance]);
+
+  const joinWaitlist = useCallback(() => {
+    if (!data || !socketRef.current) {
+      setError("Could not connect to waitlist. Please refresh and try again.");
+      return;
+    }
+    setJoinWaitlistLoading(true);
+    socketRef.current.emit("join_waitlist", {
+      astrologerId: data.astrologer.id,
+    });
+    setTimeout(() => setJoinWaitlistLoading(false), 800);
+  }, [data]);
+
+  const cancelWaitlist = useCallback(() => {
+    if (!waitlistState || !socketRef.current || !data) {
+      return;
+    }
+    socketRef.current.emit("cancel_waitlist", {
+      waitlistId: waitlistState.waitlistId,
+      astrologerId: data.astrologer.id,
+    });
+  }, [data, waitlistState]);
 
   if (loading) {
     return (
@@ -174,6 +356,27 @@ export default function AstrologerProfilePage() {
       <Navbar />
 
       <div className="mx-auto max-w-4xl px-4 py-8 sm:px-6 sm:py-10">
+        {waitlistState ? (
+          <section className="mb-6 rounded-2xl border border-violet-200 bg-violet-50 p-5 shadow-sm">
+            <h2 className="text-lg font-bold text-violet-900">You are in queue</h2>
+            <p className="mt-2 text-sm text-violet-800">
+              You are #{waitlistState.position} in queue for{" "}
+              {astrologer.user.name}. Estimated wait: ~
+              {Math.max(1, waitlistState.position * 5)} min.
+            </p>
+            <p className="mt-1 text-xs text-violet-700">
+              Queue length: {waitlistState.queueLength}
+            </p>
+            <button
+              type="button"
+              onClick={cancelWaitlist}
+              className="mt-4 rounded-xl border border-violet-300 bg-white px-4 py-2 text-sm font-semibold text-violet-800 hover:bg-violet-100"
+            >
+              Cancel Request
+            </button>
+          </section>
+        ) : null}
+
         <div className="overflow-hidden rounded-2xl border border-slate-100 bg-white shadow-sm">
           <div className="bg-gradient-to-r from-violet-600/90 to-indigo-600/90 px-6 py-10 text-white">
             <div className="flex flex-col gap-6 sm:flex-row sm:items-center">
@@ -200,6 +403,11 @@ export default function AstrologerProfilePage() {
                   <span className="rounded-full bg-white/15 px-2 py-0.5 text-xs font-semibold">
                     ₹{price.toFixed(0)} / min
                   </span>
+                  {astrologer.is_busy ? (
+                    <span className="rounded-full bg-orange-500/30 px-2 py-0.5 text-xs font-semibold">
+                      Busy · {astrologer.waiting_count} waiting
+                    </span>
+                  ) : null}
                 </div>
                 <div className="mt-4 flex flex-wrap gap-2">
                   {astrologer.specializations.map((s) => (
@@ -223,13 +431,15 @@ export default function AstrologerProfilePage() {
               <div className="hidden lg:block">
                 <button
                   type="button"
-                  disabled={!astrologer.is_available || chatLoading}
+                  disabled={(!astrologer.is_available && !astrologer.is_busy) || chatLoading}
                   onClick={() => void startChat()}
                   className="rounded-xl bg-white px-6 py-3 text-sm font-bold text-violet-700 shadow-md transition hover:bg-white/95 disabled:cursor-not-allowed disabled:bg-white/50 disabled:text-violet-400"
                 >
                   {chatLoading
                     ? "Starting…"
-                    : astrologer.is_available
+                    : astrologer.is_busy
+                      ? `Join Waitlist (${astrologer.waiting_count})`
+                      : astrologer.is_available
                       ? "Chat Now"
                       : "Offline"}
                 </button>
@@ -284,17 +494,51 @@ export default function AstrologerProfilePage() {
       <div className="fixed bottom-0 left-0 right-0 border-t border-slate-200 bg-white/95 p-4 backdrop-blur lg:hidden">
         <button
           type="button"
-          disabled={!astrologer.is_available || chatLoading}
+          disabled={(!astrologer.is_available && !astrologer.is_busy) || chatLoading}
           onClick={() => void startChat()}
           className="w-full rounded-xl bg-gradient-to-r from-purple-600 to-orange-500 py-3.5 text-sm font-bold text-white shadow-lg transition hover:opacity-95 disabled:cursor-not-allowed disabled:opacity-50"
         >
           {chatLoading
             ? "Starting…"
-            : astrologer.is_available
+            : astrologer.is_busy
+              ? `Join Waitlist (${astrologer.waiting_count})`
+              : astrologer.is_available
               ? "Chat Now"
               : "Offline"}
         </button>
       </div>
+
+      {busyPromptOpen ? (
+        <div className="fixed inset-0 z-[85] flex items-end justify-center bg-black/40 p-4 sm:items-center">
+          <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl">
+            <h2 className="text-lg font-bold text-slate-900">Astrologer is busy</h2>
+            <p className="mt-2 text-sm text-slate-700">
+              This astrologer is in another active session.
+              <span className="font-semibold">
+                {" "}
+                {busyQueueLength} users already waiting.
+              </span>
+            </p>
+            <div className="mt-5 flex gap-3">
+              <button
+                type="button"
+                className="flex-1 rounded-xl border border-slate-200 py-2.5 text-sm font-semibold text-slate-700"
+                onClick={() => setBusyPromptOpen(false)}
+              >
+                Not now
+              </button>
+              <button
+                type="button"
+                className="flex-1 rounded-xl bg-gradient-to-r from-purple-600 to-orange-500 py-2.5 text-sm font-semibold text-white disabled:opacity-60"
+                onClick={joinWaitlist}
+                disabled={joinWaitlistLoading}
+              >
+                {joinWaitlistLoading ? "Joining…" : "Join Waitlist"}
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
 
       {rechargeOpen ? (
         <div className="fixed inset-0 z-[80] flex items-end justify-center bg-black/40 p-4 sm:items-center">

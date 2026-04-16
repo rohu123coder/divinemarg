@@ -48,6 +48,21 @@ CREATE TABLE chat_sessions (
   total_charged NUMERIC(14, 2)
 );
 
+CREATE TABLE astrologer_waitlist (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  astrologer_id UUID NOT NULL REFERENCES astrologers (id) ON DELETE CASCADE,
+  user_id UUID NOT NULL REFERENCES users (id) ON DELETE CASCADE,
+  session_id UUID REFERENCES chat_sessions (id) ON DELETE SET NULL,
+  position INTEGER NOT NULL,
+  status VARCHAR(20) NOT NULL DEFAULT 'waiting',
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  UNIQUE (astrologer_id, user_id, status)
+);
+
+CREATE INDEX idx_waitlist_astrologer
+  ON astrologer_waitlist (astrologer_id, status, position);
+
 CREATE TABLE messages (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   session_id UUID NOT NULL REFERENCES chat_sessions (id) ON DELETE CASCADE,

@@ -32,6 +32,8 @@ type AstrologerListRow = {
   experience_years: number | null;
   name: string;
   avatar_url: string | null;
+  waiting_count: number;
+  is_busy: boolean;
 };
 
 function listOrderClause(sort: z.infer<typeof listQuerySchema>["sort"]): string {
@@ -103,7 +105,19 @@ router.get("/", async (req: Request, res: Response) => {
        a.is_available,
        a.experience_years,
        u.name,
-       u.avatar_url
+       u.avatar_url,
+       (
+         SELECT COUNT(*)::int
+         FROM astrologer_waitlist w
+         WHERE w.astrologer_id = a.id
+           AND w.status = 'waiting'
+       ) AS waiting_count,
+       EXISTS (
+         SELECT 1
+         FROM chat_sessions cs
+         WHERE cs.astrologer_id = a.id
+           AND cs.status = 'active'
+       ) AS is_busy
      FROM astrologers a
      INNER JOIN users u ON u.id = a.user_id
      ${whereSql}
@@ -125,6 +139,8 @@ router.get("/", async (req: Request, res: Response) => {
     experience_years: row.experience_years,
     name: row.name,
     avatar_url: row.avatar_url,
+    waiting_count: row.waiting_count,
+    is_busy: row.is_busy,
   }));
 
   res.json({
@@ -398,6 +414,8 @@ type DetailRow = {
   email: string;
   phone: string;
   avatar_url: string | null;
+  waiting_count: number;
+  is_busy: boolean;
 };
 
 router.get("/:id", optionalAuthMiddleware, async (req: Request, res: Response) => {
@@ -423,7 +441,19 @@ router.get("/:id", optionalAuthMiddleware, async (req: Request, res: Response) =
           u.name,
           u.email,
           u.phone,
-          u.avatar_url
+          u.avatar_url,
+          (
+            SELECT COUNT(*)::int
+            FROM astrologer_waitlist w
+            WHERE w.astrologer_id = a.id
+              AND w.status = 'waiting'
+          ) AS waiting_count,
+          EXISTS (
+            SELECT 1
+            FROM chat_sessions cs
+            WHERE cs.astrologer_id = a.id
+              AND cs.status = 'active'
+          ) AS is_busy
         FROM astrologers a
         INNER JOIN users u ON u.id = a.user_id
        WHERE a.id = $1
@@ -462,6 +492,8 @@ router.get("/:id", optionalAuthMiddleware, async (req: Request, res: Response) =
         price_per_minute:
           row.price_per_minute != null ? Number(row.price_per_minute) : null,
         is_available: row.is_available,
+        waiting_count: row.waiting_count,
+        is_busy: row.is_busy,
         experience_years: row.experience_years,
         user: {
           name: row.name,

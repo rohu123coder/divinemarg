@@ -15,6 +15,8 @@ type Astro = {
   rating: number | null;
   price_per_minute: number | null;
   is_available: boolean;
+  is_busy: boolean;
+  waiting_count: number;
   experience_years: number | null;
 };
 

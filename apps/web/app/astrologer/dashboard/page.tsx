@@ -25,6 +25,13 @@ type IncomingRequest = {
   userName: string;
 };
 
+type WaitlistEntry = {
+  waitlistId: string;
+  userId: string;
+  userName: string;
+  position: number;
+};
+
 export default function AstrologerDashboardPage() {
   const router = useRouter();
   const { user, token, isLoggedIn } = useAuthStore();
@@ -35,6 +42,9 @@ export default function AstrologerDashboardPage() {
   const [availLoading, setAvailLoading] = useState(false);
   const [incoming, setIncoming] = useState<IncomingRequest | null>(null);
   const [countdown, setCountdown] = useState(30);
+  const [waitlistNotice, setWaitlistNotice] = useState<WaitlistEntry | null>(null);
+  const [waitlistQueue, setWaitlistQueue] = useState<WaitlistEntry[]>([]);
+  const [waitlistCollapsed, setWaitlistCollapsed] = useState(false);
 
   const socketRef = useRef<Socket | null>(null);
   const countdownRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -97,12 +107,40 @@ export default function AstrologerDashboardPage() {
 
     socket.on("connect", rejoinUserRoom);
     socket.io.on("reconnect", rejoinUserRoom);
+    socket.on("connect", () => {
+      socket.emit("get_waitlist");
+    });
 
     socket.on("incoming_request", (payload: IncomingRequest) => {
       incomingRef.current = payload;
       setIncoming(payload);
       setCountdown(30);
     });
+
+    socket.on("waitlist_request", (payload: WaitlistEntry) => {
+      setWaitlistNotice(payload);
+    });
+
+    socket.on("waitlist_updated", (payload: { queue: WaitlistEntry[] }) => {
+      setWaitlistQueue(payload.queue ?? []);
+    });
+
+    socket.on("waitlist_data", (payload: { queue: WaitlistEntry[] }) => {
+      setWaitlistQueue(payload.queue ?? []);
+    });
+
+    socket.on("waitlist_ready", (payload: { queue: WaitlistEntry[] }) => {
+      setWaitlistQueue(payload.queue ?? []);
+      setWaitlistCollapsed(false);
+    });
+
+    socket.on(
+      "waitlist_session_started",
+      (payload: { sessionId: string; userName: string }) => {
+        const q = encodeURIComponent(payload.userName);
+        router.push(`/astrologer/chat/${payload.sessionId}?name=${q}`);
+      }
+    );
 
     socket.on("disconnect", () => {
       // Keep any active incoming request visible across transient disconnects.
@@ -115,7 +153,7 @@ export default function AstrologerDashboardPage() {
       socket.disconnect();
       socketRef.current = null;
     };
-  }, [mounted, token, isLoggedIn, user?.role]);
+  }, [mounted, token, isLoggedIn, user?.role, router]);
 
   useEffect(() => {
     if (!incoming) {
@@ -189,6 +227,31 @@ export default function AstrologerDashboardPage() {
     socketRef.current.emit("decline_request", { sessionId: incoming.sessionId });
     setIncoming(null);
   };
+
+  const sendWaitlistAction = useCallback(
+    (waitlistId: string, action: "accept" | "decline" | "already_added") => {
+      if (!socketRef.current) {
+        return;
+      }
+      socketRef.current.emit("waitlist_action", { waitlistId, action });
+      if (action !== "accept") {
+        setWaitlistNotice((prev) =>
+          prev?.waitlistId === waitlistId ? null : prev
+        );
+      }
+    },
+    []
+  );
+
+  const acceptFromQueue = useCallback((entry: WaitlistEntry) => {
+    if (!socketRef.current) {
+      return;
+    }
+    socketRef.current.emit("accept_from_waitlist", {
+      waitlistId: entry.waitlistId,
+      userId: entry.userId,
+    });
+  }, []);
 
   const stars = useMemo(() => {
     const r = dash?.rating;
@@ -297,6 +360,49 @@ export default function AstrologerDashboardPage() {
             </div>
           </div>
         ) : null}
+
+        <section className="mt-8 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+          <button
+            type="button"
+            onClick={() => setWaitlistCollapsed((prev) => !prev)}
+            className="flex w-full items-center justify-between text-left"
+          >
+            <h2 className="text-base font-semibold text-slate-900">
+              Waiting Queue ({waitlistQueue.length})
+            </h2>
+            <span className="text-sm text-slate-500">
+              {waitlistCollapsed ? "Show" : "Hide"}
+            </span>
+          </button>
+          {!waitlistCollapsed ? (
+            waitlistQueue.length > 0 ? (
+              <ul className="mt-4 space-y-2">
+                {waitlistQueue.map((entry) => (
+                  <li
+                    key={entry.waitlistId}
+                    className="flex items-center justify-between rounded-xl border border-slate-200 px-3 py-2"
+                  >
+                    <div>
+                      <p className="text-sm font-semibold text-slate-900">
+                        #{entry.position} {entry.userName}
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => acceptFromQueue(entry)}
+                      disabled={Boolean(incoming)}
+                      className="rounded-lg bg-gradient-to-r from-purple-600 to-orange-500 px-3 py-1.5 text-xs font-semibold text-white disabled:opacity-50"
+                    >
+                      Accept
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p className="mt-3 text-sm text-slate-600">No users in waitlist.</p>
+            )
+          ) : null}
+        </section>
       </main>
 
       {incoming ? (
@@ -326,6 +432,42 @@ export default function AstrologerDashboardPage() {
                 Accept
               </button>
             </div>
+          </div>
+        </div>
+      ) : null}
+
+      {waitlistNotice ? (
+        <div className="fixed left-1/2 top-24 z-[95] w-[min(92vw,42rem)] -translate-x-1/2 rounded-2xl border border-violet-200 bg-white p-4 shadow-xl">
+          <p className="text-sm font-semibold text-slate-900">
+            New request from {waitlistNotice.userName}
+          </p>
+          <p className="mt-1 text-xs text-slate-600">
+            Queue position #{waitlistNotice.position}
+          </p>
+          <div className="mt-3 flex flex-wrap gap-2">
+            <button
+              type="button"
+              onClick={() => sendWaitlistAction(waitlistNotice.waitlistId, "accept")}
+              className="rounded-lg bg-gradient-to-r from-purple-600 to-orange-500 px-3 py-1.5 text-xs font-semibold text-white"
+            >
+              Accept
+            </button>
+            <button
+              type="button"
+              onClick={() =>
+                sendWaitlistAction(waitlistNotice.waitlistId, "already_added")
+              }
+              className="rounded-lg border border-slate-300 px-3 py-1.5 text-xs font-semibold text-slate-800"
+            >
+              Add to Waitlist
+            </button>
+            <button
+              type="button"
+              onClick={() => sendWaitlistAction(waitlistNotice.waitlistId, "decline")}
+              className="rounded-lg border border-red-200 bg-red-50 px-3 py-1.5 text-xs font-semibold text-red-700"
+            >
+              Decline
+            </button>
           </div>
         </div>
       ) : null}
