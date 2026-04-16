@@ -48,6 +48,7 @@ export function ChatSessionClient({ sessionId }: ChatSessionClientProps) {
   const [input, setInput] = useState("");
   const [typing, setTyping] = useState(false);
   const [elapsedMin, setElapsedMin] = useState(0);
+  const [elapsedSec, setElapsedSec] = useState(0);
   const [summary, setSummary] = useState<{
     totalMinutes: number;
     totalCharged: number;
@@ -65,6 +66,7 @@ export function ChatSessionClient({ sessionId }: ChatSessionClientProps) {
     setMessages([]);
     setStatus("connecting");
     setElapsedMin(0);
+    setElapsedSec(0);
   }, [sessionId]);
 
   useEffect(() => {
@@ -116,11 +118,15 @@ export function ChatSessionClient({ sessionId }: ChatSessionClientProps) {
 
     socket.on(
       "session_tick",
-      (payload: {
+      ({
+        elapsedMinutes,
+        elapsedSeconds,
+      }: {
         elapsedMinutes: number;
         elapsedSeconds: number;
       }) => {
-        setElapsedMin(Math.max(0, payload.elapsedMinutes ?? 0));
+        setElapsedMin(Math.max(0, elapsedMinutes ?? 0));
+        setElapsedSec(Math.max(0, elapsedSeconds ?? 0));
       }
     );
 
@@ -245,6 +251,12 @@ export function ChatSessionClient({ sessionId }: ChatSessionClientProps) {
     socketRef.current.emit("end_session", { sessionId });
   }, [sessionId]);
 
+  function formatTimer(totalSeconds: number): string {
+    const m = Math.floor(totalSeconds / 60);
+    const s = totalSeconds % 60;
+    return `${m}:${s.toString().padStart(2, "0")}`;
+  }
+
   const statusBadge = useMemo(() => {
     const base =
       "inline-flex rounded-full px-2.5 py-0.5 text-xs font-semibold capitalize";
@@ -289,7 +301,7 @@ export function ChatSessionClient({ sessionId }: ChatSessionClientProps) {
               <span>
                 Timer:{" "}
                 <span className="font-semibold text-slate-900">
-                  {status === "active" ? `${elapsedMin} min` : "—"}
+                  {status === "active" ? formatTimer(elapsedSec) : "—"}
                 </span>
               </span>
             </div>
