@@ -50,6 +50,33 @@ function listOrderClause(sort: z.infer<typeof listQuerySchema>["sort"]): string 
   }
 }
 
+async function buildPublicVisibilityConditions(alias: string): Promise<string[]> {
+  const columnsResult = await query<{ column_name: string }>(
+    `SELECT column_name
+     FROM information_schema.columns
+     WHERE table_schema = 'public'
+       AND table_name = 'astrologers'
+       AND column_name = ANY($1::text[])`,
+    [["is_verified", "is_approved", "is_active", "status"]]
+  );
+  const columns = new Set(columnsResult.rows.map((row) => row.column_name));
+  const conditions: string[] = [];
+
+  if (columns.has("is_active")) {
+    conditions.push(`${alias}.is_active = true`);
+  }
+
+  if (columns.has("is_approved")) {
+    conditions.push(`${alias}.is_approved = true`);
+  } else if (columns.has("status")) {
+    conditions.push(`LOWER(COALESCE(${alias}.status::text, '')) = 'verified'`);
+  } else if (columns.has("is_verified")) {
+    conditions.push(`${alias}.is_verified = true`);
+  }
+
+  return conditions;
+}
+
 router.get("/", async (req: Request, res: Response) => {
   const parsed = listQuerySchema.safeParse(req.query);
   if (!parsed.success) {
@@ -64,7 +91,7 @@ router.get("/", async (req: Request, res: Response) => {
   const offset = (page - 1) * limit;
   const orderBy = listOrderClause(sort);
 
-  const conditions: string[] = ["a.is_verified = true"];
+  const conditions = await buildPublicVisibilityConditions("a");
   const params: unknown[] = [];
   let p = 1;
 
@@ -426,6 +453,10 @@ router.get("/:id", optionalAuthMiddleware, async (req: Request, res: Response) =
   }
   const id = idParse.data;
   const viewerId = req.user?.userId ?? null;
+  const publicVisibilityConditions = await buildPublicVisibilityConditions("a");
+  const publicVisibilitySql = publicVisibilityConditions.length
+    ? publicVisibilityConditions.join(" AND ")
+    : "TRUE";
 
   const result = await query<DetailRow>(
     `SELECT
@@ -458,7 +489,7 @@ router.get("/:id", optionalAuthMiddleware, async (req: Request, res: Response) =
         INNER JOIN users u ON u.id = a.user_id
        WHERE a.id = $1
          AND (
-           a.is_verified = true
+           (${publicVisibilitySql})
            OR ($2::uuid IS NOT NULL AND a.user_id = $2)
          )`,
     [id, viewerId]
