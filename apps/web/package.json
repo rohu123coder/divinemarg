@@ -9,6 +9,7 @@
     "lint": "next lint"
   },
   "dependencies": {
+    "agora-rtc-sdk-ng": "^4.24.3",
     "axios": "^1.15.0",
     "divinemarg-shared": "*",
     "luxon": "^3.5.0",

@@ -1,6 +1,7 @@
 "use client";
 
 import { useRouter, useSearchParams } from "next/navigation";
+import dynamic from "next/dynamic";
 import {
   useCallback,
   useEffect,
@@ -11,9 +12,13 @@ import {
 import { io, type Socket } from "socket.io-client";
 
 import { AstrologerNavbar } from "@/components/AstrologerNavbar";
-import { AgoraCallScreen } from "@/components/AgoraCallScreen";
 import { getSocketApiBase } from "@/lib/socketBase";
 import { useAuthStore } from "@/lib/store";
+
+const AgoraCallScreen = dynamic(
+  () => import("@/components/AgoraCallScreen").then((m) => m.AgoraCallScreen),
+  { ssr: false }
+);
 
 type ChatMessage = {
   id: string;
