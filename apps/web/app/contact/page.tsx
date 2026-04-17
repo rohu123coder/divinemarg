@@ -10,7 +10,16 @@ export const metadata: Metadata = {
     "Get in touch with DivineMarg support for account help, payments, technical issues, and general inquiries.",
 };
 
-const contactCards = [
+type ContactCard = {
+  title: string;
+  value: string;
+  detail: string;
+  icon: string;
+  href?: string;
+  cta?: string;
+};
+
+const contactCards: ContactCard[] = [
   {
     title: "Email Support",
     value: "support@divinemarg.com",
@@ -99,7 +108,7 @@ export default function ContactPage() {
                         <p className="mt-1 text-sm font-medium text-slate-800">{card.value}</p>
                       )}
                       <p className="mt-1 text-sm text-slate-600">{card.detail}</p>
-                      {card.cta ? (
+                      {card.cta && card.href ? (
                         <Link
                           href={card.href}
                           className="mt-4 inline-flex rounded-full bg-[#7C3AED] px-4 py-2 text-sm font-semibold text-white transition hover:opacity-95"
