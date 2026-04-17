@@ -2,9 +2,12 @@
 
 import Link from "next/link";
 import Image from "next/image";
-import { useRouter } from "next/navigation";
-import { Fragment, useEffect, useState } from "react";
+import { usePathname, useRouter } from "next/navigation";
+import { Fragment, useEffect, useMemo, useState } from "react";
+import { io, type Socket } from "socket.io-client";
 
+import api from "@/lib/api";
+import { getSocketApiBase } from "@/lib/socketBase";
 import { useAuthStore } from "@/lib/store";
 
 function formatMoney(n: number): string {
@@ -17,9 +20,11 @@ function formatMoney(n: number): string {
 
 export function Navbar() {
   const router = useRouter();
-  const { user, isLoggedIn, logout, isWalletRefreshing } = useAuthStore();
+  const pathname = usePathname();
+  const { user, isLoggedIn, logout, isWalletRefreshing, token } = useAuthStore();
   const [mounted, setMounted] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
+  const [hasOnlineAstrologers, setHasOnlineAstrologers] = useState(false);
 
   const centerLinks = [
     { label: "Free Kundli", href: "/kundli" },
@@ -35,17 +40,95 @@ export function Navbar() {
     setMounted(true);
   }, []);
 
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      try {
+        const res = await api.get("/api/astrologers", {
+          params: { online: true, limit: 1, page: 1 },
+        });
+        const total = Number(res.data?.data?.total ?? 0);
+        if (!cancelled) {
+          setHasOnlineAstrologers(total > 0);
+        }
+      } catch {
+        if (!cancelled) {
+          setHasOnlineAstrologers(false);
+        }
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!token || !isLoggedIn) {
+      return;
+    }
+    const socket: Socket = io(getSocketApiBase(), {
+      auth: { token },
+      transports: ["websocket", "polling"],
+    });
+    socket.on("astrologer_status_changed", (payload: { is_online: boolean }) => {
+      if (payload.is_online) {
+        setHasOnlineAstrologers(true);
+      } else {
+        void (async () => {
+          try {
+            const res = await api.get("/api/astrologers", {
+              params: { online: true, limit: 1, page: 1 },
+            });
+            const total = Number(res.data?.data?.total ?? 0);
+            setHasOnlineAstrologers(total > 0);
+          } catch {
+            setHasOnlineAstrologers(false);
+          }
+        })();
+      }
+    });
+    return () => socket.disconnect();
+  }, [isLoggedIn, token]);
+
   const balance = user?.wallet_balance ?? 0;
   const role = user?.role;
+  const dashboardHref =
+    role === "astrologer" ? "/astrologer/dashboard" : "/dashboard";
+
+  const isActive = useMemo(
+    () => (href: string) => {
+      const cleanHref = href.split("?")[0];
+      if (cleanHref === "/") {
+        return pathname === "/";
+      }
+      return pathname === cleanHref || pathname.startsWith(`${cleanHref}/`);
+    },
+    [pathname]
+  );
 
   // Astrologer pages use their own dedicated navbar component.
   if (mounted && isLoggedIn && role === "astrologer") {
     return null;
   }
 
+  const chatCta = (
+    <Link
+      href="/astrologers"
+      className="inline-flex items-center gap-2 rounded-full bg-[#16A34A] px-4 py-2 text-sm font-semibold text-white transition hover:opacity-95"
+      onClick={() => setMenuOpen(false)}
+    >
+      <span
+        className={`h-2.5 w-2.5 rounded-full ${
+          hasOnlineAstrologers ? "animate-online-pulse bg-emerald-200" : "bg-emerald-100"
+        }`}
+      />
+      Chat with Astrologer
+    </Link>
+  );
+
   return (
-    <header className="sticky top-0 z-50 border-b border-violet-200/70 bg-white/95 shadow-sm backdrop-blur-md">
-      <div className="mx-auto flex min-h-16 max-w-7xl items-center justify-between px-4 py-2 sm:px-6">
+    <header className="sticky top-0 z-50 border-b border-slate-200 bg-white">
+      <div className="mx-auto flex min-h-[68px] max-w-7xl items-center justify-between px-4 sm:px-6">
         <Link
           href="/"
           className="shrink-0"
@@ -56,11 +139,11 @@ export function Navbar() {
             <Image
               src="/logo.png"
               alt="DivineMarg"
-              width={36}
-              height={36}
-              className="h-9 w-9 object-contain"
+              width={140}
+              height={40}
+              className="h-10 w-auto object-contain"
             />
-            <span className="text-lg font-extrabold text-slate-900">
+            <span className="text-[22px] font-bold text-[#B8960C]">
               DivineMarg
             </span>
           </div>
@@ -80,7 +163,11 @@ export function Navbar() {
                 ) : null}
                 <Link
                   href={link.href}
-                  className="whitespace-nowrap text-sm font-medium text-slate-600 transition hover:text-violet-700"
+                  className={`whitespace-nowrap border-b-2 pb-0.5 text-[14px] font-medium transition ${
+                    isActive(link.href)
+                      ? "border-[#B8960C] text-[#B8960C]"
+                      : "border-transparent text-slate-700 hover:text-[#B8960C]"
+                  }`}
                   onClick={() => setMenuOpen(false)}
                 >
                   {link.label}
@@ -95,47 +182,43 @@ export function Navbar() {
             <div className="h-9 w-44 animate-pulse rounded-full bg-slate-100" />
           ) : isLoggedIn ? (
             <>
-              {role === "user" ? (
+              {role !== "astrologer" ? (
                 <span className="inline-flex items-center rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700 sm:text-sm">
                   {isWalletRefreshing ? "Updating..." : formatMoney(balance)}
                 </span>
               ) : null}
+              {chatCta}
               <Link
-                href="/astrologers"
-                className="inline-flex items-center gap-2 rounded-full bg-emerald-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-emerald-700"
-                onClick={() => setMenuOpen(false)}
-              >
-                <span className="h-2.5 w-2.5 rounded-full bg-emerald-300" />
-                Chat with Astrologer
-              </Link>
-              <Link
-                href={role === "astrologer" ? "/astrologer/dashboard" : "/dashboard"}
-                className="rounded-full border border-violet-200 px-3 py-2 text-sm font-semibold text-violet-700 transition hover:bg-violet-50"
+                href={dashboardHref}
+                className={`rounded-md px-2 py-1 text-sm font-semibold transition ${
+                  isActive(dashboardHref)
+                    ? "text-[#B8960C]"
+                    : "text-slate-700 hover:text-[#B8960C]"
+                }`}
                 onClick={() => setMenuOpen(false)}
               >
                 Dashboard
               </Link>
               <button
                 type="button"
-                className="rounded-full px-2 py-2 text-sm font-semibold text-slate-600 transition hover:text-red-600"
+                className="rounded-md px-2 py-1 text-sm font-semibold text-slate-600 transition hover:text-red-600"
                 onClick={() => logout()}
               >
                 Logout
               </button>
+              <Link
+                href="/astrologer/login"
+                className="text-xs text-slate-400 transition hover:text-slate-600"
+              >
+                Astrologer Login
+              </Link>
             </>
           ) : (
             <>
-              <Link
-                href="/astrologers"
-                className="inline-flex items-center gap-2 rounded-full bg-emerald-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-emerald-700"
-                onClick={() => setMenuOpen(false)}
-              >
-                <span className="h-2.5 w-2.5 rounded-full bg-emerald-300" />
-                Chat with Astrologer
-              </Link>
+              {chatCta}
               <Link
                 href="/login"
-                className="rounded-full px-3 py-2 text-sm font-semibold text-slate-700 transition hover:bg-violet-50 hover:text-violet-700"
+                className="rounded-full border border-transparent px-3 py-2 text-sm font-semibold text-slate-700 transition hover:text-[#B8960C]"
                 onClick={(event) => {
                   event.preventDefault();
                   router.push("/login");
@@ -145,7 +228,7 @@ export function Navbar() {
               </Link>
               <Link
                 href="/login?tab=register"
-                className="rounded-full bg-gradient-to-r from-violet-600 to-indigo-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:opacity-95"
+                className="rounded-full bg-violet-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-violet-700"
                 onClick={(event) => {
                   event.preventDefault();
                   router.push("/login?tab=register");
@@ -204,18 +287,22 @@ export function Navbar() {
       </div>
 
       {menuOpen && mounted ? (
-        <div className="border-t border-violet-100 bg-white px-4 py-4 md:hidden">
+        <div className="border-t border-slate-200 bg-white px-4 py-4 md:hidden">
           <div className="flex flex-col gap-4">
             <div>
-              <p className="px-1 text-xs font-semibold uppercase tracking-wider text-violet-500">
+              <p className="px-1 text-xs font-semibold uppercase tracking-wider text-slate-500">
                 Nav links
               </p>
-              <div className="mt-2 grid grid-cols-2 gap-2">
+              <div className="mt-2 space-y-1">
                 {centerLinks.map((link) => (
                   <Link
                     key={link.label}
                     href={link.href}
-                    className="rounded-lg px-3 py-2 text-sm font-semibold text-slate-700 transition hover:bg-violet-50"
+                    className={`block rounded-md px-3 py-2 text-sm font-medium ${
+                      isActive(link.href)
+                        ? "bg-amber-50 text-[#B8960C]"
+                        : "text-slate-700 hover:bg-slate-50"
+                    }`}
                     onClick={() => setMenuOpen(false)}
                   >
                     {link.label}
@@ -224,21 +311,14 @@ export function Navbar() {
               </div>
             </div>
 
-            <div className="space-y-2 border-t border-violet-100 pt-4">
-              <Link
-                href="/astrologers"
-                className="inline-flex w-full items-center justify-center gap-2 rounded-full bg-emerald-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-emerald-700"
-                onClick={() => setMenuOpen(false)}
-              >
-                <span className="h-2.5 w-2.5 rounded-full bg-emerald-300" />
-                Chat with Astrologer
-              </Link>
+            <div className="space-y-2 border-t border-slate-200 pt-4">
+              <div className="w-full">{chatCta}</div>
 
               {isLoggedIn ? (
                 <>
                   <Link
-                    href={role === "astrologer" ? "/astrologer/dashboard" : "/dashboard"}
-                    className="block rounded-full border border-violet-200 px-4 py-2.5 text-center text-sm font-semibold text-violet-700 transition hover:bg-violet-50"
+                    href={dashboardHref}
+                    className="block rounded-full border border-slate-200 px-4 py-2.5 text-center text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
                     onClick={() => setMenuOpen(false)}
                   >
                     Dashboard
@@ -259,7 +339,7 @@ export function Navbar() {
                   <div className="grid grid-cols-2 gap-2">
                     <Link
                       href="/login"
-                      className="rounded-full px-3 py-2.5 text-center text-sm font-semibold text-slate-700 transition hover:bg-violet-50 hover:text-violet-700"
+                      className="rounded-full border border-slate-200 px-3 py-2.5 text-center text-sm font-semibold text-slate-700"
                       onClick={(event) => {
                         event.preventDefault();
                         setMenuOpen(false);
@@ -270,7 +350,7 @@ export function Navbar() {
                     </Link>
                     <Link
                       href="/login?tab=register"
-                      className="rounded-full bg-gradient-to-r from-violet-600 to-indigo-600 px-3 py-2.5 text-center text-sm font-semibold text-white shadow-sm transition hover:opacity-95"
+                      className="rounded-full bg-violet-600 px-3 py-2.5 text-center text-sm font-semibold text-white"
                       onClick={(event) => {
                         event.preventDefault();
                         setMenuOpen(false);

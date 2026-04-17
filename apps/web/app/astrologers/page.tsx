@@ -60,6 +60,31 @@ const SORT_OPTIONS: { label: string; value: ApiSort }[] = [
 ];
 
 const PAGE_SIZE = 9;
+const CATEGORY_PILLS = [
+  "All",
+  "Love",
+  "Career",
+  "Finance",
+  "Marriage",
+  "Health",
+  "Vastu",
+  "Numerology",
+  "Tarot",
+] as const;
+
+function matchesCategory(a: Astro, category: string): boolean {
+  if (category === "All") {
+    return true;
+  }
+  const lowered = category.toLowerCase();
+  return a.specializations.some((spec) => {
+    const s = spec.toLowerCase();
+    if (lowered === "love" || lowered === "marriage") {
+      return s.includes("love") || s.includes("relationship") || s.includes("marriage");
+    }
+    return s.includes(lowered);
+  });
+}
 
 function matchesFilters(
   a: Astro,
@@ -197,6 +222,9 @@ export default function AstrologersPage() {
   const [page, setPage] = useState(1);
   const [sheetOpen, setSheetOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [search, setSearch] = useState("");
+  const [activeCategory, setActiveCategory] =
+    useState<(typeof CATEGORY_PILLS)[number]>("All");
   const [pendingAction, setPendingAction] = useState<{
     astrologer: Astro;
     callType: "voice" | "video";
@@ -290,8 +318,12 @@ export default function AstrologersPage() {
   const filtered = useMemo(() => {
     const s = Array.from(specs);
     const l = Array.from(langs);
-    return all.filter((a) => matchesFilters(a, s, l));
-  }, [all, specs, langs]);
+    const term = search.trim().toLowerCase();
+    return all
+      .filter((a) => matchesFilters(a, s, l))
+      .filter((a) => matchesCategory(a, activeCategory))
+      .filter((a) => (term ? a.name.toLowerCase().includes(term) : true));
+  }, [activeCategory, all, search, specs, langs]);
 
   const totalFiltered = filtered.length;
   const totalPages = Math.max(1, Math.ceil(totalFiltered / PAGE_SIZE));
@@ -398,10 +430,7 @@ export default function AstrologersPage() {
         />
 
         <div className="min-w-0 flex-1">
-          <div className="flex items-center justify-between gap-4">
-            <h1 className="text-2xl font-bold text-slate-900 sm:text-3xl">
-              Astrologers
-            </h1>
+          <div className="flex items-center justify-end gap-4">
             <button
               type="button"
               className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-800 shadow-sm lg:hidden"
@@ -410,7 +439,43 @@ export default function AstrologersPage() {
               Filters
             </button>
           </div>
-          <p className="mt-2 text-sm text-slate-600">
+          <h1 className="text-center text-3xl font-bold text-slate-900 sm:text-4xl">
+            Chat with Astrologer
+          </h1>
+          <div className="mt-4 overflow-x-auto pb-1">
+            <div className="flex min-w-max items-center gap-2">
+              {CATEGORY_PILLS.map((category) => (
+                <button
+                  key={category}
+                  type="button"
+                  className={`rounded-full border px-4 py-1.5 text-sm font-medium transition ${
+                    activeCategory === category
+                      ? "border-[#B8960C] bg-[#B8960C] text-white"
+                      : "border-slate-300 bg-white text-slate-700 hover:border-[#B8960C] hover:text-[#B8960C]"
+                  }`}
+                  onClick={() => {
+                    setActiveCategory(category);
+                    setPage(1);
+                  }}
+                >
+                  {category}
+                </button>
+              ))}
+            </div>
+          </div>
+          <div className="mt-4">
+            <input
+              type="text"
+              value={search}
+              onChange={(e) => {
+                setSearch(e.target.value);
+                setPage(1);
+              }}
+              placeholder="Search name..."
+              className="w-full rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-sm text-slate-900 outline-none ring-[#B8960C] focus:ring-2"
+            />
+          </div>
+          <p className="mt-3 text-sm text-slate-600">
             {loading
               ? "Loading…"
               : `${totalFiltered} astrologer${totalFiltered === 1 ? "" : "s"} found`}
@@ -423,7 +488,7 @@ export default function AstrologersPage() {
             {loading ? (
               <SkeletonGrid />
             ) : (
-              <div className="grid gap-6 sm:grid-cols-2 xl:grid-cols-3">
+              <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
                 {slice.map((a) => (
                   <AstrologerCard
                     key={a.id}

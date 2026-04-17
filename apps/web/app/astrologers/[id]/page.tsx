@@ -28,26 +28,55 @@ type AstrologerDetail = {
   total_reviews: number;
   price_per_minute: number | null;
   is_available: boolean;
+  is_online: boolean;
   is_busy: boolean;
   waiting_count: number;
+  profile_photo_url?: string | null;
   experience_years: number | null;
   user: {
     name: string;
     email: string;
     phone: string;
     avatar_url: string | null;
+    profile_photo_url?: string | null;
   };
 };
 
-function StarRow({ value }: { value: number }) {
+type RatingBreakdown = {
+  5: number;
+  4: number;
+  3: number;
+  2: number;
+  1: number;
+};
+
+type SimilarAstrologer = {
+  id: string;
+  name: string;
+  profile_photo_url: string | null;
+  avatar_url: string | null;
+  specializations: string[];
+  price_per_minute: number | null;
+  rating: number | null;
+};
+
+function StarRow({ value }: { value: number | null }) {
+  const count = Math.max(0, Math.min(5, Math.round(value ?? 0)));
   return (
     <span className="text-amber-500" aria-hidden>
-      {"★".repeat(Math.round(value))}
+      {"★".repeat(count)}
       <span className="text-slate-200">
-        {"★".repeat(Math.max(0, 5 - Math.round(value)))}
+        {"★".repeat(Math.max(0, 5 - count))}
       </span>
     </span>
   );
+}
+
+function formatK(n: number): string {
+  if (n >= 1000) {
+    return `${Math.round(n / 100) / 10}K`;
+  }
+  return String(n);
 }
 
 export default function AstrologerProfilePage() {
@@ -58,7 +87,11 @@ export default function AstrologerProfilePage() {
   const [data, setData] = useState<{
     astrologer: AstrologerDetail;
     reviews: Review[];
+    rating_breakdown: RatingBreakdown;
   } | null>(null);
+  const [similarAstrologers, setSimilarAstrologers] = useState<SimilarAstrologer[]>(
+    []
+  );
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [chatLoading, setChatLoading] = useState(false);
@@ -91,9 +124,27 @@ export default function AstrologerProfilePage() {
         const d = res.data?.data as {
           astrologer: AstrologerDetail;
           reviews: Review[];
+          rating_breakdown: RatingBreakdown;
         };
         if (!cancelled && d) {
           setData(d);
+        }
+        const similarRes = await api.get("/api/astrologers", {
+          params: { page: 1, limit: 12 },
+        });
+        const list =
+          (similarRes.data?.data?.astrologers as SimilarAstrologer[] | undefined) ?? [];
+        if (!cancelled) {
+          setSimilarAstrologers(
+            list
+              .filter((a) => a.id !== id)
+              .slice(0, 6)
+              .map((a) => ({
+                ...a,
+                profile_photo_url: a.profile_photo_url ?? null,
+                avatar_url: a.avatar_url ?? null,
+              }))
+          );
         }
       } catch {
         if (!cancelled) {
@@ -423,12 +474,42 @@ export default function AstrologerProfilePage() {
 
   const { astrologer, reviews } = data;
   const price = astrologer.price_per_minute ?? 0;
+  const ratingBreakdown = data.rating_breakdown;
+  const ratingTotal = Math.max(
+    1,
+    ratingBreakdown[5] +
+      ratingBreakdown[4] +
+      ratingBreakdown[3] +
+      ratingBreakdown[2] +
+      ratingBreakdown[1]
+  );
+  const displayPhoto =
+    astrologer.profile_photo_url ??
+    astrologer.user.profile_photo_url ??
+    astrologer.user.avatar_url ??
+    null;
+  const chatMinutes = formatK((astrologer.total_reviews || 1) * 18);
+  const callMinutes = formatK((astrologer.total_reviews || 1) * 24);
+  const specializationText = astrologer.specializations.join(", ");
+  const languagesText = astrologer.languages.join(", ");
+  const headerRating = astrologer.rating ?? 0;
 
   return (
     <div className="min-h-screen bg-slate-50 pb-28 lg:pb-10">
       <Navbar />
 
-      <div className="mx-auto max-w-4xl px-4 py-8 sm:px-6 sm:py-10">
+      <div className="mx-auto max-w-6xl px-4 py-8 sm:px-6 sm:py-10">
+        <div className="mb-4 text-sm text-slate-500">
+          <Link href="/" className="hover:text-[#B8960C]">
+            Home
+          </Link>{" "}
+          &gt;{" "}
+          <Link href="/astrologers" className="hover:text-[#B8960C]">
+            Astrologers
+          </Link>{" "}
+          &gt; <span>{astrologer.user.name}&apos;s Profile</span>
+        </div>
+
         {waitlistState ? (
           <section className="mb-6 rounded-2xl border border-violet-200 bg-violet-50 p-5 shadow-sm">
             <h2 className="text-lg font-bold text-violet-900">You are in queue</h2>
@@ -450,129 +531,101 @@ export default function AstrologerProfilePage() {
           </section>
         ) : null}
 
-        <div className="overflow-hidden rounded-2xl border border-slate-100 bg-white shadow-sm">
-          <div className="bg-gradient-to-r from-violet-600/90 to-indigo-600/90 px-6 py-10 text-white">
-            <div className="flex flex-col gap-6 sm:flex-row sm:items-center">
-              {astrologer.user.avatar_url ? (
+        <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+          <div className="flex flex-col gap-6 lg:flex-row">
+            <div className="shrink-0">
+              {displayPhoto ? (
                 // eslint-disable-next-line @next/next/no-img-element
                 <img
-                  src={astrologer.user.avatar_url}
+                  src={displayPhoto}
                   alt=""
-                  className="h-28 w-28 rounded-full object-cover ring-4 ring-white/30"
+                  className="h-[200px] w-[200px] rounded-2xl object-cover"
                 />
               ) : (
-                <div className="flex h-28 w-28 items-center justify-center rounded-full bg-white/20 text-3xl font-bold ring-4 ring-white/30">
+                <div className="flex h-[200px] w-[200px] items-center justify-center rounded-2xl bg-slate-100 text-4xl font-bold text-slate-700">
                   {astrologer.user.name.slice(0, 1).toUpperCase()}
                 </div>
               )}
-              <div className="min-w-0 flex-1">
-                <h1 className="text-3xl font-bold">{astrologer.user.name}</h1>
-                <div className="mt-2 flex flex-wrap items-center gap-3 text-sm text-white/90">
-                  <StarRow value={astrologer.rating ?? 0} />
-                  <span>
-                    ({astrologer.total_reviews} review
-                    {astrologer.total_reviews === 1 ? "" : "s"})
+            </div>
+
+            <div className="min-w-0 flex-1">
+              <div className="flex items-center gap-2">
+                <h1 className="text-3xl font-bold text-slate-900">{astrologer.user.name}</h1>
+                <span className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-emerald-500 text-xs font-bold text-white">
+                  ✓
+                </span>
+              </div>
+              <p className="mt-2 text-sm text-slate-600">{specializationText || "Astrologer"}</p>
+              <p className="mt-1 text-sm text-slate-600">{languagesText}</p>
+              <p className="mt-1 text-sm text-slate-600">
+                Exp: {astrologer.experience_years ?? 0} Years
+              </p>
+              <p className="mt-2 text-lg font-bold text-slate-900">₹{price.toFixed(0)}/min</p>
+              <div className="mt-2 flex items-center gap-3 text-sm text-slate-600">
+                <StarRow value={headerRating} />
+                <span>{headerRating.toFixed(2)}</span>
+              </div>
+
+              <div className="mt-3 flex flex-wrap items-center gap-4 text-sm text-slate-700">
+                <span>💬 {chatMinutes} mins</span>
+                <span>📞 {callMinutes} mins</span>
+                {astrologer.is_busy ? (
+                  <span className="font-semibold text-red-600">
+                    Busy · {astrologer.waiting_count} in queue
                   </span>
-                  <span className="rounded-full bg-white/15 px-2 py-0.5 text-xs font-semibold">
-                    ₹{price.toFixed(0)} / min
-                  </span>
-                  {astrologer.is_busy ? (
-                    <span className="rounded-full bg-orange-500/30 px-2 py-0.5 text-xs font-semibold">
-                      Busy · {astrologer.waiting_count} waiting
-                    </span>
-                  ) : null}
-                </div>
-                <div className="mt-4 flex flex-wrap gap-2">
-                  {astrologer.specializations.map((s) => (
-                    <span
-                      key={s}
-                      className="rounded-full bg-white/15 px-2.5 py-0.5 text-xs font-medium"
-                    >
-                      {s}
-                    </span>
-                  ))}
-                </div>
-                <p className="mt-2 text-sm text-white/85">
-                  Languages: {astrologer.languages.join(", ")}
-                </p>
-                {astrologer.experience_years != null ? (
-                  <p className="mt-1 text-sm text-white/85">
-                    {astrologer.experience_years}+ years experience
-                  </p>
                 ) : null}
               </div>
-              <div className="hidden lg:block">
-                <div className="flex flex-wrap gap-2">
-                  <button
-                    type="button"
-                    disabled={chatLoading}
-                    onClick={() => {
-                      if (!astrologer.is_available && !astrologer.is_busy) {
-                        setError("Astrologer is offline");
-                        return;
-                      }
-                      void startChat();
-                    }}
-                    className="rounded-xl bg-white px-4 py-3 text-sm font-bold text-violet-700 shadow-md transition hover:bg-white/95 disabled:cursor-not-allowed disabled:bg-white/50 disabled:text-violet-400"
-                  >
-                    {chatLoading
-                      ? "Starting…"
-                      : astrologer.is_busy
-                        ? `Join Waitlist (${astrologer.waiting_count})`
-                        : astrologer.is_available
-                          ? `Chat — ₹${price.toFixed(0)}/min`
-                          : "Chat"}
-                  </button>
 
-                  <button
-                    type="button"
-                    disabled={chatLoading}
-                    onClick={() => {
-                      if (!astrologer.is_available && !astrologer.is_busy) {
-                        setError("Astrologer is offline");
-                        return;
-                      }
-                      void startChat("voice");
-                    }}
-                    className="rounded-xl border border-white/40 bg-white/80 px-4 py-3 text-sm font-bold text-violet-700 shadow-md transition hover:bg-white/95 disabled:cursor-not-allowed disabled:bg-white/50 disabled:text-violet-400"
-                  >
-                    {chatLoading
-                      ? "Starting…"
-                      : astrologer.is_busy
-                        ? `Join Waitlist (${astrologer.waiting_count})`
-                        : astrologer.is_available
-                          ? `Voice — ₹${price.toFixed(0)}/min`
-                          : "Voice"}
-                  </button>
-
-                  <button
-                    type="button"
-                    disabled={chatLoading}
-                    onClick={() => {
-                      if (!astrologer.is_available && !astrologer.is_busy) {
-                        setError("Astrologer is offline");
-                        return;
-                      }
-                      void startChat("video");
-                    }}
-                    className="rounded-xl border border-white/40 bg-white/80 px-4 py-3 text-sm font-bold text-violet-700 shadow-md transition hover:bg-white/95 disabled:cursor-not-allowed disabled:bg-white/50 disabled:text-violet-400"
-                  >
-                    {chatLoading
-                      ? "Starting…"
-                      : astrologer.is_busy
-                        ? `Join Waitlist (${astrologer.waiting_count})`
-                        : astrologer.is_available
-                          ? `Video — ₹${price.toFixed(0)}/min`
-                          : "Video"}
-                  </button>
-                </div>
+              <div className="mt-6 flex flex-wrap gap-3">
+                <button
+                  type="button"
+                  disabled={chatLoading}
+                  onClick={() => {
+                    if (!astrologer.is_available && !astrologer.is_busy) {
+                      setError("Astrologer is offline");
+                      return;
+                    }
+                    void startChat();
+                  }}
+                  className="rounded-full bg-[#16A34A] px-6 py-2.5 text-sm font-semibold text-white disabled:opacity-60"
+                >
+                  Start Chat
+                </button>
+                <button
+                  type="button"
+                  disabled={chatLoading}
+                  onClick={() => {
+                    if (!astrologer.is_available && !astrologer.is_busy) {
+                      setError("Astrologer is offline");
+                      return;
+                    }
+                    void startChat("voice");
+                  }}
+                  className="rounded-full border border-slate-300 bg-white px-6 py-2.5 text-sm font-semibold text-slate-700 disabled:opacity-60"
+                >
+                  Start Call
+                </button>
+                <button
+                  type="button"
+                  disabled={chatLoading}
+                  onClick={() => {
+                    if (!astrologer.is_available && !astrologer.is_busy) {
+                      setError("Astrologer is offline");
+                      return;
+                    }
+                    void startChat("video");
+                  }}
+                  className="rounded-full border border-slate-300 bg-white px-6 py-2.5 text-sm font-semibold text-slate-700 disabled:opacity-60"
+                >
+                  Start Video
+                </button>
               </div>
             </div>
           </div>
-        </div>
+        </section>
 
-        <section className="mt-10 rounded-2xl border border-slate-100 bg-white p-6 shadow-sm">
-          <h2 className="text-lg font-bold text-slate-900">About</h2>
+        <section className="mt-8 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+          <h2 className="text-xl font-bold text-slate-900">About me</h2>
           <p className="mt-3 whitespace-pre-wrap text-slate-600">
             {astrologer.bio?.trim()
               ? astrologer.bio
@@ -580,37 +633,110 @@ export default function AstrologerProfilePage() {
           </p>
         </section>
 
-        <section className="mt-10 rounded-2xl border border-slate-100 bg-white p-6 shadow-sm">
-          <h2 className="text-lg font-bold text-slate-900">Reviews</h2>
-          {reviews.length === 0 ? (
-            <p className="mt-4 text-sm text-slate-600">No reviews yet.</p>
-          ) : (
-            <ul className="mt-4 space-y-6">
-              {reviews.map((r) => (
-                <li
-                  key={r.id}
-                  className="border-b border-slate-100 pb-6 last:border-0 last:pb-0"
-                >
-                  <div className="flex flex-wrap items-center gap-2">
-                    <span className="font-semibold text-slate-900">
-                      {r.user_name}
-                    </span>
-                    <StarRow value={r.rating} />
-                    <span className="text-xs text-slate-500">
-                      {new Date(r.created_at).toLocaleDateString("en-IN", {
-                        day: "numeric",
-                        month: "short",
-                        year: "numeric",
-                      })}
-                    </span>
+        <section className="mt-8 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+          <h2 className="text-xl font-bold text-slate-900">Rating & Reviews</h2>
+          <div className="mt-5 grid gap-6 lg:grid-cols-[340px,1fr]">
+            <div className="rounded-xl border border-slate-200 p-4">
+              <p className="text-4xl font-bold text-slate-900">
+                {(astrologer.rating ?? 0).toFixed(2)}
+              </p>
+              <p className="mt-2">
+                <StarRow value={astrologer.rating} />
+              </p>
+              <p className="mt-1 text-sm text-slate-500">
+                {astrologer.total_reviews} total reviews
+              </p>
+
+              <div className="mt-5 space-y-2">
+                {[5, 4, 3, 2, 1].map((star) => {
+                  const count = ratingBreakdown[star as 5 | 4 | 3 | 2 | 1] ?? 0;
+                  const width = (count / ratingTotal) * 100;
+                  return (
+                    <div key={star} className="flex items-center gap-2 text-xs text-slate-600">
+                      <span className="w-4">{star}★</span>
+                      <div className="h-2.5 flex-1 rounded-full bg-slate-100">
+                        <div
+                          className="h-2.5 rounded-full bg-amber-400"
+                          style={{ width: `${Math.max(3, width)}%` }}
+                        />
+                      </div>
+                      <span className="w-8 text-right">{count}</span>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
+            <div>
+              {reviews.length === 0 ? (
+                <p className="text-sm text-slate-600">No reviews yet.</p>
+              ) : (
+                <ul className="space-y-4">
+                  {reviews.slice(0, 8).map((r) => (
+                    <li key={r.id} className="rounded-xl border border-slate-200 p-4">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className="text-sm font-semibold text-slate-900">
+                          {r.user_name}
+                        </span>
+                        <StarRow value={r.rating} />
+                        <span className="text-xs text-slate-500">
+                          {new Date(r.created_at).toLocaleDateString("en-IN", {
+                            day: "numeric",
+                            month: "short",
+                            year: "numeric",
+                          })}
+                        </span>
+                      </div>
+                      <p className="mt-2 text-sm text-slate-600">
+                        {r.comment || "Great consultation and accurate guidance."}
+                      </p>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          </div>
+        </section>
+
+        <section className="mt-8 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+          <h2 className="text-xl font-bold text-slate-900">Similar Astrologers</h2>
+          <div className="mt-4 flex gap-4 overflow-x-auto pb-2">
+            {similarAstrologers.map((a) => (
+              <button
+                key={a.id}
+                type="button"
+                onClick={() => router.push(`/astrologers/${a.id}`)}
+                className="min-w-[220px] rounded-xl border border-slate-200 bg-white p-4 text-left transition hover:shadow-sm"
+              >
+                <div className="flex items-center gap-3">
+                  {a.profile_photo_url || a.avatar_url ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={a.profile_photo_url ?? a.avatar_url ?? ""}
+                      alt={a.name}
+                      className="h-12 w-12 rounded-full object-cover"
+                    />
+                  ) : (
+                    <div className="flex h-12 w-12 items-center justify-center rounded-full bg-slate-100 font-bold text-slate-700">
+                      {a.name.slice(0, 1).toUpperCase()}
+                    </div>
+                  )}
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-semibold text-slate-900">{a.name}</p>
+                    <p className="truncate text-xs text-slate-600">
+                      {a.specializations.join(", ")}
+                    </p>
                   </div>
-                  {r.comment ? (
-                    <p className="mt-2 text-sm text-slate-600">{r.comment}</p>
-                  ) : null}
-                </li>
-              ))}
-            </ul>
-          )}
+                </div>
+                <p className="mt-3 text-xs text-amber-500">
+                  {"★".repeat(Math.max(1, Math.round(a.rating ?? 4)))}
+                </p>
+                <p className="mt-1 text-sm font-semibold text-slate-900">
+                  ₹{(a.price_per_minute ?? 0).toFixed(0)}/min
+                </p>
+              </button>
+            ))}
+          </div>
         </section>
       </div>
 

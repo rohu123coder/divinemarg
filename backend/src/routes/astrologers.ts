@@ -593,6 +593,14 @@ type ReviewRow = {
   user_name: string;
 };
 
+type RatingBreakdownRow = {
+  five_star: string;
+  four_star: string;
+  three_star: string;
+  two_star: string;
+  one_star: string;
+};
+
 type DetailRow = {
   id: string;
   bio: string | null;
@@ -679,13 +687,33 @@ router.get("/:id", optionalAuthMiddleware, async (req: Request, res: Response) =
   }
 
   const reviewsResult = await query<ReviewRow>(
-    `SELECT r.id, r.rating, r.comment, r.created_at, u.name AS user_name
-     FROM reviews r
-     INNER JOIN users u ON u.id = r.user_id
-     WHERE r.astrologer_id = $1
-     ORDER BY r.created_at DESC`,
+    `SELECT
+       cs.id,
+       cs.rating,
+       cs.review_text AS comment,
+       COALESCE(cs.rated_at, cs.ended_at, cs.started_at, NOW()) AS created_at,
+       u.name AS user_name
+     FROM chat_sessions cs
+     INNER JOIN users u ON u.id = cs.user_id
+     WHERE cs.astrologer_id = $1
+       AND cs.rating IS NOT NULL
+     ORDER BY COALESCE(cs.rated_at, cs.ended_at, cs.started_at) DESC
+     LIMIT 30`,
     [id]
   );
+  const ratingBreakdownResult = await query<RatingBreakdownRow>(
+    `SELECT
+       COUNT(*) FILTER (WHERE cs.rating = 5)::text AS five_star,
+       COUNT(*) FILTER (WHERE cs.rating = 4)::text AS four_star,
+       COUNT(*) FILTER (WHERE cs.rating = 3)::text AS three_star,
+       COUNT(*) FILTER (WHERE cs.rating = 2)::text AS two_star,
+       COUNT(*) FILTER (WHERE cs.rating = 1)::text AS one_star
+     FROM chat_sessions cs
+     WHERE cs.astrologer_id = $1
+       AND cs.rating IS NOT NULL`,
+    [id]
+  );
+  const breakdown = ratingBreakdownResult.rows[0];
 
   res.json({
     success: true,
@@ -728,6 +756,13 @@ router.get("/:id", optionalAuthMiddleware, async (req: Request, res: Response) =
         },
       },
       reviews: reviewsResult.rows,
+      rating_breakdown: {
+        5: Number(breakdown?.five_star ?? 0),
+        4: Number(breakdown?.four_star ?? 0),
+        3: Number(breakdown?.three_star ?? 0),
+        2: Number(breakdown?.two_star ?? 0),
+        1: Number(breakdown?.one_star ?? 0),
+      },
     },
   });
 });
