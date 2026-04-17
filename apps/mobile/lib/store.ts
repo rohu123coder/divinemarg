@@ -1,5 +1,6 @@
 import { create } from "zustand";
 import { createJSONStorage, persist } from "zustand/middleware";
+import { MMKV } from "react-native-mmkv";
 
 import { setToken } from "./auth";
 
@@ -22,12 +23,7 @@ const fallbackStorage: StorageAdapter = {
 
 const createStorageAdapter = (): StorageAdapter => {
   try {
-    const mod = require("react-native-mmkv") as {
-      MMKV?: new (args: { id: string }) => StorageAdapter;
-    };
-    if (mod.MMKV) {
-      return new mod.MMKV({ id: "divinemarg-store" });
-    }
+    return new MMKV({ id: "divinemarg-store" });
   } catch {
     // Fallback for non-native environments.
   }

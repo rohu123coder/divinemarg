@@ -1,3 +1,5 @@
+import { MMKV } from "react-native-mmkv";
+
 type SimpleKV = {
   getString: (key: string) => string | undefined;
   set: (key: string, value: string) => void;
@@ -18,10 +20,7 @@ const fallbackStorage: SimpleKV = {
 
 const createStorage = (): SimpleKV => {
   try {
-    const mod = require("react-native-mmkv") as { MMKV?: new (args: { id: string }) => SimpleKV };
-    if (mod.MMKV) {
-      return new mod.MMKV({ id: "divinemarg-auth" });
-    }
+    return new MMKV({ id: "divinemarg-auth" });
   } catch {
     // No-op: fallback for environments without native MMKV bindings.
   }
