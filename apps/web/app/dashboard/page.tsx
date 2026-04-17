@@ -4,20 +4,50 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 
+import { ChatHistoryModal } from "@/components/ChatHistoryModal";
 import { Navbar } from "@/components/Navbar";
+import { RatingModal } from "@/components/RatingModal";
 import { WalletWidget } from "@/components/WalletWidget";
 import api from "@/lib/api";
 import { useAuthStore } from "@/lib/store";
 
 type SessionRow = {
   id: string;
+  astrologer_id: string;
   status: string;
   started_at: string | null;
   ended_at: string | null;
   total_minutes: number | null;
   total_charged: number | null;
   astrologer_name: string;
+  astrologer_photo: string | null;
+  rating: number | null;
+  session_type: "chat" | "voice" | "video" | null;
 };
+
+type ArchivedMessage = {
+  sender_role: "user" | "astrologer";
+  content: string;
+  created_at: string;
+};
+
+function renderSessionTypeIcon(type: SessionRow["session_type"]): string {
+  if (type === "voice") {
+    return "📞";
+  }
+  if (type === "video") {
+    return "📹";
+  }
+  return "💬";
+}
+
+function renderStars(rating: number | null): string {
+  if (rating == null) {
+    return "—";
+  }
+  const rounded = Math.max(1, Math.min(5, Math.round(rating)));
+  return `${"★".repeat(rounded)}${"☆".repeat(5 - rounded)}`;
+}
 
 export default function DashboardPage() {
   const router = useRouter();
@@ -26,6 +56,10 @@ export default function DashboardPage() {
   const [mounted, setMounted] = useState(false);
   const [sessions, setSessions] = useState<SessionRow[]>([]);
   const [loading, setLoading] = useState(true);
+  const [selectedSession, setSelectedSession] = useState<SessionRow | null>(null);
+  const [messages, setMessages] = useState<ArchivedMessage[]>([]);
+  const [messagesLoading, setMessagesLoading] = useState(false);
+  const [rateTarget, setRateTarget] = useState<SessionRow | null>(null);
 
   useEffect(() => {
     setMounted(true);
@@ -94,6 +128,20 @@ export default function DashboardPage() {
     return null;
   }
 
+  const openHistory = async (session: SessionRow) => {
+    setSelectedSession(session);
+    setMessages([]);
+    setMessagesLoading(true);
+    try {
+      const res = await api.get(`/api/chat/history/${session.id}/messages`);
+      setMessages((res.data?.data?.messages as ArchivedMessage[] | undefined) ?? []);
+    } catch {
+      setMessages([]);
+    } finally {
+      setMessagesLoading(false);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-slate-50">
       <Navbar />
@@ -147,9 +195,11 @@ export default function DashboardPage() {
                 <thead>
                   <tr className="border-b border-slate-100 bg-slate-50/80 text-xs uppercase tracking-wide text-slate-500">
                     <th className="px-4 py-3 font-medium">Astrologer</th>
+                    <th className="px-4 py-3 font-medium">Type</th>
                     <th className="px-4 py-3 font-medium">Date</th>
                     <th className="px-4 py-3 font-medium">Duration</th>
                     <th className="px-4 py-3 font-medium">Charged</th>
+                    <th className="px-4 py-3 font-medium">Rating</th>
                     <th className="px-4 py-3 font-medium">Status</th>
                   </tr>
                 </thead>
@@ -157,9 +207,34 @@ export default function DashboardPage() {
                   {sessions.map((s) => {
                     const dateSrc = s.ended_at ?? s.started_at;
                     return (
-                      <tr key={s.id} className="text-slate-800">
+                      <tr
+                        key={s.id}
+                        className="cursor-pointer text-slate-800 hover:bg-violet-50/40"
+                        onClick={() => {
+                          void openHistory(s);
+                        }}
+                      >
                         <td className="px-4 py-3 font-medium">
-                          {s.astrologer_name}
+                          <div className="flex items-center gap-2">
+                            {s.astrologer_photo ? (
+                              // eslint-disable-next-line @next/next/no-img-element
+                              <img
+                                src={s.astrologer_photo}
+                                alt=""
+                                className="h-8 w-8 rounded-full object-cover"
+                              />
+                            ) : (
+                              <div className="flex h-8 w-8 items-center justify-center rounded-full bg-violet-100 text-xs font-bold text-violet-700">
+                                {s.astrologer_name.slice(0, 1).toUpperCase()}
+                              </div>
+                            )}
+                            <span>{s.astrologer_name}</span>
+                          </div>
+                        </td>
+                        <td className="px-4 py-3">
+                          <span title={s.session_type ?? "chat"}>
+                            {renderSessionTypeIcon(s.session_type)}
+                          </span>
                         </td>
                         <td className="px-4 py-3 text-slate-600">
                           {dateSrc
@@ -178,6 +253,9 @@ export default function DashboardPage() {
                           {s.total_charged != null
                             ? `₹${Number(s.total_charged).toFixed(0)}`
                             : "—"}
+                        </td>
+                        <td className="px-4 py-3 text-amber-500">
+                          {renderStars(s.rating)}
                         </td>
                         <td className="px-4 py-3">
                           <span
@@ -201,6 +279,51 @@ export default function DashboardPage() {
           </div>
         </div>
       </div>
+
+      <ChatHistoryModal
+        open={Boolean(selectedSession)}
+        sessionId={selectedSession?.id ?? ""}
+        astrologerName={selectedSession?.astrologer_name ?? "Astrologer"}
+        messages={messages}
+        loading={messagesLoading}
+        rated={selectedSession?.rating != null}
+        onClose={() => setSelectedSession(null)}
+        onChatAgain={() => {
+          if (!selectedSession) {
+            return;
+          }
+          router.push(`/astrologers/${selectedSession.astrologer_id}`);
+        }}
+        onRateSession={() => {
+          if (selectedSession) {
+            setRateTarget(selectedSession);
+          }
+        }}
+      />
+
+      <RatingModal
+        open={Boolean(rateTarget)}
+        astrologerName={rateTarget?.astrologer_name ?? "Astrologer"}
+        onClose={() => setRateTarget(null)}
+        onSkip={() => setRateTarget(null)}
+        onSubmitRating={async ({ rating, reviewText }) => {
+          if (!rateTarget) {
+            return;
+          }
+          await api.post(`/api/sessions/${rateTarget.id}/rate`, {
+            rating,
+            reviewText: reviewText || undefined,
+          });
+          setSessions((prev) =>
+            prev.map((session) =>
+              session.id === rateTarget.id ? { ...session, rating } : session
+            )
+          );
+          setSelectedSession((prev) =>
+            prev && prev.id === rateTarget.id ? { ...prev, rating } : prev
+          );
+        }}
+      />
     </div>
   );
 }

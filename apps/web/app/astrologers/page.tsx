@@ -2,10 +2,12 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
+import { io, type Socket } from "socket.io-client";
 
 import { AstrologerCard } from "@/components/AstrologerCard";
 import { Navbar } from "@/components/Navbar";
 import api from "@/lib/api";
+import { getSocketApiBase } from "@/lib/socketBase";
 import { useAuthStore } from "@/lib/store";
 
 type Astro = {
@@ -16,6 +18,7 @@ type Astro = {
   specializations: string[];
   languages: string[];
   rating: number | null;
+  total_reviews: number;
   price_per_minute: number | null;
   is_available: boolean;
   is_online: boolean;
@@ -25,6 +28,8 @@ type Astro = {
   video_available: boolean;
   is_busy: boolean;
   waiting_count: number;
+  avg_session_duration: number | null;
+  estimated_wait: number;
   experience_years: number | null;
 };
 
@@ -183,7 +188,7 @@ function SkeletonGrid() {
 
 export default function AstrologersPage() {
   const router = useRouter();
-  const { isLoggedIn, user } = useAuthStore();
+  const { isLoggedIn, user, token } = useAuthStore();
   const [sort, setSort] = useState<ApiSort>("rating_desc");
   const [specs, setSpecs] = useState<Set<string>>(new Set());
   const [langs, setLangs] = useState<Set<string>>(new Set());
@@ -256,6 +261,31 @@ export default function AstrologersPage() {
       cancelled = true;
     };
   }, [sort]);
+
+  useEffect(() => {
+    if (!token || !isLoggedIn) {
+      return;
+    }
+    const socket: Socket = io(getSocketApiBase(), {
+      auth: { token },
+      transports: ["websocket", "polling"],
+    });
+    socket.on(
+      "astrologer_status_changed",
+      (payload: { astrologerId: string; is_online: boolean }) => {
+        setAll((prev) =>
+          prev.map((astro) =>
+            astro.id === payload.astrologerId
+              ? { ...astro, is_online: payload.is_online }
+              : astro
+          )
+        );
+      }
+    );
+    return () => {
+      socket.disconnect();
+    };
+  }, [isLoggedIn, token]);
 
   const filtered = useMemo(() => {
     const s = Array.from(specs);
@@ -399,8 +429,10 @@ export default function AstrologersPage() {
                     key={a.id}
                     {...a}
                     languages={a.languages}
+                    total_reviews={a.total_reviews}
                     is_online={a.is_online}
                     is_verified={a.is_verified}
+                    estimated_wait={a.estimated_wait}
                     actionLoading={actionLoadingKey?.startsWith(a.id) ?? false}
                     onChatNow={() => handleCardAction(a, "chat")}
                     onVoiceCall={() => handleCardAction(a, "voice")}

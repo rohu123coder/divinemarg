@@ -42,6 +42,18 @@ const listQuerySchema = z.object({
   limit: z.coerce.number().int().min(1).max(50).default(20),
   specialization: z.string().trim().min(1).optional(),
   language: z.string().trim().min(1).optional(),
+  online: z
+    .union([z.boolean(), z.enum(["true", "false"])])
+    .optional()
+    .transform((value) => {
+      if (value === undefined) {
+        return undefined;
+      }
+      if (typeof value === "boolean") {
+        return value;
+      }
+      return value === "true";
+    }),
   sort: z
     .enum(["rating_desc", "rating_asc", "price_asc", "price_desc"])
     .default("rating_desc"),
@@ -54,6 +66,7 @@ type AstrologerListRow = {
   languages: string[];
   rating: string | null;
   total_reviews: number;
+  avg_session_duration: string | null;
   price_per_minute: string | null;
   is_available: boolean;
   is_online: boolean;
@@ -72,14 +85,14 @@ type AstrologerListRow = {
 function listOrderClause(sort: z.infer<typeof listQuerySchema>["sort"]): string {
   switch (sort) {
     case "rating_asc":
-      return "a.rating ASC NULLS LAST, a.id";
+      return "a.avg_rating ASC NULLS LAST, a.id";
     case "price_asc":
       return "a.price_per_minute ASC NULLS LAST, a.id";
     case "price_desc":
       return "a.price_per_minute DESC NULLS LAST, a.id";
     case "rating_desc":
     default:
-      return "a.rating DESC NULLS LAST, a.id";
+      return "a.avg_rating DESC NULLS LAST, a.id";
   }
 }
 
@@ -93,7 +106,7 @@ router.get("/", async (req: Request, res: Response) => {
     return;
   }
 
-  const { page, limit, specialization, language, sort } = parsed.data;
+  const { page, limit, specialization, language, online, sort } = parsed.data;
   const offset = (page - 1) * limit;
   const orderBy = listOrderClause(sort);
 
@@ -109,6 +122,11 @@ router.get("/", async (req: Request, res: Response) => {
   if (language) {
     conditions.push(`$${p} = ANY(a.languages)`);
     params.push(language);
+    p++;
+  }
+  if (typeof online === "boolean") {
+    conditions.push(`a.is_online = $${p}`);
+    params.push(online);
     p++;
   }
 
@@ -132,8 +150,9 @@ router.get("/", async (req: Request, res: Response) => {
        a.bio,
        a.specializations,
        a.languages,
-       a.rating,
+       COALESCE(a.avg_rating, a.rating) AS rating,
        a.total_reviews,
+       a.avg_session_duration::text,
        a.price_per_minute,
        a.is_available,
        a.is_online,
@@ -172,6 +191,8 @@ router.get("/", async (req: Request, res: Response) => {
     languages: row.languages,
     rating: row.rating != null ? Number(row.rating) : null,
     total_reviews: row.total_reviews,
+    avg_session_duration:
+      row.avg_session_duration != null ? Number(row.avg_session_duration) : null,
     price_per_minute:
       row.price_per_minute != null ? Number(row.price_per_minute) : null,
     is_available: row.is_available,
@@ -185,6 +206,10 @@ router.get("/", async (req: Request, res: Response) => {
     voice_available: row.voice_available,
     video_available: row.video_available,
     waiting_count: row.waiting_count,
+    estimated_wait: Math.round(
+      row.waiting_count *
+        (row.avg_session_duration != null ? Number(row.avg_session_duration) : 5)
+    ),
     is_busy: row.is_busy,
   }));
 
@@ -215,7 +240,7 @@ router.get(
       voice_available: boolean;
       video_available: boolean;
     }>(
-      `SELECT id, rating, total_reviews, is_available, is_online,
+      `SELECT id, COALESCE(avg_rating, rating) AS rating, total_reviews, is_available, is_online,
               chat_available, voice_available, video_available
        FROM astrologers WHERE user_id = $1`,
       [userId]
@@ -367,7 +392,7 @@ router.put(
     params.push(userId);
     const result = await query(
       `UPDATE astrologers SET ${sets.join(", ")} WHERE user_id = $${i}
-       RETURNING id, bio, specializations, languages, rating, total_reviews,
+       RETURNING id, bio, specializations, languages, COALESCE(avg_rating, rating) AS rating, total_reviews,
          price_per_minute, is_available, is_verified, experience_years`,
       params
     );
@@ -575,6 +600,7 @@ type DetailRow = {
   languages: string[];
   rating: string | null;
   total_reviews: number;
+  avg_session_duration: string | null;
   price_per_minute: string | null;
   is_available: boolean;
   is_online: boolean;
@@ -608,8 +634,9 @@ router.get("/:id", optionalAuthMiddleware, async (req: Request, res: Response) =
           a.bio,
           a.specializations,
           a.languages,
-          a.rating,
+          COALESCE(a.avg_rating, a.rating) AS rating,
           a.total_reviews,
+          a.avg_session_duration::text,
           a.price_per_minute,
           a.is_available,
           a.is_online,
@@ -670,6 +697,10 @@ router.get("/:id", optionalAuthMiddleware, async (req: Request, res: Response) =
         languages: row.languages,
         rating: row.rating != null ? Number(row.rating) : null,
         total_reviews: row.total_reviews,
+        avg_session_duration:
+          row.avg_session_duration != null
+            ? Number(row.avg_session_duration)
+            : null,
         price_per_minute:
           row.price_per_minute != null ? Number(row.price_per_minute) : null,
         is_available: row.is_available,
@@ -680,6 +711,12 @@ router.get("/:id", optionalAuthMiddleware, async (req: Request, res: Response) =
         profile_photo_url:
           row.profile_photo_url ?? row.user_profile_photo_url ?? null,
         waiting_count: row.waiting_count,
+        estimated_wait: Math.round(
+          row.waiting_count *
+            (row.avg_session_duration != null
+              ? Number(row.avg_session_duration)
+              : 5)
+        ),
         is_busy: row.is_busy,
         experience_years: row.experience_years,
         user: {

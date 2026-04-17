@@ -257,6 +257,23 @@ router.post(
          WHERE id = $3`,
         [totalMinutes, totalCharged, sessionId]
       );
+      await client.query(
+        `UPDATE astrologers
+         SET avg_session_duration = (
+           SELECT COALESCE(AVG(latest.total_minutes), 5)
+           FROM (
+             SELECT cs.total_minutes
+             FROM chat_sessions cs
+             WHERE cs.astrologer_id = $1
+               AND cs.status = 'ended'
+               AND cs.total_minutes > 0
+             ORDER BY cs.started_at DESC NULLS LAST
+             LIMIT 20
+           ) latest
+         )
+         WHERE id = $1`,
+        [row.astrologer_id]
+      );
 
       await client.query("COMMIT");
 
@@ -363,21 +380,29 @@ router.get("/history", async (req: Request, res: Response) => {
 
   const result = await query<{
     id: string;
+    astrologer_id: string;
     status: string;
     started_at: Date | null;
     ended_at: Date | null;
     total_minutes: number | null;
     total_charged: string | null;
     astrologer_name: string;
+    astrologer_photo: string | null;
+    rating: number | null;
+    session_type: string | null;
   }>(
     `SELECT
        cs.id,
+       cs.astrologer_id,
        cs.status,
        cs.started_at,
        cs.ended_at,
        cs.total_minutes,
        cs.total_charged,
-       u.name AS astrologer_name
+       u.name AS astrologer_name,
+       COALESCE(NULLIF(TRIM(a.profile_photo_url), ''), NULLIF(TRIM(u.profile_photo_url), ''), u.avatar_url) AS astrologer_photo,
+       cs.rating,
+       cs.session_type
      FROM chat_sessions cs
      INNER JOIN astrologers a ON a.id = cs.astrologer_id
      INNER JOIN users u ON u.id = a.user_id
@@ -394,10 +419,61 @@ router.get("/history", async (req: Request, res: Response) => {
         ...s,
         total_charged:
           s.total_charged != null ? Number(s.total_charged) : null,
+        rating: s.rating != null ? Number(s.rating) : null,
       })),
       page,
       limit,
       total,
+    },
+  });
+});
+
+router.get("/history/:sessionId/messages", async (req: Request, res: Response) => {
+  const userId = req.user?.userId;
+  if (!userId) {
+    res.status(401).json({ success: false, error: "Unauthorized" });
+    return;
+  }
+
+  const idParse = z.string().uuid().safeParse(req.params.sessionId);
+  if (!idParse.success) {
+    res.status(400).json({ success: false, error: "Invalid session id" });
+    return;
+  }
+  const sessionId = idParse.data;
+
+  const accessCheck = await query<{ id: string }>(
+    `SELECT id
+     FROM chat_sessions
+     WHERE id = $1 AND user_id = $2
+     LIMIT 1`,
+    [sessionId, userId]
+  );
+  if (!accessCheck.rows[0]) {
+    res.status(404).json({ success: false, error: "Session not found" });
+    return;
+  }
+
+  const messagesResult = await query<{
+    sender_role: "user" | "astrologer";
+    content: string;
+    created_at: Date;
+  }>(
+    `SELECT sender_role, content, created_at
+     FROM session_messages_archive
+     WHERE session_id = $1
+     ORDER BY created_at ASC`,
+    [sessionId]
+  );
+
+  res.json({
+    success: true,
+    data: {
+      messages: messagesResult.rows.map((row) => ({
+        sender_role: row.sender_role,
+        content: row.content,
+        created_at: row.created_at.toISOString(),
+      })),
     },
   });
 });

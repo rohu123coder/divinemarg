@@ -8,6 +8,11 @@ import { generateAgoraToken, generateChannelName } from "../services/agoraServic
 const router = Router();
 router.use(authMiddleware);
 
+const rateSessionBodySchema = z.object({
+  rating: z.coerce.number().int().min(1).max(5),
+  reviewText: z.string().trim().max(2000).optional(),
+});
+
 router.get(
   "/:sessionId/context",
   async (req, res) => {
@@ -130,6 +135,110 @@ router.get(
     });
   }
 );
+
+router.post("/:sessionId/rate", async (req, res) => {
+  const userId = req.user?.userId;
+  if (!userId) {
+    res.status(401).json({ success: false, error: "Unauthorized" });
+    return;
+  }
+  if (req.user?.role === "astrologer") {
+    res.status(403).json({
+      success: false,
+      error: "This action is only available to users",
+    });
+    return;
+  }
+
+  const idParse = z.string().uuid().safeParse(req.params.sessionId);
+  if (!idParse.success) {
+    res.status(400).json({ success: false, error: "Invalid session id" });
+    return;
+  }
+  const sessionId = idParse.data;
+
+  const bodyParse = rateSessionBodySchema.safeParse(req.body);
+  if (!bodyParse.success) {
+    res.status(400).json({
+      success: false,
+      error: bodyParse.error.issues[0]?.message ?? "Invalid body",
+    });
+    return;
+  }
+
+  const { rating, reviewText } = bodyParse.data;
+
+  const client = await pool.connect();
+  try {
+    await client.query("BEGIN");
+
+    const sessionResult = await client.query<{
+      id: string;
+      astrologer_id: string;
+      user_id: string;
+      rated_at: Date | null;
+      status: string;
+    }>(
+      `SELECT id, astrologer_id, user_id, rated_at, status
+       FROM chat_sessions
+       WHERE id = $1
+       FOR UPDATE`,
+      [sessionId]
+    );
+    const session = sessionResult.rows[0];
+    if (!session || session.user_id !== userId) {
+      await client.query("ROLLBACK");
+      res.status(404).json({ success: false, error: "Session not found" });
+      return;
+    }
+    if (session.status !== "ended") {
+      await client.query("ROLLBACK");
+      res.status(400).json({ success: false, error: "Session is not ended yet" });
+      return;
+    }
+    if (session.rated_at) {
+      await client.query("ROLLBACK");
+      res.status(400).json({ success: false, error: "Session already rated" });
+      return;
+    }
+
+    await client.query(
+      `UPDATE chat_sessions
+       SET rating = $1,
+           review_text = $2,
+           rated_at = NOW()
+       WHERE id = $3`,
+      [rating, reviewText?.trim() || null, sessionId]
+    );
+
+    await client.query(
+      `UPDATE astrologers
+       SET avg_rating = (
+             SELECT AVG(cs.rating)
+             FROM chat_sessions cs
+             WHERE cs.astrologer_id = $1
+               AND cs.rating IS NOT NULL
+           ),
+           total_reviews = (
+             SELECT COUNT(*)
+             FROM chat_sessions cs
+             WHERE cs.astrologer_id = $1
+               AND cs.rating IS NOT NULL
+           )
+       WHERE id = $1`,
+      [session.astrologer_id]
+    );
+
+    await client.query("COMMIT");
+    res.json({ success: true });
+  } catch (err) {
+    await client.query("ROLLBACK");
+    console.error("rate session failed:", err);
+    res.status(500).json({ success: false, error: "Could not submit rating" });
+  } finally {
+    client.release();
+  }
+});
 
 export { router as sessionsRouter };
 

@@ -3,20 +3,25 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { type FormEvent, useEffect, useState } from "react";
+import { io, type Socket } from "socket.io-client";
 
 import { Navbar } from "@/components/Navbar";
 import api from "@/lib/api";
 import { rashis } from "@/lib/horoscope";
+import { getSocketApiBase } from "@/lib/socketBase";
+import { useAuthStore } from "@/lib/store";
 
 type Astro = {
   id: string;
   name: string;
   avatar_url: string | null;
+  profile_photo_url?: string | null;
   specializations: string[];
   languages: string[];
   rating: number | null;
   price_per_minute: number | null;
   is_available: boolean;
+  is_online?: boolean;
   experience_years: number | null;
 };
 
@@ -251,8 +256,11 @@ function getPanchang(date: Date) {
 
 export default function HomePage() {
   const router = useRouter();
+  const { token, isLoggedIn } = useAuthStore();
   const [featured, setFeatured] = useState<Astro[]>([]);
+  const [liveAstrologers, setLiveAstrologers] = useState<Astro[]>([]);
   const [loading, setLoading] = useState(true);
+  const [liveLoading, setLiveLoading] = useState(true);
   const [kundliForm, setKundliForm] = useState({
     name: "",
     gender: "male",
@@ -291,6 +299,68 @@ export default function HomePage() {
       cancelled = true;
     };
   }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    const loadLive = async () => {
+      setLiveLoading(true);
+      try {
+        const res = await api.get(`/api/astrologers`, {
+          params: { online: true, limit: 10, page: 1 },
+        });
+        const list = res.data?.data?.astrologers as Astro[] | undefined;
+        if (!cancelled) {
+          setLiveAstrologers(list ?? []);
+        }
+      } catch {
+        if (!cancelled) {
+          setLiveAstrologers([]);
+        }
+      } finally {
+        if (!cancelled) {
+          setLiveLoading(false);
+        }
+      }
+    };
+    void loadLive();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!isLoggedIn || !token) {
+      return;
+    }
+    const socket: Socket = io(getSocketApiBase(), {
+      auth: { token },
+      transports: ["websocket", "polling"],
+    });
+
+    socket.on(
+      "astrologer_status_changed",
+      async (payload: { astrologerId: string; is_online: boolean }) => {
+        if (!payload.is_online) {
+          setLiveAstrologers((prev) =>
+            prev.filter((astro) => astro.id !== payload.astrologerId)
+          );
+          return;
+        }
+        try {
+          const res = await api.get(`/api/astrologers`, {
+            params: { online: true, limit: 10, page: 1 },
+          });
+          setLiveAstrologers((res.data?.data?.astrologers as Astro[] | undefined) ?? []);
+        } catch {
+          // no-op for live refresh errors
+        }
+      }
+    );
+
+    return () => {
+      socket.disconnect();
+    };
+  }, [isLoggedIn, token]);
 
   const today = new Date();
   const todayLong = today.toLocaleDateString("en-IN", {
@@ -382,6 +452,57 @@ export default function HomePage() {
           </div>
         </div>
       </section>
+
+      {!liveLoading && liveAstrologers.length > 0 ? (
+        <section className="mx-auto max-w-7xl px-4 py-10 sm:px-6">
+          <div className="mb-5 flex items-center justify-between">
+            <h2 className="text-2xl font-bold text-slate-900">Live Astrologers</h2>
+            <Link href="/astrologers" className="text-sm font-semibold text-violet-700 hover:underline">
+              View all
+            </Link>
+          </div>
+          <div className="flex gap-4 overflow-x-auto pb-2">
+            {liveAstrologers.map((astrologer) => (
+              <article
+                key={`live-${astrologer.id}`}
+                className="min-w-[240px] rounded-2xl border border-violet-100 bg-white p-4 shadow-sm"
+              >
+                <div className="flex items-center gap-3">
+                  <div className="relative">
+                    {astrologer.profile_photo_url || astrologer.avatar_url ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img
+                        src={astrologer.profile_photo_url ?? astrologer.avatar_url ?? ""}
+                        alt={astrologer.name}
+                        className="h-12 w-12 rounded-full object-cover"
+                      />
+                    ) : (
+                      <div className="flex h-12 w-12 items-center justify-center rounded-full bg-gradient-to-br from-violet-500 to-indigo-600 text-sm font-bold text-white">
+                        {astrologer.name.slice(0, 1).toUpperCase()}
+                      </div>
+                    )}
+                    <span className="animate-online-pulse absolute bottom-0 right-0 h-3 w-3 rounded-full border-2 border-white bg-emerald-500" />
+                  </div>
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-semibold text-slate-900">
+                      {astrologer.name}
+                    </p>
+                    <p className="text-xs text-slate-600">
+                      ₹{astrologer.price_per_minute ?? 0}/min
+                    </p>
+                  </div>
+                </div>
+                <Link
+                  href={`/astrologers/${astrologer.id}`}
+                  className="mt-4 block rounded-xl bg-gradient-to-r from-purple-600 to-orange-500 py-2 text-center text-sm font-semibold text-white"
+                >
+                  Chat Now
+                </Link>
+              </article>
+            ))}
+          </div>
+        </section>
+      ) : null}
 
       <section className="mx-auto max-w-7xl px-4 py-12 sm:px-6">
         <div className="grid gap-6 lg:grid-cols-3">

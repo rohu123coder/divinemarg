@@ -21,6 +21,22 @@ body {
 }
 
 @layer utilities {
+  @keyframes onlinePulse {
+    0% {
+      box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.5);
+    }
+    70% {
+      box-shadow: 0 0 0 8px rgba(16, 185, 129, 0);
+    }
+    100% {
+      box-shadow: 0 0 0 0 rgba(16, 185, 129, 0);
+    }
+  }
+
+  .animate-online-pulse {
+    animation: onlinePulse 1.8s infinite;
+  }
+
   .text-secondary {
     color: #64748b;
   }

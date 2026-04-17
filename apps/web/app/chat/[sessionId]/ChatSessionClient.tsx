@@ -12,6 +12,7 @@ import {
 import { io, type Socket } from "socket.io-client";
 
 import { Navbar } from "@/components/Navbar";
+import { RatingModal } from "@/components/RatingModal";
 import api from "@/lib/api";
 import { useAuthStore } from "@/lib/store";
 
@@ -69,6 +70,7 @@ export function ChatSessionClient({ sessionId }: ChatSessionClientProps) {
     totalCharged: number;
   } | null>(null);
   const [toast, setToast] = useState<string | null>(null);
+  const [showRatingModal, setShowRatingModal] = useState(false);
 
   type CallType = "voice" | "video";
 
@@ -132,6 +134,7 @@ export function ChatSessionClient({ sessionId }: ChatSessionClientProps) {
     setCallInitiated(false);
     callInitiatedRef.current = false;
     autoInitiateDoneRef.current = false;
+    setShowRatingModal(false);
   }, [sessionId]);
 
   useEffect(() => {
@@ -281,6 +284,9 @@ export function ChatSessionClient({ sessionId }: ChatSessionClientProps) {
             totalMinutes: duration,
             totalCharged: charge,
           });
+          setTimeout(() => {
+            setShowRatingModal(true);
+          }, 2000);
         }
       }
     );
@@ -711,6 +717,19 @@ export function ChatSessionClient({ sessionId }: ChatSessionClientProps) {
           onEndCall={endCall}
         />
       ) : null}
+
+      <RatingModal
+        open={showRatingModal}
+        astrologerName={astrologerName}
+        onClose={() => setShowRatingModal(false)}
+        onSkip={() => setShowRatingModal(false)}
+        onSubmitRating={async ({ rating, reviewText }) => {
+          await api.post(`/api/sessions/${sessionId}/rate`, {
+            rating,
+            reviewText: reviewText || undefined,
+          });
+        }}
+      />
     </div>
   );
 }

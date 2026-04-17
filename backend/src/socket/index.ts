@@ -12,6 +12,9 @@ declare module "socket.io" {
       userId: string;
       role?: string;
     };
+    userId?: string;
+    role?: string;
+    astrologerId?: string;
   }
 }
 
@@ -243,16 +246,46 @@ async function emitWaitlistUpdated(
   astrologerId: string
 ): Promise<WaitlistQueueRow[]> {
   const queue = await loadAstrologerQueue(astrologerId);
+  const mappedQueue = queue.map((row) => ({
+    waitlistId: row.id,
+    userId: row.user_id,
+    userName: row.user_name,
+    position: row.position,
+  }));
   io.to(`user:${astrologerUserId}`).emit("waitlist_updated", {
-    queue: queue.map((row) => ({
-      waitlistId: row.id,
-      userId: row.user_id,
-      userName: row.user_name,
-      position: row.position,
-    })),
+    astrologerId,
+    queue: mappedQueue,
+    total: queue.length,
+  });
+  io.emit("waitlist_updated", {
+    astrologerId,
+    queue: mappedQueue,
     total: queue.length,
   });
   return queue;
+}
+
+async function updateAstrologerAverageSessionDuration(
+  client: PoolClient,
+  astrologerId: string
+): Promise<void> {
+  await client.query(
+    `UPDATE astrologers
+     SET avg_session_duration = (
+       SELECT COALESCE(AVG(latest.total_minutes), 5)
+       FROM (
+         SELECT cs.total_minutes
+         FROM chat_sessions cs
+         WHERE cs.astrologer_id = $1
+           AND cs.status = 'ended'
+           AND cs.total_minutes > 0
+         ORDER BY cs.started_at DESC NULLS LAST
+         LIMIT 20
+       ) latest
+     )
+     WHERE id = $1`,
+    [astrologerId]
+  );
 }
 
 async function reorderWaitlistAfterRemoval(
@@ -364,6 +397,95 @@ async function acceptWaitlistEntry(
     await client.query("ROLLBACK");
     console.error("acceptWaitlistEntry failed:", err);
     return { ok: false, reason: "internal_error" };
+  } finally {
+    client.release();
+  }
+}
+
+async function autoConnectNextInQueue(
+  io: Server,
+  astrologerId: string,
+  astrologerUserId: string,
+  astrologerName: string
+): Promise<void> {
+  const client = await pool.connect();
+  try {
+    await client.query("BEGIN");
+    const nextInQueue = await client.query<{
+      id: string;
+      astrologer_id: string;
+      user_id: string;
+      position: number;
+      user_name: string;
+    }>(
+      `SELECT w.id,
+              w.astrologer_id,
+              w.user_id,
+              w.position,
+              u.name AS user_name
+       FROM astrologer_waitlist w
+       INNER JOIN users u ON u.id = w.user_id
+       WHERE w.astrologer_id = $1
+         AND w.status = 'waiting'
+       ORDER BY w.position ASC
+       LIMIT 1
+       FOR UPDATE`,
+      [astrologerId]
+    );
+    const next = nextInQueue.rows[0];
+    if (!next) {
+      await client.query("ROLLBACK");
+      return;
+    }
+
+    const newSession = await client.query<{ id: string }>(
+      `INSERT INTO chat_sessions (user_id, astrologer_id, status, started_at)
+       VALUES ($1, $2, 'active', NOW())
+       RETURNING id`,
+      [next.user_id, astrologerId]
+    );
+    const newSessionId = newSession.rows[0]?.id;
+    if (!newSessionId) {
+      await client.query("ROLLBACK");
+      return;
+    }
+
+    await client.query(
+      `UPDATE astrologer_waitlist
+       SET status = 'accepted',
+           session_id = $2,
+           updated_at = now()
+       WHERE id = $1`,
+      [next.id, newSessionId]
+    );
+
+    await reorderWaitlistAfterRemoval(client, astrologerId, next.position);
+    await client.query("COMMIT");
+
+    io.to(`user:${next.user_id}`).emit("queue_your_turn", {
+      sessionId: newSessionId,
+      astrologerId,
+      astrologerName,
+      message: "Your turn! Connecting you now...",
+    });
+    io.to(`user:${next.user_id}`).emit("session_starting", {
+      sessionId: newSessionId,
+      astrologerId,
+      astrologerName,
+    });
+    io.to(`user:${astrologerUserId}`).emit("waitlist_session_started", {
+      waitlistId: next.id,
+      sessionId: newSessionId,
+      userId: next.user_id,
+      userName: next.user_name,
+    });
+
+    startSessionTimer(io, newSessionId, Date.now());
+    await emitWaitlistUpdated(io, astrologerUserId, astrologerId);
+    await emitQueuePositionUpdates(io, astrologerId);
+  } catch (err) {
+    await client.query("ROLLBACK");
+    console.error("autoConnectNextInQueue failed:", err);
   } finally {
     client.release();
   }
@@ -619,6 +741,7 @@ async function finalizeChatSession(
        WHERE id = $3`,
       [effectiveDuration, totalCharged, sessionId]
     );
+    await updateAstrologerAverageSessionDuration(client, row.astrologer_id);
 
     await client.query("COMMIT");
     liveSessions.delete(sessionId);
@@ -651,22 +774,18 @@ async function finalizeChatSession(
       totalCharged,
     });
 
-    const waitlistQueue = await emitWaitlistUpdated(
+    await emitWaitlistUpdated(
       io,
       row.astrologer_user_id,
       row.astrologer_id
     );
-    if (waitlistQueue.length > 0) {
-      io.to(`user:${row.astrologer_user_id}`).emit("waitlist_ready", {
-        queue: waitlistQueue.slice(0, 5).map((item) => ({
-          waitlistId: item.id,
-          userId: item.user_id,
-          userName: item.user_name,
-          position: item.position,
-        })),
-      });
-    }
     await emitQueuePositionUpdates(io, row.astrologer_id);
+    await autoConnectNextInQueue(
+      io,
+      row.astrologer_id,
+      row.astrologer_user_id,
+      row.astrologer_name
+    );
 
     return { ended: true, totalMinutes: effectiveDuration, totalCharged };
   } catch (e) {
@@ -734,6 +853,8 @@ export function registerSocketHandlers(io: Server): void {
         userId: decoded.userId,
         role: decoded.role,
       };
+      socket.data.userId = decoded.userId;
+      socket.data.role = decoded.role;
       next();
     } catch {
       next(new Error("Unauthorized"));
@@ -749,6 +870,20 @@ export function registerSocketHandlers(io: Server): void {
   io.on("connection", (socket) => {
     const user = socket.data.user;
     socket.join(`user:${user.userId}`);
+    if (socket.data.role === "astrologer") {
+      void (async () => {
+        const astroResult = await pool.query<{ id: string }>(
+          `SELECT id FROM astrologers WHERE user_id = $1 LIMIT 1`,
+          [user.userId]
+        );
+        const astrologerId = astroResult.rows[0]?.id;
+        if (astrologerId) {
+          socket.data.astrologerId = astrologerId;
+        }
+      })().catch((err) => {
+        console.error("failed to load astrologer socket context:", err);
+      });
+    }
 
     socket.on("join_user_room", () => {
       socket.join(`user:${user.userId}`);
@@ -1180,6 +1315,15 @@ export function registerSocketHandlers(io: Server): void {
       if (!row) {
         return;
       }
+      try {
+        await pool.query(
+          `INSERT INTO session_messages_archive (session_id, sender_role, content, created_at)
+           VALUES ($1, $2, $3, NOW())`,
+          [sessionId, senderType, content]
+        );
+      } catch (archiveErr) {
+        console.error("message archive insert failed:", archiveErr);
+      }
       const state = ensureLiveSession(
         sessionId,
         session.started_at ? new Date(session.started_at).getTime() : Date.now()
@@ -1541,6 +1685,8 @@ export function registerSocketHandlers(io: Server): void {
 
     socket.on("disconnect", () => {
       const uid = user.userId;
+      const role = socket.data.role;
+      const astrologerId = socket.data.astrologerId;
       setTimeout(async () => {
         try {
           // If the user reconnected in the grace window, do not end sessions.
@@ -1548,6 +1694,23 @@ export function registerSocketHandlers(io: Server): void {
           const stillDisconnected = userRoomSockets.length === 0;
           if (!stillDisconnected) {
             return;
+          }
+
+          if (role === "astrologer") {
+            const statusResult = await pool.query<{ id: string }>(
+              `UPDATE astrologers
+               SET is_online = false
+               WHERE user_id = $1
+               RETURNING id`,
+              [uid]
+            );
+            const nextAstrologerId = astrologerId ?? statusResult.rows[0]?.id;
+            if (nextAstrologerId) {
+              io.emit("astrologer_status_changed", {
+                astrologerId: nextAstrologerId,
+                is_online: false,
+              });
+            }
           }
 
           const open = await pool.query<{ id: string }>(

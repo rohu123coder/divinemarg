@@ -71,6 +71,11 @@ export default function AstrologerProfilePage() {
     position: number;
     queueLength: number;
   } | null>(null);
+  const [queueTurn, setQueueTurn] = useState<{
+    sessionId: string;
+    astrologerName: string;
+    countdown: number;
+  } | null>(null);
 
   const socketRef = useRef<Socket | null>(null);
 
@@ -216,11 +221,74 @@ export default function AstrologerProfilePage() {
       }
     );
 
+    socket.on(
+      "queue_your_turn",
+      (payload: { sessionId: string; astrologerName?: string; astrologerId?: string }) => {
+        if (payload.astrologerId && payload.astrologerId !== id) {
+          return;
+        }
+        setQueueTurn({
+          sessionId: payload.sessionId,
+          astrologerName: payload.astrologerName ?? data?.astrologer.user.name ?? "Astrologer",
+          countdown: 3,
+        });
+      }
+    );
+
+    socket.on(
+      "waitlist_updated",
+      (payload: {
+        astrologerId?: string;
+        queue?: Array<{ waitlistId: string; userId: string; position: number }>;
+      }) => {
+        if (payload.astrologerId && payload.astrologerId !== id) {
+          return;
+        }
+        if (!payload.queue) {
+          return;
+        }
+        setWaitlistState((prev) =>
+          prev
+            ? (() => {
+                const mine = payload.queue?.find(
+                  (entry) => entry.waitlistId === prev.waitlistId
+                );
+                if (!mine) {
+                  return null;
+                }
+                return {
+                  ...prev,
+                  position: mine.position,
+                  queueLength: payload.queue?.length ?? prev.queueLength,
+                };
+              })()
+            : prev
+        );
+      }
+    );
+
     return () => {
       socket.disconnect();
       socketRef.current = null;
     };
   }, [data?.astrologer.user.name, id, isLoggedIn, router, token, user?.role]);
+
+  useEffect(() => {
+    if (!queueTurn) {
+      return;
+    }
+    if (queueTurn.countdown <= 0) {
+      const astrologerName = encodeURIComponent(queueTurn.astrologerName);
+      router.push(`/chat/${queueTurn.sessionId}?name=${astrologerName}`);
+      return;
+    }
+    const t = setTimeout(() => {
+      setQueueTurn((prev) =>
+        prev ? { ...prev, countdown: prev.countdown - 1 } : prev
+      );
+    }, 1000);
+    return () => clearTimeout(t);
+  }, [queueTurn, router]);
 
   const startChat = useCallback(
     async (callType?: "voice" | "video") => {
@@ -658,6 +726,30 @@ export default function AstrologerProfilePage() {
               onClick={() => setRechargeOpen(false)}
             >
               Close
+            </button>
+          </div>
+        </div>
+      ) : null}
+
+      {queueTurn ? (
+        <div className="fixed inset-0 z-[90] flex items-center justify-center bg-black/50 p-4">
+          <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl">
+            <h2 className="text-lg font-bold text-slate-900">Your turn!</h2>
+            <p className="mt-2 text-sm text-slate-700">
+              Connecting to {queueTurn.astrologerName}...
+            </p>
+            <p className="mt-4 text-center text-3xl font-bold text-violet-700">
+              {queueTurn.countdown}
+            </p>
+            <button
+              type="button"
+              className="mt-5 w-full rounded-xl bg-gradient-to-r from-purple-600 to-orange-500 py-2.5 text-sm font-semibold text-white"
+              onClick={() => {
+                const astrologerName = encodeURIComponent(queueTurn.astrologerName);
+                router.push(`/chat/${queueTurn.sessionId}?name=${astrologerName}`);
+              }}
+            >
+              Connect Now
             </button>
           </div>
         </div>

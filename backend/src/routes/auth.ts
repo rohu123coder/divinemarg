@@ -9,6 +9,7 @@ import { pool, query } from "../db/index.js";
 import { sendEmailOTP, sendPasswordResetEmail } from "../lib/email.js";
 import { redis } from "../lib/redis.js";
 import { authMiddleware } from "../middleware/auth.js";
+import { getSocketServer } from "../socket/io.js";
 
 const router = Router();
 
@@ -572,10 +573,11 @@ router.post("/astrologer/login", async (req: Request, res: Response) => {
     bio: string | null;
     specializations: string[];
     languages: string[];
-    rating: string | null;
+    avg_rating: string | null;
     total_reviews: number;
     price_per_minute: string | null;
     is_available: boolean;
+    is_online: boolean;
     is_verified: boolean;
     experience_years: number | null;
     u_email: string;
@@ -593,10 +595,11 @@ router.post("/astrologer/login", async (req: Request, res: Response) => {
        a.bio,
        a.specializations,
        a.languages,
-       a.rating,
+       a.avg_rating,
        a.total_reviews,
        a.price_per_minute,
        a.is_available,
+       a.is_online,
        a.is_verified,
        a.experience_years,
        u.password_hash,
@@ -639,17 +642,33 @@ router.post("/astrologer/login", async (req: Request, res: Response) => {
     { expiresIn: "30d", }
   );
 
+  await query(
+    `UPDATE astrologers
+     SET is_online = true
+     WHERE user_id = $1`,
+    [row.user_id]
+  );
+  try {
+    getSocketServer().emit("astrologer_status_changed", {
+      astrologerId: row.astrologer_id,
+      is_online: true,
+    });
+  } catch {
+    // socket may be unavailable in tests
+  }
+
   const astrologer = {
     id: row.astrologer_id,
     user_id: row.user_id,
     bio: row.bio,
     specializations: row.specializations,
     languages: row.languages,
-    rating: row.rating != null ? Number(row.rating) : null,
+    rating: row.avg_rating != null ? Number(row.avg_rating) : null,
     total_reviews: row.total_reviews,
     price_per_minute:
       row.price_per_minute != null ? Number(row.price_per_minute) : null,
     is_available: row.is_available,
+    is_online: true,
     is_approved: row.is_verified,
     is_verified: row.is_verified,
     experience_years: row.experience_years,
@@ -667,6 +686,35 @@ router.post("/astrologer/login", async (req: Request, res: Response) => {
     success: true,
     data: { token, astrologer },
   });
+});
+
+router.post("/astrologer/logout", authMiddleware, async (req: Request, res: Response) => {
+  const userId = req.user?.userId;
+  if (!userId || req.user?.role !== "astrologer") {
+    res.status(401).json({ success: false, error: "Unauthorized" });
+    return;
+  }
+
+  const statusResult = await query<{ id: string }>(
+    `UPDATE astrologers
+     SET is_online = false
+     WHERE user_id = $1
+     RETURNING id`,
+    [userId]
+  );
+  const astrologerId = statusResult.rows[0]?.id;
+  if (astrologerId) {
+    try {
+      getSocketServer().emit("astrologer_status_changed", {
+        astrologerId,
+        is_online: false,
+      });
+    } catch {
+      // socket may be unavailable in tests
+    }
+  }
+
+  res.json({ success: true });
 });
 
 router.post("/astrologer/forgot-password", async (req: Request, res: Response) => {

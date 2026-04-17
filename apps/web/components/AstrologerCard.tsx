@@ -19,6 +19,7 @@ export type AstrologerCardProps = {
   specializations: string[];
   languages: string[];
   rating: number | null;
+  total_reviews?: number;
   price_per_minute: number | null;
   is_available: boolean;
   is_online?: boolean;
@@ -28,6 +29,8 @@ export type AstrologerCardProps = {
   is_verified?: boolean;
   is_busy?: boolean;
   waiting_count?: number;
+  estimated_wait?: number | null;
+  avg_session_duration?: number | null;
   experience_years: number | null;
   onChatNow?: () => void;
   onVoiceCall?: () => void;
@@ -42,6 +45,7 @@ export function AstrologerCard({
   profile_photo_url,
   specializations,
   rating,
+  total_reviews = 0,
   price_per_minute,
   is_online = false,
   chat_available = true,
@@ -49,6 +53,7 @@ export function AstrologerCard({
   video_available = false,
   is_busy = false,
   waiting_count = 0,
+  estimated_wait = null,
   experience_years,
   onChatNow,
   onVoiceCall,
@@ -65,6 +70,10 @@ export function AstrologerCard({
   const displayPhoto = profile_photo_url ?? avatar_url;
 
   const price = price_per_minute ?? 0;
+  const roundedRating = rating != null ? Math.round(rating * 2) / 2 : null;
+  const filledStars = roundedRating != null ? Math.floor(roundedRating) : 0;
+  const hasHalf = roundedRating != null && roundedRating - filledStars >= 0.5;
+  const emptyStars = 5 - filledStars - (hasHalf ? 1 : 0);
 
   const chatUi =
     onChatNow != null ? (
@@ -102,26 +111,31 @@ export function AstrologerCard({
         )}
         <div className="min-w-0 flex-1">
           <h3 className="truncate font-semibold text-slate-900">{name}</h3>
-          <div className="mt-1 flex flex-wrap items-center gap-2">
-            <span className="inline-flex items-center rounded-full bg-amber-50 px-2 py-0.5 text-xs font-medium text-amber-800 ring-1 ring-amber-100">
-              ⭐ {rating != null ? rating.toFixed(1) : "New"}
-            </span>
-            <span
-              className={`inline-flex rounded-full px-2 py-0.5 text-xs font-semibold ${
-                is_busy
-                  ? "bg-amber-50 text-amber-700 ring-1 ring-amber-200"
-                  : is_online
-                  ? "bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200"
-                  : "bg-slate-100 text-slate-500 ring-1 ring-slate-200"
-              }`}
-            >
-              {is_busy ? "Busy" : is_online ? "Online" : "Offline"}
-            </span>
-            {is_busy ? (
-              <span className="inline-flex rounded-full bg-orange-50 px-2 py-0.5 text-xs font-semibold text-orange-700 ring-1 ring-orange-100">
-                Busy · {waiting_count} waiting
+          <div className="mt-1 space-y-1">
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="inline-flex items-center rounded-full bg-amber-50 px-2 py-0.5 text-xs font-medium text-amber-800 ring-1 ring-amber-100">
+                {rating == null
+                  ? "New"
+                  : `${"★".repeat(filledStars)}${hasHalf ? "☆" : ""}${"☆".repeat(
+                      emptyStars
+                    )} ${rating.toFixed(1)}`}
               </span>
-            ) : null}
+              <span className="text-xs text-slate-500">({total_reviews} reviews)</span>
+            </div>
+            <div className="flex items-center gap-2 text-xs">
+              <span
+                className={`inline-flex h-2.5 w-2.5 rounded-full ${
+                  is_online ? "bg-emerald-500 animate-online-pulse" : "bg-slate-400"
+                }`}
+              />
+              <span className="font-semibold text-slate-700">
+                {is_busy
+                  ? `~${Math.max(1, estimated_wait ?? waiting_count * 5)} min wait • ${waiting_count} in queue`
+                  : is_online
+                    ? "Available now"
+                    : "Offline"}
+              </span>
+            </div>
           </div>
         </div>
       </div>
