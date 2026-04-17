@@ -87,7 +87,9 @@ export function Navbar() {
         })();
       }
     });
-    return () => socket.disconnect();
+    return () => {
+      socket.disconnect();
+    };
   }, [isLoggedIn, token]);
 
   const balance = user?.wallet_balance ?? 0;
