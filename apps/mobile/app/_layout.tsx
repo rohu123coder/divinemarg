@@ -1,89 +1,98 @@
-import { useEffect, useState } from "react";
-import { Stack } from "expo-router";
-import * as SplashScreen from "expo-splash-screen";
-import * as SecureStore from "expo-secure-store";
+import { useEffect, useMemo, useState } from "react";
+import { router, Stack, useSegments } from "expo-router";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 
+import { AppSplashScreen } from "../components/SplashScreen";
+import { getToken } from "../lib/auth";
 import api from "../lib/api";
-import { setToken } from "../lib/auth-token";
-import { TOKEN_KEY, useAuthStore, type AuthUser } from "../lib/store";
-
-SplashScreen.preventAutoHideAsync().catch(() => undefined);
+import { useAppStore, type User } from "../lib/store";
 
 export default function RootLayout() {
+  const segments = useSegments();
+  const [showSplash, setShowSplash] = useState(true);
   const [ready, setReady] = useState(false);
+  const isLoggedIn = useAppStore((state) => state.isLoggedIn);
+  const hydrateAuth = useAppStore((state) => state.hydrateAuth);
+  const logout = useAppStore((state) => state.logout);
+
+  const inAuthGroup = useMemo(() => segments[0] === "auth", [segments]);
 
   useEffect(() => {
-    let cancelled = false;
-
     (async () => {
       try {
-        const raw = await SecureStore.getItemAsync(TOKEN_KEY);
-        if (cancelled) return;
-        if (!raw) {
-          setReady(true);
-          await SplashScreen.hideAsync();
-          return;
-        }
-        setToken(raw);
-        const res = await api.get("/api/auth/me");
-        const user = res.data?.data?.user as AuthUser | undefined;
-        if (user && !cancelled) {
-          useAuthStore.getState().hydrate(user, raw);
-        }
-      } catch (e: unknown) {
-        const status =
-          e &&
-          typeof e === "object" &&
-          "response" in e &&
-          e.response &&
-          typeof e.response === "object" &&
-          "status" in e.response
-            ? (e.response as { status?: number }).status
-            : undefined;
-        if (status === 401) {
-          try {
-            await SecureStore.deleteItemAsync(TOKEN_KEY);
-          } catch {
-            /* ignore */
+        const token = getToken();
+        if (!token) {
+          logout();
+        } else {
+          const res = await api.get("/api/auth/me");
+          const payload = res.data?.data?.user as
+            | {
+                id: string;
+                name: string;
+                phone: string;
+                wallet_balance: number;
+                profile_photo?: string | null;
+                avatar_url?: string | null;
+              }
+            | undefined;
+          if (payload) {
+            const user: User = {
+              id: payload.id,
+              name: payload.name,
+              phone: payload.phone,
+              wallet_balance: payload.wallet_balance ?? 0,
+              profile_photo: payload.profile_photo ?? payload.avatar_url ?? null,
+            };
+            hydrateAuth({ user, token });
+          } else {
+            logout();
           }
-          setToken(null);
-          useAuthStore.setState({
-            user: null,
-            token: null,
-            isLoggedIn: false,
-          });
         }
+      } catch {
+        logout();
       } finally {
-        if (!cancelled) {
-          setReady(true);
-          await SplashScreen.hideAsync();
-        }
+        setReady(true);
       }
     })();
+  }, [hydrateAuth, logout]);
 
-    return () => {
-      cancelled = true;
-    };
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setShowSplash(false);
+    }, 2500);
+    return () => clearTimeout(timer);
   }, []);
 
-  if (!ready) {
-    return null;
+  useEffect(() => {
+    if (!ready || showSplash) {
+      return;
+    }
+    if (isLoggedIn && inAuthGroup) {
+      router.replace("/(tabs)");
+      return;
+    }
+    if (!isLoggedIn && !inAuthGroup) {
+      router.replace("/auth/login");
+    }
+  }, [inAuthGroup, isLoggedIn, ready, showSplash]);
+
+  if (!ready || showSplash) {
+    return <AppSplashScreen />;
   }
 
   return (
     <SafeAreaProvider>
       <Stack screenOptions={{ headerShown: false }}>
         <Stack.Screen name="(tabs)" />
-        <Stack.Screen
-          name="login"
-          options={{ presentation: "modal", headerShown: false }}
-        />
-        <Stack.Screen
-          name="astrologer/[id]"
-          options={{ headerShown: false }}
-        />
+        <Stack.Screen name="auth/login" />
+        <Stack.Screen name="auth/register" />
+        <Stack.Screen name="astrologer/[id]" />
         <Stack.Screen name="chat/[sessionId]" options={{ headerShown: false }} />
+        <Stack.Screen name="call/[sessionId]" options={{ headerShown: false }} />
+        <Stack.Screen name="wallet/index" />
+        <Stack.Screen name="wallet/recharge" />
+        <Stack.Screen name="account/index" />
+        <Stack.Screen name="account/sessions" />
       </Stack>
     </SafeAreaProvider>
   );

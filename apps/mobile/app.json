@@ -3,33 +3,33 @@
     "name": "DivineMarg",
     "slug": "divinemarg",
     "version": "1.0.0",
-    "platforms": ["ios", "android", "web"],
     "orientation": "portrait",
-    "scheme": "divinemarg",
     "icon": "./assets/icon.png",
-    "userInterfaceStyle": "light",
     "splash": {
-      "image": "./assets/splash-icon.png",
-      "resizeMode": "contain",
-      "backgroundColor": "#ffffff"
+      "backgroundColor": "#0F0A1E"
     },
     "ios": {
-      "supportsTablet": true
+      "bundleIdentifier": "com.divinemarg.app"
     },
     "android": {
       "adaptiveIcon": {
-        "foregroundImage": "./assets/adaptive-icon.png",
-        "backgroundColor": "#ffffff"
+        "backgroundColor": "#0F0A1E"
+      },
+      "package": "com.divinemarg.app"
+    },
+    "plugins": [
+      "expo-router",
+      "expo-secure-store",
+      "expo-font"
+    ],
+    "extra": {
+      "router": {
+        "origin": false
+      },
+      "eas": {
+        "projectId": "dcc29648-0c17-42a3-a0fc-ec927c23f9af"
       }
     },
-    "web": {
-      "bundler": "metro",
-      "output": "single",
-      "favicon": "./assets/favicon.png"
-    },
-    "plugins": ["expo-router", "expo-secure-store"],
-    "extra": {
-      "apiUrl": "http://localhost:4000"
-    }
+    "owner": "rohu2502"
   }
 }

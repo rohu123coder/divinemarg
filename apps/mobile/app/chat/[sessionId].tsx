@@ -1,420 +1,227 @@
 import { Ionicons } from "@expo/vector-icons";
 import { useLocalSearchParams, useRouter } from "expo-router";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
-  ActivityIndicator,
-  Alert,
   FlatList,
+  Image,
   KeyboardAvoidingView,
+  Modal,
   Platform,
   Pressable,
+  SafeAreaView,
   StyleSheet,
   Text,
   TextInput,
   View,
 } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
-import { io, type Socket } from "socket.io-client";
 
-import { baseURL } from "../../lib/api";
-import { useAuthStore } from "../../lib/store";
-import type { ChatMessage } from "../../lib/types";
+import { ChatBubble } from "../../components/ChatBubble";
+import { connectSocket, disconnectSocket, socket } from "../../lib/socket";
+import { useAppStore } from "../../lib/store";
 
-const PRIMARY = "#7C3AED";
-const LIGHT = "#EDE9FE";
+type Message = {
+  id: string;
+  message: string;
+  timestamp: string;
+  mine: boolean;
+};
 
-export default function ChatScreen() {
-  const { sessionId, name: nameParam } = useLocalSearchParams<{
-    sessionId: string;
-    name?: string;
-  }>();
+export default function ActiveChatScreen() {
+  const { sessionId } = useLocalSearchParams<{ sessionId: string }>();
   const router = useRouter();
-  const token = useAuthStore((s) => s.token);
-  const isLoggedIn = useAuthStore((s) => s.isLoggedIn);
-  const user = useAuthStore((s) => s.user);
-
-  const astrologerName = useMemo(() => {
-    if (!nameParam) return "Astrologer";
-    try {
-      return decodeURIComponent(nameParam);
-    } catch {
-      return nameParam;
-    }
-  }, [nameParam]);
-
-  const [status, setStatus] = useState<string>("connecting");
-  const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const token = useAppStore((state) => state.token);
+  const astrologers = useAppStore((state) => state.astrologers);
+  const astro = astrologers.find((a) => a.id === sessionId) ?? astrologers[0];
+  const [seconds, setSeconds] = useState(0);
   const [input, setInput] = useState("");
-  const [startedAt, setStartedAt] = useState<string | null>(null);
-  const [elapsedSec, setElapsedSec] = useState(0);
-  const socketRef = useRef<Socket | null>(null);
-  const summaryShown = useRef(false);
-  const lowBalanceRef = useRef(false);
+  const [incomingCall, setIncomingCall] = useState(false);
+  const [messages, setMessages] = useState<Message[]>([
+    { id: "m1", message: "Namaste, how may I help you today?", timestamp: "10:30", mine: false },
+  ]);
 
   useEffect(() => {
-    summaryShown.current = false;
-    lowBalanceRef.current = false;
-    setMessages([]);
-    setStatus("connecting");
-    setStartedAt(null);
-    setElapsedSec(0);
-  }, [sessionId]);
+    const timer = setInterval(() => setSeconds((s) => s + 1), 1000);
+    return () => clearInterval(timer);
+  }, []);
 
   useEffect(() => {
-    if (!isLoggedIn || !token || !sessionId) {
-      return;
-    }
+    if (!token) return;
+    connectSocket(token);
+    socket.emit("join_session", { sessionId });
 
-    const socket = io(baseURL, {
-      auth: { token },
-      transports: ["websocket", "polling"],
+    socket.on("new_message", (payload: { content: string }) => {
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: `m-${Date.now()}`,
+          message: payload.content,
+          timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+          mine: false,
+        },
+      ]);
     });
-    socketRef.current = socket;
-
-    socket.on("connect", () => {
-      socket.emit("join_session", { sessionId });
-    });
-
-    socket.on("connect_error", () => {
-      setStatus("error");
-    });
-
-    socket.on(
-      "joined_session",
-      (payload: { sessionId: string; status: string }) => {
-        if (payload.sessionId !== sessionId) return;
-        setStatus(payload.status);
-      }
-    );
-
-    socket.on(
-      "session_started",
-      (payload: { sessionId: string; startedAt: string }) => {
-        if (payload.sessionId !== sessionId) return;
-        setStatus("active");
-        setStartedAt(payload.startedAt);
-      }
-    );
-
-    socket.on("new_message", (msg: ChatMessage) => {
-      if (msg.sessionId !== sessionId) return;
-      setMessages((prev) => [...prev, msg]);
-    });
-
-    socket.on(
-      "session_ended",
-      (payload: {
-        sessionId: string;
-        totalMinutes: number;
-        totalCharged: number;
-      }) => {
-        if (payload.sessionId !== sessionId) return;
-        if (summaryShown.current) return;
-        summaryShown.current = true;
-        if (lowBalanceRef.current) {
-          lowBalanceRef.current = false;
-          router.back();
-          return;
-        }
-        Alert.alert(
-          "Session ended",
-          `Duration: ${payload.totalMinutes} min\nCharged: ₹${payload.totalCharged}`,
-          [{ text: "OK", onPress: () => router.back() }]
-        );
-      }
-    );
-
-    socket.on("insufficient_balance", (payload: { sessionId: string }) => {
-      if (payload.sessionId !== sessionId) return;
-      lowBalanceRef.current = true;
-      Alert.alert(
-        "Low balance",
-        "Your wallet balance is too low to continue. The session will end."
-      );
-    });
+    socket.on("incoming_call", () => setIncomingCall(true));
 
     return () => {
-      socket.disconnect();
-      socketRef.current = null;
+      socket.off("new_message");
+      socket.off("incoming_call");
+      disconnectSocket();
     };
-  }, [isLoggedIn, router, sessionId, token]);
+  }, [sessionId, token]);
 
-  useEffect(() => {
-    if (status !== "active" || !startedAt) {
-      return;
-    }
-    const tick = () => {
-      const ms = Date.now() - new Date(startedAt).getTime();
-      setElapsedSec(Math.max(0, Math.floor(ms / 1000)));
-    };
-    tick();
-    const id = setInterval(tick, 1000);
-    return () => clearInterval(id);
-  }, [startedAt, status]);
-
-  const fmtTime = (total: number) => {
-    const m = Math.floor(total / 60);
-    const s = total % 60;
-    return `${m}:${s.toString().padStart(2, "0")}`;
-  };
+  const timerText = useMemo(() => {
+    const mm = Math.floor(seconds / 60).toString().padStart(2, "0");
+    const ss = (seconds % 60).toString().padStart(2, "0");
+    return `${mm}:${ss}`;
+  }, [seconds]);
 
   const send = () => {
-    const text = input.trim();
-    if (!text || !sessionId) return;
-    socketRef.current?.emit("send_message", { sessionId, content: text });
+    const message = input.trim();
+    if (!message) return;
+    setMessages((prev) => [
+      ...prev,
+      { id: `u-${Date.now()}`, message, timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }), mine: true },
+    ]);
+    socket.emit("new_message", { sessionId, content: message });
     setInput("");
   };
 
-  const endSession = useCallback(() => {
-    Alert.alert("End chat", "End this session?", [
-      { text: "Cancel", style: "cancel" },
-      {
-        text: "End",
-        style: "destructive",
-        onPress: () => {
-          socketRef.current?.emit("end_session", { sessionId });
-        },
-      },
-    ]);
-  }, [sessionId]);
-
-  const listData = useMemo(
-    () => [...messages].reverse(),
-    [messages]
-  );
-
-  if (!sessionId) {
-    return (
-      <SafeAreaView style={styles.safe}>
-        <Text style={styles.err}>Invalid session</Text>
-      </SafeAreaView>
-    );
-  }
-
   return (
-    <SafeAreaView style={styles.safe} edges={["top"]}>
+    <SafeAreaView style={styles.safe}>
       <KeyboardAvoidingView
-        style={styles.flex}
+        style={{ flex: 1 }}
         behavior={Platform.OS === "ios" ? "padding" : undefined}
-        keyboardVerticalOffset={Platform.OS === "ios" ? 8 : 0}
       >
-        <View style={styles.header}>
-          <Pressable onPress={() => router.back()} style={styles.headerBtn}>
-            <Ionicons name="arrow-back" size={22} color={PRIMARY} />
+        <View style={styles.top}>
+          <Pressable onPress={() => router.back()}>
+            <Ionicons name="arrow-back" size={22} color="#1A1A2E" />
           </Pressable>
-          <View style={styles.headerMid}>
-            <Text style={styles.headerTitle} numberOfLines={1}>
-              {astrologerName}
-            </Text>
-            <Text style={styles.headerSub}>
-              {status === "active"
-                ? fmtTime(elapsedSec)
-                : status === "waiting"
-                  ? "Waiting for astrologer…"
-                  : status === "connecting"
-                    ? "Connecting…"
-                    : status}
-            </Text>
+          <View style={styles.profile}>
+            <Image source={{ uri: astro?.profile_photo ?? "https://i.pravatar.cc/100?img=40" }} style={styles.photo} />
+            <Text style={styles.name}>{astro?.name ?? "Astrologer"}</Text>
           </View>
-          <Pressable onPress={endSession} style={styles.endBtn}>
-            <Text style={styles.endTxt}>End</Text>
+          <Text style={styles.timer}>{timerText}</Text>
+          <Pressable style={styles.endBtn} onPress={() => router.back()}>
+            <Text style={styles.endText}>End</Text>
           </Pressable>
         </View>
 
-        {status === "error" ? (
-          <View style={styles.centered}>
-            <Text style={styles.err}>Could not connect. Try again.</Text>
-          </View>
-        ) : (
-          <FlatList
-            data={listData}
-            inverted
-            keyExtractor={(item) => item.id}
-            contentContainerStyle={styles.list}
-            renderItem={({ item }) => {
-              const mine =
-                item.senderType === "user" && item.senderId === user?.id;
-              return (
-                <View
-                  style={[
-                    styles.bubbleRow,
-                    mine ? styles.bubbleRowMine : styles.bubbleRowThem,
-                  ]}
-                >
-                  <View
-                    style={[
-                      styles.bubble,
-                      mine ? styles.bubbleMine : styles.bubbleThem,
-                    ]}
-                  >
-                    <Text
-                      style={[
-                        styles.bubbleTxt,
-                        mine ? styles.bubbleTxtMine : styles.bubbleTxtThem,
-                      ]}
-                    >
-                      {item.content}
-                    </Text>
-                  </View>
-                </View>
-              );
-            }}
-            ListEmptyComponent={
-              <Text style={styles.empty}>
-                {status === "waiting"
-                  ? "Say hi while you wait…"
-                  : "No messages yet."}
-              </Text>
-            }
-          />
-        )}
+        <View style={styles.callActions}>
+          <Pressable style={styles.iconBtn}>
+            <Ionicons name="call" size={18} color="#7C3AED" />
+          </Pressable>
+          <Pressable style={styles.iconBtn}>
+            <Ionicons name="videocam" size={20} color="#7C3AED" />
+          </Pressable>
+        </View>
+
+        <FlatList
+          data={messages}
+          keyExtractor={(item) => item.id}
+          renderItem={({ item }) => (
+            <ChatBubble message={item.message} timestamp={item.timestamp} mine={item.mine} />
+          )}
+          contentContainerStyle={styles.messages}
+        />
 
         <View style={styles.composer}>
           <TextInput
             style={styles.input}
-            placeholder="Message…"
-            placeholderTextColor="#9CA3AF"
+            placeholder="Type a message..."
             value={input}
             onChangeText={setInput}
-            multiline
           />
-          <Pressable style={styles.send} onPress={send}>
-            {status === "connecting" ? (
-              <ActivityIndicator color="#fff" size="small" />
-            ) : (
-              <Ionicons name="send" size={20} color="#fff" />
-            )}
+          <Pressable style={styles.sendBtn} onPress={send}>
+            <Ionicons name="arrow-up" size={18} color="#FFFFFF" />
           </Pressable>
         </View>
       </KeyboardAvoidingView>
+
+      <Modal visible={incomingCall} transparent animationType="fade">
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalCard}>
+            <Image source={{ uri: astro?.profile_photo ?? "https://i.pravatar.cc/100?img=40" }} style={styles.modalPhoto} />
+            <Text style={styles.modalName}>{astro?.name}</Text>
+            <Text style={styles.modalSub}>Incoming Voice Call...</Text>
+            <View style={styles.modalActions}>
+              <Pressable style={styles.accept} onPress={() => setIncomingCall(false)}>
+                <Text style={styles.modalActionText}>Accept</Text>
+              </Pressable>
+              <Pressable style={styles.decline} onPress={() => setIncomingCall(false)}>
+                <Text style={styles.modalActionText}>Decline</Text>
+              </Pressable>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  safe: {
-    flex: 1,
-    backgroundColor: "#F3F4F6",
-  },
-  flex: {
-    flex: 1,
-  },
-  header: {
+  safe: { flex: 1, backgroundColor: "#FFFFFF" },
+  top: {
     flexDirection: "row",
     alignItems: "center",
-    paddingHorizontal: 8,
+    gap: 8,
+    paddingHorizontal: 12,
     paddingVertical: 10,
-    backgroundColor: "#fff",
     borderBottomWidth: 1,
-    borderBottomColor: LIGHT,
+    borderColor: "#E5E7EB",
   },
-  headerBtn: {
-    padding: 8,
-  },
-  headerMid: {
-    flex: 1,
-    marginHorizontal: 4,
-  },
-  headerTitle: {
-    fontSize: 17,
-    fontWeight: "800",
-    color: "#111827",
-  },
-  headerSub: {
-    fontSize: 13,
-    color: "#6B7280",
-    marginTop: 2,
-  },
-  endBtn: {
-    paddingVertical: 8,
-    paddingHorizontal: 12,
-  },
-  endTxt: {
-    color: "#DC2626",
-    fontWeight: "700",
-    fontSize: 16,
-  },
-  list: {
-    paddingHorizontal: 12,
-    paddingVertical: 12,
-  },
-  bubbleRow: {
-    marginBottom: 8,
-    flexDirection: "row",
-  },
-  bubbleRowMine: {
-    justifyContent: "flex-end",
-  },
-  bubbleRowThem: {
-    justifyContent: "flex-start",
-  },
-  bubble: {
-    maxWidth: "80%",
-    borderRadius: 16,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-  },
-  bubbleMine: {
-    backgroundColor: PRIMARY,
-  },
-  bubbleThem: {
-    backgroundColor: "#fff",
+  profile: { flexDirection: "row", alignItems: "center", gap: 6, flex: 1 },
+  photo: { width: 30, height: 30, borderRadius: 15 },
+  name: { color: "#1A1A2E", fontWeight: "700" },
+  timer: { color: "#10B981", fontWeight: "700", fontSize: 12 },
+  endBtn: { paddingHorizontal: 10, paddingVertical: 5, borderRadius: 8, backgroundColor: "#FEE2E2" },
+  endText: { color: "#EF4444", fontWeight: "700" },
+  callActions: { flexDirection: "row", justifyContent: "flex-end", gap: 8, paddingHorizontal: 12, paddingVertical: 8 },
+  iconBtn: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
     borderWidth: 1,
-    borderColor: LIGHT,
+    borderColor: "#EDE9FE",
+    alignItems: "center",
+    justifyContent: "center",
   },
-  bubbleTxt: {
-    fontSize: 16,
-    lineHeight: 22,
-  },
-  bubbleTxtMine: {
-    color: "#fff",
-  },
-  bubbleTxtThem: {
-    color: "#111827",
-  },
-  empty: {
-    textAlign: "center",
-    color: "#9CA3AF",
-    marginTop: 24,
-  },
+  messages: { padding: 12 },
   composer: {
     flexDirection: "row",
-    alignItems: "flex-end",
-    padding: 12,
-    backgroundColor: "#fff",
+    alignItems: "center",
     borderTopWidth: 1,
-    borderTopColor: LIGHT,
+    borderColor: "#E5E7EB",
+    padding: 10,
     gap: 8,
   },
   input: {
     flex: 1,
-    minHeight: 44,
-    maxHeight: 120,
     borderWidth: 1,
-    borderColor: LIGHT,
-    borderRadius: 14,
+    borderColor: "#E5E7EB",
+    borderRadius: 24,
     paddingHorizontal: 14,
     paddingVertical: 10,
-    fontSize: 16,
-    backgroundColor: "#FAFAFA",
   },
-  send: {
-    backgroundColor: PRIMARY,
-    width: 44,
-    height: 44,
-    borderRadius: 22,
+  sendBtn: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: "#7C3AED",
     alignItems: "center",
     justifyContent: "center",
   },
-  centered: {
+  modalOverlay: {
     flex: 1,
+    backgroundColor: "rgba(0,0,0,0.5)",
     alignItems: "center",
     justifyContent: "center",
   },
-  err: {
-    color: "#B91C1C",
-    fontSize: 15,
-    textAlign: "center",
-    margin: 24,
-  },
+  modalCard: { width: 280, borderRadius: 16, backgroundColor: "#FFFFFF", padding: 20, alignItems: "center" },
+  modalPhoto: { width: 80, height: 80, borderRadius: 40, marginBottom: 8 },
+  modalName: { fontSize: 18, color: "#1A1A2E", fontWeight: "700" },
+  modalSub: { marginTop: 4, color: "#6B7280" },
+  modalActions: { marginTop: 16, flexDirection: "row", gap: 10 },
+  accept: { backgroundColor: "#10B981", borderRadius: 10, paddingHorizontal: 16, paddingVertical: 10 },
+  decline: { backgroundColor: "#EF4444", borderRadius: 10, paddingHorizontal: 16, paddingVertical: 10 },
+  modalActionText: { color: "#FFFFFF", fontWeight: "700" },
 });

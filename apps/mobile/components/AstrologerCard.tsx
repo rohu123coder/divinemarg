@@ -9,13 +9,11 @@ import {
   type ViewStyle,
 } from "react-native";
 
-import type { AstrologerListItem } from "../lib/types";
-
-const PRIMARY = "#7C3AED";
-const LIGHT = "#EDE9FE";
+import type { Astrologer } from "../lib/store";
 
 type Props = {
-  item: AstrologerListItem;
+  item: Astrologer;
+  mode?: "chat" | "call";
   style?: ViewStyle;
 };
 
@@ -26,20 +24,42 @@ function initials(name: string): string {
   return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
 }
 
-export function AstrologerCard({ item, style }: Props) {
+const COLORS = {
+  primary: "#7C3AED",
+  gold: "#D4AF37",
+  text: "#1A1A2E",
+  secondary: "#6B7280",
+  card: "#FFFFFF",
+  online: "#10B981",
+  busy: "#EF4444",
+};
+
+export function AstrologerCard({ item, mode = "chat", style }: Props) {
   const router = useRouter();
-  const specText = item.specializations.slice(0, 3).join(" · ");
-  const rating =
-    item.rating != null ? item.rating.toFixed(1) : "—";
-  const price = item.price_per_minute ?? 0;
+  const isBusy = item.status === "busy";
+  const isOnline = item.status === "online";
+  const isOffline = item.status === "offline";
+  const actionText = mode === "chat" ? "Chat" : "Call";
+  const buttonColor = isOnline ? COLORS.online : isBusy ? COLORS.busy : "#9CA3AF";
+
+  const handleAction = () => {
+    if (isOffline) {
+      return;
+    }
+    if (mode === "chat") {
+      router.push(`/astrologer/${item.id}`);
+      return;
+    }
+    router.push(`/call/${item.id}`);
+  };
 
   return (
     <View style={[styles.card, style]}>
       <View style={styles.row}>
-        <View style={styles.avatarWrap}>
-          {item.avatar_url ? (
+        <View style={[styles.avatarWrap, isOnline && styles.avatarRing]}>
+          {item.profile_photo ? (
             <Image
-              source={{ uri: item.avatar_url }}
+              source={{ uri: item.profile_photo }}
               style={styles.avatarImg}
             />
           ) : (
@@ -51,59 +71,60 @@ export function AstrologerCard({ item, style }: Props) {
             <Text style={styles.name} numberOfLines={1}>
               {item.name}
             </Text>
-            <View
-              style={[
-                styles.badge,
-                item.is_available ? styles.badgeOn : styles.badgeOff,
-              ]}
-            >
-              <Text
-                style={[
-                  styles.badgeTxt,
-                  item.is_available ? styles.badgeTxtOn : styles.badgeTxtOff,
-                ]}
-              >
-                {item.is_available ? "Online" : "Offline"}
-              </Text>
-            </View>
+            <Ionicons name="checkmark-circle" size={16} color={COLORS.online} />
+            <Text style={styles.verified}>Verified</Text>
           </View>
           <Text style={styles.spec} numberOfLines={2}>
-            {specText || "Astrologer"}
+            {item.specialization}
+          </Text>
+          <Text style={styles.spec} numberOfLines={1}>
+            {item.languages.join(", ")}
+          </Text>
+          <Text style={styles.spec} numberOfLines={1}>
+            Exp: {item.experience_years} Years
           </Text>
           <View style={styles.metaRow}>
             <View style={styles.ratingPill}>
               <Ionicons name="star" size={14} color="#F59E0B" />
-              <Text style={styles.ratingTxt}>{rating}</Text>
-              <Text style={styles.reviewsMuted}>
-                ({item.total_reviews})
-              </Text>
+              <Text style={styles.ratingTxt}>{item.rating.toFixed(1)}</Text>
+              <Text style={styles.reviewsMuted}>{item.orders}+ orders</Text>
             </View>
-            <Text style={styles.price}>₹{price}/min</Text>
+            <Text style={styles.price}>₹{item.price_per_min}/min</Text>
           </View>
         </View>
       </View>
       <Pressable
         style={({ pressed }) => [
           styles.chatBtn,
+          { borderColor: buttonColor },
+          isOffline && styles.chatBtnDisabled,
           pressed && styles.chatBtnPressed,
         ]}
-        onPress={() => router.push(`/astrologer/${item.id}`)}
+        onPress={handleAction}
+        disabled={isOffline}
       >
-        <Text style={styles.chatBtnTxt}>Chat</Text>
+        <Text style={[styles.chatBtnTxt, { color: buttonColor }]}>
+          {isOffline ? "Offline" : actionText}
+        </Text>
       </Pressable>
+      {isBusy ? (
+        <>
+          <Text style={styles.waiting}>Wait ~{item.wait_time_minutes ?? 3}m</Text>
+          <Text style={styles.demand}>High in demand! Join waitlist</Text>
+        </>
+      ) : null}
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   card: {
-    backgroundColor: "#fff",
+    backgroundColor: COLORS.card,
     borderRadius: 16,
     padding: 14,
-    marginHorizontal: 16,
-    marginBottom: 12,
+    marginBottom: 14,
     borderWidth: 1,
-    borderColor: LIGHT,
+    borderColor: "#EEE7FF",
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.06,
@@ -118,11 +139,14 @@ const styles = StyleSheet.create({
     width: 56,
     height: 56,
     borderRadius: 28,
-    backgroundColor: LIGHT,
+    backgroundColor: "#EDE9FE",
     alignItems: "center",
     justifyContent: "center",
     overflow: "hidden",
+    borderWidth: 2,
+    borderColor: "#F3F4F6",
   },
+  avatarRing: { borderColor: COLORS.gold },
   avatarImg: {
     width: 56,
     height: 56,
@@ -130,7 +154,7 @@ const styles = StyleSheet.create({
   avatarTxt: {
     fontSize: 18,
     fontWeight: "700",
-    color: PRIMARY,
+    color: COLORS.primary,
   },
   main: {
     flex: 1,
@@ -139,28 +163,19 @@ const styles = StyleSheet.create({
   titleRow: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 8,
+    gap: 4,
   },
   name: {
     flex: 1,
     fontSize: 17,
     fontWeight: "700",
-    color: "#1F2937",
+    color: COLORS.text,
   },
-  badge: {
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 8,
-  },
-  badgeOn: { backgroundColor: "#D1FAE5" },
-  badgeOff: { backgroundColor: "#F3F4F6" },
-  badgeTxt: { fontSize: 11, fontWeight: "600" },
-  badgeTxtOn: { color: "#047857" },
-  badgeTxtOff: { color: "#6B7280" },
+  verified: { fontSize: 12, color: COLORS.secondary, fontWeight: "600" },
   spec: {
-    marginTop: 4,
+    marginTop: 2,
     fontSize: 13,
-    color: "#6B7280",
+    color: COLORS.secondary,
   },
   metaRow: {
     flexDirection: "row",
@@ -185,21 +200,34 @@ const styles = StyleSheet.create({
   price: {
     fontSize: 15,
     fontWeight: "700",
-    color: PRIMARY,
+    color: COLORS.primary,
   },
   chatBtn: {
     marginTop: 12,
-    backgroundColor: PRIMARY,
     borderRadius: 12,
-    paddingVertical: 10,
+    paddingVertical: 9,
+    borderWidth: 1.5,
     alignItems: "center",
+  },
+  chatBtnDisabled: {
+    backgroundColor: "#F3F4F6",
   },
   chatBtnPressed: {
     opacity: 0.9,
   },
   chatBtnTxt: {
-    color: "#fff",
     fontSize: 16,
     fontWeight: "700",
+  },
+  waiting: {
+    marginTop: 6,
+    color: COLORS.busy,
+    fontSize: 12,
+    fontWeight: "600",
+  },
+  demand: {
+    marginTop: 2,
+    color: COLORS.secondary,
+    fontSize: 12,
   },
 });

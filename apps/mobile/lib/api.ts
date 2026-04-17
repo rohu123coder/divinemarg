@@ -1,13 +1,10 @@
 import axios from "axios";
-import Constants from "expo-constants";
 import { router } from "expo-router";
 
-import { getToken, setToken } from "./auth-token";
-import { useAuthStore } from "./store";
+import { getToken } from "./auth";
+import { useAppStore } from "./store";
 
-const extra = Constants.expoConfig?.extra as { apiUrl?: string } | undefined;
-const baseURL =
-  extra?.apiUrl?.replace(/\/$/, "") ?? "http://localhost:4000";
+const baseURL = "https://divinemarg.onrender.com";
 
 const api = axios.create({
   baseURL,
@@ -17,9 +14,9 @@ const api = axios.create({
 });
 
 api.interceptors.request.use((config) => {
-  const t = getToken();
-  if (t) {
-    config.headers.Authorization = `Bearer ${t}`;
+  const token = getToken();
+  if (token) {
+    config.headers.Authorization = `Bearer ${token}`;
   }
   return config;
 });
@@ -28,12 +25,12 @@ api.interceptors.response.use(
   (response) => response,
   async (error) => {
     if (error?.response?.status === 401) {
-      await useAuthStore.getState().logout();
-      router.replace("/login");
+      useAppStore.getState().logout();
+      router.replace("/auth/login");
     }
     return Promise.reject(error);
   }
 );
 
-export { api, baseURL, setToken };
+export { api, baseURL };
 export default api;
