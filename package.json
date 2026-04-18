@@ -21,6 +21,17 @@
   },
   "dependencies": {
     "agora-rtc-sdk-ng": "^4.24.3",
-    "agora-token": "^2.0.5"
+    "agora-token": "^2.0.5",
+    "react": "19.1.0",
+    "react-dom": "19.1.0"
+  },
+  "overrides": {
+    "react": "19.1.0",
+    "react-dom": "19.1.0",
+    "@types/react": "19.1.0"
+  },
+  "resolutions": {
+    "react": "19.1.0",
+    "react-dom": "19.1.0"
   }
 }
