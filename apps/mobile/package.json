@@ -25,7 +25,7 @@
     "expo-status-bar": "~3.0.9",
     "expo-system-ui": "~6.0.9",
     "react": "^18.2.0",
-    "react-native": "^0.76.9",
+    "react-native": "^0.78.0",
     "react-native-agora": "4.6.2",
     "react-native-mmkv": "2.12.2",
     "react-native-razorpay": "*",
