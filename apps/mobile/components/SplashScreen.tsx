@@ -1,3 +1,6 @@
+/**
+ * JS-only splash UI (Animated + View/Text). No native modules or expo-notifications.
+ */
 import { useEffect, useMemo, useRef } from "react";
 import { Animated, StyleSheet, Text, View } from "react-native";
 

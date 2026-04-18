@@ -2,33 +2,41 @@
   "expo": {
     "name": "DivineMarg",
     "slug": "divinemarg",
+    "scheme": "divinemarg",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "splash": {
       "image": "./assets/splash-icon.png",
-      "backgroundColor": "#0F0A1E",
-      "resizeMode": "contain"
-    },
-    "ios": {
-      "bundleIdentifier": "com.divinemarg.app"
+      "resizeMode": "contain",
+      "backgroundColor": "#0F0A1E"
     },
     "android": {
       "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#0F0A1E"
       },
-      "package": "com.divinemarg.app"
+      "package": "com.divinemarg.app",
+      "newArchEnabled": false
+    },
+    "ios": {
+      "bundleIdentifier": "com.divinemarg.app",
+      "supportsTablet": false
     },
     "plugins": [
       "./plugins/withFixReactNative77AppGradle.js",
       "expo-router",
-      "expo-secure-store",
-      "expo-font"
+      "expo-font",
+      [
+        "expo-splash-screen",
+        {
+          "backgroundColor": "#0F0A1E",
+          "image": "./assets/splash-icon.png",
+          "imageWidth": 200
+        }
+      ]
     ],
     "extra": {
-      "router": {
-        "origin": false
-      },
       "eas": {
         "projectId": "dcc29648-0c17-42a3-a0fc-ec927c23f9af"
       }
