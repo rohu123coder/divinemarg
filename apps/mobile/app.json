@@ -6,7 +6,9 @@
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "splash": {
-      "backgroundColor": "#0F0A1E"
+      "image": "./assets/splash-icon.png",
+      "backgroundColor": "#0F0A1E",
+      "resizeMode": "contain"
     },
     "ios": {
       "bundleIdentifier": "com.divinemarg.app"
