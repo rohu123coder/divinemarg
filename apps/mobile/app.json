@@ -18,6 +18,7 @@
       "package": "com.divinemarg.app"
     },
     "plugins": [
+      "./plugins/withFixReactNative77AppGradle.js",
       "expo-router",
       "expo-secure-store",
       "expo-font"
