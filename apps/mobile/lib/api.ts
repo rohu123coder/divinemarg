@@ -1,7 +1,7 @@
 import axios from "axios";
 import { router } from "expo-router";
 
-import { getToken } from "./auth";
+import { getTokenAsync } from "./auth";
 import { useAppStore } from "./store";
 
 const baseURL = "https://divinemarg.onrender.com";
@@ -13,8 +13,8 @@ const api = axios.create({
   },
 });
 
-api.interceptors.request.use((config) => {
-  const token = getToken();
+api.interceptors.request.use(async (config) => {
+  const token = await getTokenAsync();
   if (token) {
     config.headers.Authorization = `Bearer ${token}`;
   }

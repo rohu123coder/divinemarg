@@ -1,48 +1,8 @@
 import { create } from "zustand";
 import { persist, createJSONStorage } from "zustand/middleware";
-import { MMKV } from "react-native-mmkv";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 
 import { setToken } from "./auth";
-
-type StorageAdapter = {
-  set: (key: string, value: string) => void;
-  getString: (key: string) => string | undefined;
-  delete: (key: string) => void;
-};
-
-const memoryStore = new Map<string, string>();
-const fallbackStorage: StorageAdapter = {
-  set: (key, value) => {
-    memoryStore.set(key, value);
-  },
-  getString: (key) => memoryStore.get(key),
-  delete: (key) => {
-    memoryStore.delete(key);
-  },
-};
-
-const createStorageAdapter = (): StorageAdapter => {
-  try {
-    return new MMKV({ id: "divinemarg-store" });
-  } catch {
-    // Fallback for non-native environments.
-  }
-  return fallbackStorage;
-};
-
-const mmkv = createStorageAdapter();
-
-type MMKVStorage = {
-  setItem: (key: string, value: string) => void;
-  getItem: (key: string) => string | null;
-  removeItem: (key: string) => void;
-};
-
-const zustandStorage: MMKVStorage = {
-  setItem: (key, value) => mmkv.set(key, value),
-  getItem: (key) => mmkv.getString(key) ?? null,
-  removeItem: (key) => mmkv.delete(key),
-};
 
 export type User = {
   id: string;
@@ -108,11 +68,11 @@ export const useAppStore = create<AppState>()(
       activeSessions: [],
       notifications: [],
       hydrateAuth: ({ user, token }) => {
-        setToken(token);
+        void setToken(token);
         set({ user, token, isLoggedIn: true });
       },
       logout: () => {
-        setToken(null);
+        void setToken(null);
         set({ user: null, token: "", isLoggedIn: false });
       },
       setAstrologers: (astrologers) => set({ astrologers }),
@@ -123,28 +83,15 @@ export const useAppStore = create<AppState>()(
           if (!state.user) {
             return state;
           }
-          return {
-            user: {
-              ...state.user,
-              wallet_balance: amount,
-            },
-          };
+          return { user: { ...state.user, wallet_balance: amount } };
         }),
     }),
     {
       name: "divinemarg-app",
-      storage: createJSONStorage(() => zustandStorage),
-      partialize: (state) => ({
-        user: state.user,
-        token: state.token,
-        isLoggedIn: state.isLoggedIn,
-        astrologers: state.astrologers,
-        activeSessions: state.activeSessions,
-        notifications: state.notifications,
-      }),
+      storage: createJSONStorage(() => AsyncStorage),
       onRehydrateStorage: () => (state) => {
         if (state?.token) {
-          setToken(state.token);
+          void setToken(state.token);
         }
       },
     }

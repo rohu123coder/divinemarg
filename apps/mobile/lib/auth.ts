@@ -1,42 +1,23 @@
-import { MMKV } from "react-native-mmkv";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 
-type SimpleKV = {
-  getString: (key: string) => string | undefined;
-  set: (key: string, value: string) => void;
-  delete: (key: string) => void;
-};
+export const TOKEN_KEY = "divinemarg_token";
 
-const memoryStore = new Map<string, string>();
+export const getToken = (): string | null => null; // sync stub
 
-const fallbackStorage: SimpleKV = {
-  getString: (key) => memoryStore.get(key),
-  set: (key, value) => {
-    memoryStore.set(key, value);
-  },
-  delete: (key) => {
-    memoryStore.delete(key);
-  },
-};
-
-const createStorage = (): SimpleKV => {
+export const getTokenAsync = async (): Promise<string | null> => {
   try {
-    return new MMKV({ id: "divinemarg-auth" });
+    return await AsyncStorage.getItem(TOKEN_KEY);
   } catch {
-    // No-op: fallback for environments without native MMKV bindings.
+    return null;
   }
-  return fallbackStorage;
 };
 
-export const authStorage = createStorage();
-
-export const TOKEN_KEY = "token";
-
-export const getToken = (): string | null => authStorage.getString(TOKEN_KEY) ?? null;
-
-export const setToken = (token: string | null) => {
-  if (!token) {
-    authStorage.delete(TOKEN_KEY);
-    return;
-  }
-  authStorage.set(TOKEN_KEY, token);
+export const setToken = async (token: string | null) => {
+  try {
+    if (!token) {
+      await AsyncStorage.removeItem(TOKEN_KEY);
+    } else {
+      await AsyncStorage.setItem(TOKEN_KEY, token);
+    }
+  } catch {}
 };

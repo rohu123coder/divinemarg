@@ -3,7 +3,7 @@ import { router, Stack, useSegments } from "expo-router";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 
 import { AppSplashScreen } from "../components/SplashScreen";
-import { getToken } from "../lib/auth";
+import { getTokenAsync } from "../lib/auth";
 import api from "../lib/api";
 import { useAppStore, type User } from "../lib/store";
 
@@ -20,7 +20,7 @@ export default function RootLayout() {
   useEffect(() => {
     (async () => {
       try {
-        const token = getToken();
+        const token = await getTokenAsync();
         if (!token) {
           logout();
         } else {
