@@ -1,97 +1,79 @@
 /**
- * JS-only splash UI (Animated + View/Text). No native modules or expo-notifications.
+ * JS-only splash UI (Animated + Image). No native modules or expo-notifications.
  */
 import { useEffect, useMemo, useRef } from "react";
-import { Animated, StyleSheet, Text, View } from "react-native";
+import {
+  Animated,
+  Image,
+  type DimensionValue,
+  StyleSheet,
+  Text,
+  View,
+} from "react-native";
 
 const zodiac = ["♈", "♉", "♊", "♋", "♌", "♍", "♎", "♏", "♐", "♑", "♒", "♓"];
 
-const stars = Array.from({ length: 34 }).map((_, i) => ({
-  id: `star-${i}`,
-  topPct: Math.random() * 100,
-  leftPct: Math.random() * 100,
-  size: Math.max(1.5, Math.random() * 3.5),
-  delay: (i % 6) * 150,
-}));
+/** Fixed layout so zodiac positions are stable across renders */
+const SCATTER = [
+  { sym: 0, top: "8%", left: "12%" },
+  { sym: 3, top: "14%", left: "78%" },
+  { sym: 6, top: "22%", left: "6%" },
+  { sym: 9, top: "31%", left: "88%" },
+  { sym: 1, top: "42%", left: "4%" },
+  { sym: 4, top: "48%", left: "92%" },
+  { sym: 7, top: "58%", left: "10%" },
+  { sym: 10, top: "65%", left: "82%" },
+  { sym: 2, top: "72%", left: "18%" },
+  { sym: 5, top: "78%", left: "70%" },
+  { sym: 8, top: "88%", left: "28%" },
+  { sym: 11, top: "92%", left: "55%" },
+  { sym: 0, top: "52%", left: "48%" },
+  { sym: 6, top: "18%", left: "42%" },
+  { sym: 3, top: "38%", left: "62%" },
+];
 
 export function AppSplashScreen() {
-  const opacity = useRef(new Animated.Value(0)).current;
-  const twinkles = useRef(
-    stars.map(() => new Animated.Value(0.2))
-  ).current;
+  const fade = useRef(new Animated.Value(0)).current;
 
-  const zodiacPositions = useMemo(
+  const scattered = useMemo(
     () =>
-      zodiac.map((symbol, index) => {
-        const angle = (Math.PI * 2 * index) / zodiac.length;
-        const radius = 130;
-        return {
-          symbol,
-          left: 180 + radius * Math.cos(angle),
-          top: 260 + radius * Math.sin(angle),
-        };
-      }),
+      SCATTER.map((s, i) => ({
+        id: `z-${i}`,
+        char: zodiac[s.sym],
+        top: s.top,
+        left: s.left,
+      })),
     []
   );
 
   useEffect(() => {
-    Animated.timing(opacity, {
+    Animated.timing(fade, {
       toValue: 1,
-      duration: 800,
+      duration: 900,
       useNativeDriver: true,
     }).start();
-
-    twinkles.forEach((anim, index) => {
-      Animated.loop(
-        Animated.sequence([
-          Animated.delay(stars[index].delay),
-          Animated.timing(anim, {
-            toValue: 1,
-            duration: 950,
-            useNativeDriver: true,
-          }),
-          Animated.timing(anim, {
-            toValue: 0.25,
-            duration: 950,
-            useNativeDriver: true,
-          }),
-        ])
-      ).start();
-    });
-  }, [opacity, twinkles]);
+  }, [fade]);
 
   return (
     <View style={styles.container}>
-      {stars.map((star, index) => (
-        <Animated.View
-          key={star.id}
-          style={[
-            styles.star,
-            {
-              width: star.size,
-              height: star.size,
-              top: `${star.topPct}%`,
-              left: `${star.leftPct}%`,
-              opacity: twinkles[index],
-            },
-          ]}
-        />
-      ))}
-      {zodiacPositions.map((item) => (
+      {scattered.map((item) => (
         <Text
-          key={item.symbol}
+          key={item.id}
           style={[
-            styles.zodiac,
-            { left: item.left, top: item.top },
+            styles.zodiacBg,
+            { top: item.top as DimensionValue, left: item.left as DimensionValue },
           ]}
         >
-          {item.symbol}
+          {item.char}
         </Text>
       ))}
-      <Animated.View style={[styles.content, { opacity }]}>
-        <View style={styles.logoCircle}>
-          <Text style={styles.logoText}>DM</Text>
-        </View>
+      <Animated.View style={[styles.center, { opacity: fade }]}>
+        <Image
+          source={require("../assets/icon.png")}
+          style={styles.logo}
+          resizeMode="cover"
+          accessibilityLabel="DivineMarg logo"
+        />
         <Text style={styles.brand}>DivineMarg</Text>
         <Text style={styles.tagline}>Astrology & Vastu</Text>
       </Animated.View>
@@ -102,48 +84,34 @@ export function AppSplashScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#0F0A1E",
+    backgroundColor: "#FFFFFF",
     alignItems: "center",
     justifyContent: "center",
   },
-  content: {
+  center: {
     alignItems: "center",
   },
-  logoCircle: {
-    width: 104,
-    height: 104,
-    borderRadius: 52,
-    borderWidth: 2.5,
-    borderColor: "#D4AF37",
-    alignItems: "center",
-    justifyContent: "center",
-    marginBottom: 14,
-    backgroundColor: "rgba(212,175,55,0.08)",
-  },
-  logoText: {
-    fontSize: 40,
-    fontWeight: "800",
-    color: "#D4AF37",
+  logo: {
+    width: 120,
+    height: 120,
+    borderRadius: 60,
+    marginBottom: 16,
   },
   brand: {
     fontSize: 28,
-    color: "#D4AF37",
     fontWeight: "700",
-    letterSpacing: 0.4,
+    color: "#B8960C",
+    letterSpacing: 0.3,
   },
   tagline: {
     marginTop: 8,
     fontSize: 14,
     color: "#9CA3AF",
+    fontWeight: "400",
   },
-  zodiac: {
+  zodiacBg: {
     position: "absolute",
-    fontSize: 22,
-    color: "rgba(255,255,255,0.08)",
-  },
-  star: {
-    position: "absolute",
-    borderRadius: 999,
-    backgroundColor: "rgba(255,255,255,0.95)",
+    fontSize: 28,
+    color: "rgba(156, 163, 175, 0.06)",
   },
 });
