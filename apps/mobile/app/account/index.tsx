@@ -1,5 +1,7 @@
+import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
-import { Pressable, SafeAreaView, StyleSheet, Text, View } from "react-native";
+import { Pressable, StyleSheet, Text, View } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 
 import { useAppStore } from "../../lib/store";
 
@@ -10,6 +12,21 @@ export default function AccountScreen() {
 
   return (
     <SafeAreaView style={styles.safe}>
+      <View
+        style={{
+          flexDirection: "row",
+          alignItems: "center",
+          paddingHorizontal: 16,
+          paddingVertical: 12,
+          borderBottomWidth: 1,
+          borderColor: "#E5E7EB",
+        }}
+      >
+        <Pressable onPress={() => router.back()} style={{ marginRight: 12 }}>
+          <Ionicons name="arrow-back" size={22} color="#1A1A2E" />
+        </Pressable>
+        <Text style={{ fontSize: 18, fontWeight: "700", color: "#1A1A2E" }}>Account</Text>
+      </View>
       <View style={styles.card}>
         <Text style={styles.name}>{user?.name ?? "Guest User"}</Text>
         <Text style={styles.phone}>{user?.phone ?? "-"}</Text>

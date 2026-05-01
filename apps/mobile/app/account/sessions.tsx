@@ -1,12 +1,31 @@
-import { FlatList, Image, SafeAreaView, StyleSheet, Text, View } from "react-native";
+import { Ionicons } from "@expo/vector-icons";
+import { useRouter } from "expo-router";
+import { FlatList, Image, Pressable, StyleSheet, Text, View } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 
 import { useAppStore } from "../../lib/store";
 
 export default function SessionsScreen() {
+  const router = useRouter();
   const sessions = useAppStore((state) => state.activeSessions);
 
   return (
     <SafeAreaView style={styles.safe}>
+      <View
+        style={{
+          flexDirection: "row",
+          alignItems: "center",
+          paddingHorizontal: 16,
+          paddingVertical: 12,
+          borderBottomWidth: 1,
+          borderColor: "#E5E7EB",
+        }}
+      >
+        <Pressable onPress={() => router.back()} style={{ marginRight: 12 }}>
+          <Ionicons name="arrow-back" size={22} color="#1A1A2E" />
+        </Pressable>
+        <Text style={{ fontSize: 18, fontWeight: "700", color: "#1A1A2E" }}>My Sessions</Text>
+      </View>
       <Text style={styles.heading}>My Sessions</Text>
       <FlatList
         data={sessions}

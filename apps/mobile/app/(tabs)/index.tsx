@@ -137,10 +137,12 @@ export default function HomeTab() {
       <ScrollView showsVerticalScrollIndicator={false}>
         <View style={styles.header}>
           <View style={styles.headerLeft}>
-            <View style={styles.avatar}>
+            <Pressable style={styles.avatar} onPress={() => router.push("/account")}>
               <Text style={styles.avatarLabel}>{(user?.name ?? "D").slice(0, 1).toUpperCase()}</Text>
-            </View>
-            <Ionicons name="menu" size={22} color={COLORS.text} />
+            </Pressable>
+            <Pressable onPress={() => router.push("/account")}>
+              <Ionicons name="menu" size={22} color={COLORS.text} />
+            </Pressable>
           </View>
           <Text style={styles.logo}>DivineMarg</Text>
           <View style={styles.headerRight}>
@@ -162,7 +164,16 @@ export default function HomeTab() {
 
         <View style={styles.quickRow}>
           {QUICK_ACTIONS.map((item) => (
-            <Pressable key={item.key} style={styles.quickItem}>
+            <Pressable
+              key={item.key}
+              style={styles.quickItem}
+              onPress={() => {
+                if (item.key === "daily") router.push("/horoscope");
+                if (item.key === "kundli") router.push("/kundli");
+                if (item.key === "matching") router.push("/kundli-matching");
+                if (item.key === "blog") router.push("/blog");
+              }}
+            >
               <View style={styles.quickCircle}>
                 {item.icon === "ring" ? (
                   <MaterialCommunityIcons name="ring" size={22} color="#FFFFFF" />
@@ -205,10 +216,10 @@ export default function HomeTab() {
               <Text style={styles.sessionName}>{item.astrologer_name}</Text>
               <Text style={styles.sessionDate}>{item.date}</Text>
               <View style={styles.sessionActions}>
-                <Pressable style={styles.outlineBtn}>
+                <Pressable style={styles.outlineBtn} onPress={() => router.push(`/chat/${item.astrologer_id}`)}>
                   <Text style={styles.outlineTxt}>View Chat</Text>
                 </Pressable>
-                <Pressable style={styles.fillBtn}>
+                <Pressable style={styles.fillBtn} onPress={() => router.push(`/astrologer/${item.astrologer_id}`)}>
                   <Text style={styles.fillTxt}>Chat Again</Text>
                 </Pressable>
               </View>
@@ -237,14 +248,14 @@ export default function HomeTab() {
           <Badge icon="shield-checkmark-outline" label="Verified Astrologers" />
           <Badge icon="card-outline" label="Secure Payments" />
         </View>
-        <View style={{ height: 96 }} />
+        <View style={{ height: 140 }} />
       </ScrollView>
 
-      <View style={styles.stickyBar}>
-        <Pressable style={[styles.stickyBtn, styles.stickyChat]}>
+      <View style={styles.stickyBar} pointerEvents="box-none">
+        <Pressable style={[styles.stickyBtn, styles.stickyChat]} onPress={() => router.push("/(tabs)/chat")}>
           <Text style={styles.stickyTxt}>💬 Chat with Astrologer</Text>
         </Pressable>
-        <Pressable style={[styles.stickyBtn, styles.stickyCall]}>
+        <Pressable style={[styles.stickyBtn, styles.stickyCall]} onPress={() => router.push("/(tabs)/call")}>
           <Text style={styles.stickyTxt}>📞 Call with Astrologer</Text>
         </Pressable>
       </View>
@@ -483,7 +494,7 @@ const styles = StyleSheet.create({
   badgeTxt: { color: COLORS.secondary, fontSize: 13, fontWeight: "600" },
   stickyBar: {
     position: "absolute",
-    bottom: 8,
+    bottom: 70,
     left: 12,
     right: 12,
     flexDirection: "row",

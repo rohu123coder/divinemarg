@@ -1,4 +1,5 @@
-import { FlatList, Image, SafeAreaView, StyleSheet, Text, View } from "react-native";
+import { FlatList, Image, StyleSheet, Text, View } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 
 const remedies = [
   { id: "r1", name: "7 Mukhi Rudraksha", price: "₹799", image: "https://picsum.photos/200/200?1" },

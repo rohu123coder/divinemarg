@@ -78,7 +78,7 @@ function LoginContent() {
 
   const verifyOtp = useCallback(async () => {
     const code = otp.join("");
-    if (code.length !== 6) return;
+    if (!/^\d{6}$/.test(code)) return;
     setError(null); setLoading(true);
     try {
       const id = isReg ? phone : identifier;
@@ -185,7 +185,7 @@ function LoginContent() {
                   ))}
                 </div>
                 {error && <p className="text-red-600 text-sm">{error}</p>}
-                <button onClick={verifyOtp} disabled={loading || otp.some(x => x==="")}
+                <button onClick={verifyOtp} disabled={loading || otp.join("").length !== 6}
                   className="w-full py-3 rounded-xl bg-gradient-to-r from-purple-600 to-indigo-600 text-white font-semibold disabled:opacity-60">
                   {loading ? "Verifying..." : "Verify & Continue"}
                 </button>

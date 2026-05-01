@@ -210,12 +210,8 @@ async function cacheDel(key: string): Promise<void> {
   otpMemoryStore.delete(key);
 }
 
-/** Random 4–6 digit OTP */
 function generateOtp(): string {
-  const len = randomInt(4, 7);
-  const min = 10 ** (len - 1);
-  const max = 10 ** len;
-  return randomInt(min, max).toString();
+  return randomInt(100000, 1000000).toString();
 }
 
 function frontendUrl(): string {

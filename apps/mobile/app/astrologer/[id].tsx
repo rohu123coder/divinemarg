@@ -1,7 +1,8 @@
 import { Ionicons } from "@expo/vector-icons";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useMemo } from "react";
-import { FlatList, Image, Pressable, SafeAreaView, ScrollView, StyleSheet, Text, View } from "react-native";
+import { FlatList, Image, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 
 import { useAppStore } from "../../lib/store";
 
@@ -28,12 +29,20 @@ export default function AstrologerProfileScreen() {
   return (
     <SafeAreaView style={styles.safe}>
       <ScrollView contentContainerStyle={{ paddingBottom: 100 }}>
-        <View style={styles.header}>
-          <Pressable onPress={() => router.back()}>
+        <View
+          style={{
+            flexDirection: "row",
+            alignItems: "center",
+            paddingHorizontal: 16,
+            paddingVertical: 12,
+            borderBottomWidth: 1,
+            borderColor: "#E5E7EB",
+          }}
+        >
+          <Pressable onPress={() => router.back()} style={{ marginRight: 12 }}>
             <Ionicons name="arrow-back" size={22} color="#1A1A2E" />
           </Pressable>
-          <Text style={styles.headerTitle}>Profile</Text>
-          <View style={{ width: 22 }} />
+          <Text style={{ fontSize: 18, fontWeight: "700", color: "#1A1A2E" }}>Astrologer Profile</Text>
         </View>
 
         <View style={styles.hero}>
@@ -105,14 +114,6 @@ export default function AstrologerProfileScreen() {
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: "#FAFAFA" },
   empty: { marginTop: 40, textAlign: "center", color: "#6B7280" },
-  header: {
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-  },
-  headerTitle: { fontSize: 18, fontWeight: "800", color: "#1A1A2E" },
   hero: { alignItems: "center", paddingHorizontal: 16, marginBottom: 12 },
   avatarWrap: {
     width: 200,

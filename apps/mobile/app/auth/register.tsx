@@ -1,6 +1,8 @@
+import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import { useState } from "react";
-import { Alert, Pressable, SafeAreaView, StyleSheet, Text, TextInput, View } from "react-native";
+import { Alert, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 
 import api from "../../lib/api";
 
@@ -21,6 +23,21 @@ export default function RegisterScreen() {
 
   return (
     <SafeAreaView style={styles.safe}>
+      <View
+        style={{
+          flexDirection: "row",
+          alignItems: "center",
+          paddingHorizontal: 16,
+          paddingVertical: 12,
+          borderBottomWidth: 1,
+          borderColor: "#E5E7EB",
+        }}
+      >
+        <Pressable onPress={() => router.back()} style={{ marginRight: 12 }}>
+          <Ionicons name="arrow-back" size={22} color="#1A1A2E" />
+        </Pressable>
+        <Text style={{ fontSize: 18, fontWeight: "700", color: "#1A1A2E" }}>Create Account</Text>
+      </View>
       <View style={styles.container}>
         <Text style={styles.title}>Create your account</Text>
         <TextInput style={styles.input} placeholder="Full name" value={name} onChangeText={setName} />

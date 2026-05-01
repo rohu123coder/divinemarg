@@ -1,12 +1,15 @@
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
-import { FlatList, Image, Pressable, SafeAreaView, StyleSheet, Text, View } from "react-native";
+import { useMemo } from "react";
+import { FlatList, Image, Pressable, StyleSheet, Text, View } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 
 import { useAppStore } from "../../lib/store";
 
 export default function LiveTab() {
   const router = useRouter();
-  const astrologers = useAppStore((state) => state.astrologers.filter((a) => a.status !== "offline"));
+  const allAstrologers = useAppStore((state) => state.astrologers);
+  const astrologers = useMemo(() => allAstrologers.filter((a) => a.status !== "offline"), [allAstrologers]);
 
   return (
     <SafeAreaView style={styles.safe}>
