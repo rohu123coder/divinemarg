@@ -8,6 +8,7 @@ import { io, type Socket } from "socket.io-client";
 import { Footer } from "@/components/Footer";
 import { Navbar } from "@/components/Navbar";
 import api from "@/lib/api";
+import { firstName } from "@/lib/utils";
 import { rashis } from "@/lib/horoscope";
 import { getSocketApiBase } from "@/lib/socketBase";
 import { useAuthStore } from "@/lib/store";
@@ -474,19 +475,19 @@ export default function HomePage() {
                       // eslint-disable-next-line @next/next/no-img-element
                       <img
                         src={astrologer.profile_photo_url ?? astrologer.avatar_url ?? ""}
-                        alt={astrologer.name}
+                        alt={firstName(astrologer.name)}
                         className="h-12 w-12 rounded-full object-cover"
                       />
                     ) : (
                       <div className="flex h-12 w-12 items-center justify-center rounded-full bg-gradient-to-br from-violet-500 to-indigo-600 text-sm font-bold text-white">
-                        {astrologer.name.slice(0, 1).toUpperCase()}
+                        {firstName(astrologer.name).slice(0, 1).toUpperCase()}
                       </div>
                     )}
                     <span className="animate-online-pulse absolute bottom-0 right-0 h-3 w-3 rounded-full border-2 border-white bg-emerald-500" />
                   </div>
                   <div className="min-w-0">
                     <p className="truncate text-sm font-semibold text-slate-900">
-                      {astrologer.name}
+                      {firstName(astrologer.name)}
                     </p>
                     <p className="text-xs text-slate-600">
                       ₹{astrologer.price_per_minute ?? 0}/min
@@ -687,19 +688,19 @@ export default function HomePage() {
                       // eslint-disable-next-line @next/next/no-img-element
                       <img
                         src={astrologer.avatar_url}
-                        alt={astrologer.name}
+                        alt={firstName(astrologer.name)}
                         className="h-14 w-14 rounded-full object-cover"
                       />
                     ) : (
                       <div className="flex h-14 w-14 items-center justify-center rounded-full bg-gradient-to-br from-violet-600 to-indigo-600 text-lg font-bold text-white">
-                        {astrologer.name.slice(0, 1).toUpperCase()}
+                        {firstName(astrologer.name).slice(0, 1).toUpperCase()}
                       </div>
                     )}
                     <span className="absolute bottom-1 right-0 h-3.5 w-3.5 rounded-full border-2 border-white bg-emerald-500" />
                   </div>
                   <div className="min-w-0">
                     <div className="flex items-center gap-2">
-                      <h3 className="truncate text-base font-bold text-slate-900">{astrologer.name}</h3>
+                      <h3 className="truncate text-base font-bold text-slate-900">{firstName(astrologer.name)}</h3>
                       <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-semibold text-emerald-700">
                         Verified
                       </span>

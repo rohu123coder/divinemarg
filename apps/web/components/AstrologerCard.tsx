@@ -3,6 +3,8 @@
 import { useRouter } from "next/navigation";
 import { useMemo } from "react";
 
+import { firstName } from "@/lib/utils";
+
 export type AstrologerCardProps = {
   id: string;
   name: string;
@@ -54,12 +56,12 @@ export function AstrologerCard({
   actionLoading = false,
 }: AstrologerCardProps) {
   const router = useRouter();
+  const displayName = firstName(name);
   const initials = useMemo(() => {
-    const parts = name.trim().split(/\s+/).filter(Boolean);
-    const a = parts[0]?.[0] ?? "?";
-    const b = parts[1]?.[0] ?? "";
-    return (a + b).toUpperCase();
-  }, [name]);
+    const word = displayName === "Astrologer" ? "" : displayName;
+    if (!word) return "?";
+    return word.slice(0, 2).toUpperCase();
+  }, [displayName]);
 
   const displayPhoto = profile_photo_url ?? avatar_url;
 
@@ -96,7 +98,7 @@ export function AstrologerCard({
         )}
 
         <div className="min-w-0 flex-1">
-          <h3 className="pr-8 text-[16px] font-bold text-slate-900">{name}</h3>
+          <h3 className="pr-8 text-[16px] font-bold text-slate-900">{displayName}</h3>
           <p className="mt-1 line-clamp-2 text-sm text-slate-600">
             {specializations.join(", ")}
           </p>

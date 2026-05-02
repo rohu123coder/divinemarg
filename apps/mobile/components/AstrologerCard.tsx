@@ -10,6 +10,7 @@ import {
 } from "react-native";
 
 import type { Astrologer } from "../lib/store";
+import { firstName } from "../lib/utils";
 
 type Props = {
   item: Astrologer;
@@ -63,13 +64,13 @@ export function AstrologerCard({ item, mode = "chat", style }: Props) {
               style={styles.avatarImg}
             />
           ) : (
-            <Text style={styles.avatarTxt}>{initials(item.name)}</Text>
+            <Text style={styles.avatarTxt}>{initials(firstName(item.name))}</Text>
           )}
         </View>
         <View style={styles.main}>
           <View style={styles.titleRow}>
             <Text style={styles.name} numberOfLines={1}>
-              {item.name}
+              {firstName(item.name)}
             </Text>
             <Ionicons name="checkmark-circle" size={16} color={COLORS.online} />
             <Text style={styles.verified}>Verified</Text>

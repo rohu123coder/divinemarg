@@ -5,6 +5,7 @@ import { ActivityIndicator, FlatList, Image, Pressable, StyleSheet, Text, View }
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import api from "../../lib/api";
+import { firstName } from "../../lib/utils";
 
 type Session = {
   id: string;
@@ -102,7 +103,7 @@ export default function SessionsScreen() {
                 style={styles.avatar}
               />
               <View style={{ flex: 1 }}>
-                <Text style={styles.name}>{item.astrologer_name}</Text>
+                <Text style={styles.name}>{firstName(item.astrologer_name)}</Text>
                 <Text style={styles.meta}>
                   {item.mode.toUpperCase()} · {formatDate(item.started_at)}
                 </Text>

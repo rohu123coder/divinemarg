@@ -5,6 +5,7 @@ import { FlatList, Image, Pressable, StyleSheet, Text, View } from "react-native
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { useAppStore } from "../../lib/store";
+import { firstName } from "../../lib/utils";
 
 export default function LiveTab() {
   const router = useRouter();
@@ -27,7 +28,7 @@ export default function LiveTab() {
               <Ionicons name="radio" size={12} color="#10B981" />
               <Text style={styles.liveText}>LIVE</Text>
             </View>
-            <Text style={styles.name}>{item.name}</Text>
+            <Text style={styles.name}>{firstName(item.name)}</Text>
           </Pressable>
         )}
       />

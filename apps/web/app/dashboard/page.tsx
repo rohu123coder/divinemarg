@@ -9,6 +9,7 @@ import { Navbar } from "@/components/Navbar";
 import { RatingModal } from "@/components/RatingModal";
 import { WalletWidget } from "@/components/WalletWidget";
 import api from "@/lib/api";
+import { firstName } from "@/lib/utils";
 import { useAuthStore } from "@/lib/store";
 
 type SessionRow = {
@@ -225,10 +226,10 @@ export default function DashboardPage() {
                               />
                             ) : (
                               <div className="flex h-8 w-8 items-center justify-center rounded-full bg-violet-100 text-xs font-bold text-violet-700">
-                                {s.astrologer_name.slice(0, 1).toUpperCase()}
+                                {firstName(s.astrologer_name).slice(0, 1).toUpperCase()}
                               </div>
                             )}
-                            <span>{s.astrologer_name}</span>
+                            <span>{firstName(s.astrologer_name)}</span>
                           </div>
                         </td>
                         <td className="px-4 py-3">
@@ -283,7 +284,7 @@ export default function DashboardPage() {
       <ChatHistoryModal
         open={Boolean(selectedSession)}
         sessionId={selectedSession?.id ?? ""}
-        astrologerName={selectedSession?.astrologer_name ?? "Astrologer"}
+        astrologerName={firstName(selectedSession?.astrologer_name)}
         messages={messages}
         loading={messagesLoading}
         rated={selectedSession?.rating != null}
@@ -303,7 +304,7 @@ export default function DashboardPage() {
 
       <RatingModal
         open={Boolean(rateTarget)}
-        astrologerName={rateTarget?.astrologer_name ?? "Astrologer"}
+        astrologerName={firstName(rateTarget?.astrologer_name)}
         onClose={() => setRateTarget(null)}
         onSkip={() => setRateTarget(null)}
         onSubmitRating={async ({ rating, reviewText }) => {

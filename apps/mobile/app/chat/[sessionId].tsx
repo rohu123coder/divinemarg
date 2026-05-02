@@ -15,6 +15,7 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import api from "../../lib/api";
+import { firstName } from "../../lib/utils";
 import { connectSocket, disconnectSocket, socket } from "../../lib/socket";
 import { useAppStore } from "../../lib/store";
 
@@ -41,8 +42,12 @@ export default function ChatScreen() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [loading, setLoading] = useState(true);
   const [sessionEnded, setSessionEnded] = useState(true);
-  const [astrologerName, setAstrologerName] = useState(name ?? "Astrologer");
-  const [astrologerPhoto, setAstrologerPhoto] = useState<string | null>(photo ?? null);
+  const [astrologerName, setAstrologerName] = useState(
+    name && name !== "undefined" ? name : ""
+  );
+  const [astrologerPhoto, setAstrologerPhoto] = useState<string | null>(
+    photo && photo !== "undefined" && photo !== "" ? photo : null
+  );
   const [input, setInput] = useState("");
 
   const fetchMessages = useCallback(async () => {
@@ -144,11 +149,16 @@ export default function ChatScreen() {
         <Pressable onPress={() => router.back()} style={{ marginRight: 10 }}>
           <Ionicons name="arrow-back" size={22} color="#1A1A2E" />
         </Pressable>
-        <Image
-          source={{ uri: astrologerPhoto ?? "https://i.pravatar.cc/100?img=40" }}
-          style={styles.photo}
-        />
-        <Text style={styles.name}>{astrologerName}</Text>
+        {astrologerPhoto ? (
+          <Image
+            source={{ uri: astrologerPhoto }}
+            style={styles.photo}
+            onError={() => setAstrologerPhoto(null)}
+          />
+        ) : (
+          <View style={[styles.photo, styles.photoPlaceholder]} />
+        )}
+        <Text style={styles.name}>{firstName(astrologerName)}</Text>
         {!sessionEnded && (
           <View style={styles.activeBadge}>
             <Text style={styles.activeTxt}>LIVE</Text>
@@ -221,6 +231,7 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   photo: { width: 34, height: 34, borderRadius: 17 },
+  photoPlaceholder: { backgroundColor: "#E5E7EB" },
   name: { flex: 1, color: "#1A1A2E", fontWeight: "700", fontSize: 15 },
   activeBadge: {
     backgroundColor: "#10B981",

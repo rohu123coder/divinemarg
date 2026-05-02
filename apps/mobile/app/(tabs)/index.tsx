@@ -7,6 +7,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { WalletBar } from "../../components/WalletBar";
 import api from "../../lib/api";
 import { useAppStore, type Astrologer } from "../../lib/store";
+import { firstName } from "../../lib/utils";
 
 const COLORS = {
   primary: "#7C3AED",
@@ -110,13 +111,14 @@ export default function HomeTab() {
       const raw = res.data?.data?.sessions ?? res.data?.data ?? [];
       const mapped = raw.slice(0, 5).map((item: {
         id: string;
+        astrologer_id?: string;
         astrologer_name?: string;
         astrologer_photo?: string | null;
         session_type?: string;
         started_at?: string;
       }) => ({
         id: item.id,
-        astrologer_id: item.id,
+        astrologer_id: item.astrologer_id ?? item.id,
         astrologer_name: item.astrologer_name ?? "Astrologer",
         astrologer_photo: item.astrologer_photo ?? null,
         mode: (item.session_type ?? "chat") as "chat" | "call",
@@ -215,7 +217,7 @@ export default function HomeTab() {
             <Pressable key={astro.id} style={styles.liveCard} onPress={() => router.push(`/astrologer/${astro.id}`)}>
               <Image source={{ uri: astro.profile_photo ?? "https://i.pravatar.cc/200?img=40" }} style={styles.liveImg} />
               {astro.status === "online" ? <View style={styles.liveDot} /> : null}
-              <Text style={styles.liveName}>{astro.name}</Text>
+              <Text style={styles.liveName}>{firstName(astro.name)}</Text>
             </Pressable>
           ))}
         </ScrollView>
@@ -225,10 +227,21 @@ export default function HomeTab() {
           {activeSessions.map((item) => (
             <View key={item.id} style={styles.sessionCard}>
               <Image source={{ uri: item.astrologer_photo ?? "https://i.pravatar.cc/100?img=44" }} style={styles.sessionAvatar} />
-              <Text style={styles.sessionName}>{item.astrologer_name}</Text>
+              <Text style={styles.sessionName}>{firstName(item.astrologer_name)}</Text>
               <Text style={styles.sessionDate}>{item.date}</Text>
               <View style={styles.sessionActions}>
-                <Pressable style={styles.outlineBtn} onPress={() => router.push(`/chat/${item.astrologer_id}`)}>
+                <Pressable
+                  style={styles.outlineBtn}
+                  onPress={() =>
+                    router.push({
+                      pathname: `/chat/${item.id}`,
+                      params: {
+                        name: item.astrologer_name,
+                        photo: item.astrologer_photo ?? "",
+                      },
+                    })
+                  }
+                >
                   <Text style={styles.outlineTxt}>View Chat</Text>
                 </Pressable>
                 <Pressable style={styles.fillBtn} onPress={() => router.push(`/astrologer/${item.astrologer_id}`)}>
@@ -246,7 +259,7 @@ export default function HomeTab() {
               <View style={styles.topAvatarWrap}>
                 <Image source={{ uri: item.profile_photo ?? "https://i.pravatar.cc/120?img=49" }} style={styles.topAvatar} />
               </View>
-              <Text style={styles.topName}>{item.name}</Text>
+              <Text style={styles.topName}>{firstName(item.name)}</Text>
               <Text style={styles.topPrice}>₹{item.price_per_min}/min</Text>
               <Pressable style={styles.topBtn} onPress={() => router.push(`/astrologer/${item.id}`)}>
                 <Text style={styles.topBtnTxt}>Chat</Text>
