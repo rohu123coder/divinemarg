@@ -6,7 +6,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 
 import { WalletBar } from "../../components/WalletBar";
 import api from "../../lib/api";
-import { useAppStore, type ActiveSession, type Astrologer } from "../../lib/store";
+import { useAppStore, type Astrologer } from "../../lib/store";
 
 const COLORS = {
   primary: "#7C3AED",
@@ -25,33 +25,12 @@ const QUICK_ACTIONS = [
   { key: "blog", label: "Astrology Blog", icon: "book-outline" as const },
 ];
 
-const sampleSessions: ActiveSession[] = [
-  {
-    id: "s1",
-    astrologer_id: "1",
-    astrologer_name: "Acharya Rohan",
-    astrologer_photo: "https://i.pravatar.cc/120?img=12",
-    mode: "chat",
-    date: "Today, 10:30 PM",
-  },
-  {
-    id: "s2",
-    astrologer_id: "2",
-    astrologer_name: "Priya Sharma",
-    astrologer_photo: "https://i.pravatar.cc/120?img=23",
-    mode: "call",
-    date: "Yesterday, 8:10 PM",
-  },
-];
-
 export default function HomeTab() {
   const router = useRouter();
   const [search, setSearch] = useState("");
   const user = useAppStore((state) => state.user);
   const astrologers = useAppStore((state) => state.astrologers);
-  const activeSessions = useAppStore((state) =>
-    state.activeSessions.length ? state.activeSessions : sampleSessions
-  );
+  const activeSessions = useAppStore((state) => state.activeSessions);
   const setAstrologers = useAppStore((state) => state.setAstrologers);
   const setActiveSessions = useAppStore((state) => state.setActiveSessions);
 
@@ -62,6 +41,7 @@ export default function HomeTab() {
         id: string;
         name: string;
         avatar_url?: string | null;
+        profile_photo_url?: string | null;
         profile_photo?: string | null;
         specialization?: string;
         specializations?: string[];
@@ -76,7 +56,7 @@ export default function HomeTab() {
       const mapped: Astrologer[] = list.map((item, index) => ({
         id: item.id,
         name: item.name,
-        profile_photo: item.profile_photo ?? item.avatar_url ?? null,
+        profile_photo: item.profile_photo_url ?? item.profile_photo ?? item.avatar_url ?? null,
         specialization: item.specialization ?? item.specializations?.[0] ?? "Vedic Astrology",
         languages: item.languages?.length ? item.languages : ["Hindi", "English"],
         experience_years: item.experience_years ?? 5 + (index % 8),
@@ -87,7 +67,6 @@ export default function HomeTab() {
         wait_time_minutes: 3 + (index % 6),
       }));
       setAstrologers(mapped);
-      if (!activeSessions.length) setActiveSessions(sampleSessions);
     } catch {
       if (!astrologers.length) {
         setAstrologers([
@@ -118,13 +97,46 @@ export default function HomeTab() {
           },
         ]);
       }
-      if (!activeSessions.length) setActiveSessions(sampleSessions);
     }
-  }, [activeSessions.length, astrologers.length, setActiveSessions, setAstrologers]);
+  }, [astrologers.length, setAstrologers]);
 
   useEffect(() => {
     void fetchList();
   }, [fetchList]);
+
+  const fetchSessions = useCallback(async () => {
+    try {
+      const res = await api.get("/api/chat/history?page=1&limit=5");
+      const raw = res.data?.data?.sessions ?? res.data?.data ?? [];
+      const mapped = raw.slice(0, 5).map((item: {
+        id: string;
+        astrologer_name?: string;
+        astrologer_photo?: string | null;
+        session_type?: string;
+        started_at?: string;
+      }) => ({
+        id: item.id,
+        astrologer_id: item.id,
+        astrologer_name: item.astrologer_name ?? "Astrologer",
+        astrologer_photo: item.astrologer_photo ?? null,
+        mode: (item.session_type ?? "chat") as "chat" | "call",
+        date: item.started_at
+          ? new Date(item.started_at).toLocaleDateString("en-IN", {
+              day: "numeric",
+              month: "short",
+              year: "numeric",
+            })
+          : "",
+      }));
+      setActiveSessions(mapped);
+    } catch (e) {
+      console.error("Sessions fetch failed:", e);
+    }
+  }, [setActiveSessions]);
+
+  useEffect(() => {
+    void fetchSessions();
+  }, [fetchSessions]);
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();

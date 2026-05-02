@@ -1,11 +1,10 @@
-import { randomUUID } from "node:crypto";
-import path from "node:path";
-
 import multer from "multer";
+import streamifier from "streamifier";
 import { Router, type Request, type Response } from "express";
 import { z } from "zod";
 
 import { query } from "../db/index.js";
+import { cloudinary } from "../lib/cloudinary.js";
 import {
   authMiddleware,
   optionalAuthMiddleware,
@@ -14,28 +13,27 @@ import {
 
 const router = Router();
 
-const UPLOAD_DIR = path.join(process.cwd(), "uploads");
-
 const photoUpload = multer({
-  storage: multer.diskStorage({
-    destination: (_req, _file, cb) => {
-      cb(null, UPLOAD_DIR);
-    },
-    filename: (_req, file, cb) => {
-      const ext = path.extname(file.originalname).toLowerCase();
-      const safe =
-        ext === ".jpg" || ext === ".jpeg" || ext === ".png" || ext === ".webp"
-          ? ext
-          : ".jpg";
-      cb(null, `${randomUUID()}${safe}`);
-    },
-  }),
+  storage: multer.memoryStorage(),
   limits: { fileSize: 2 * 1024 * 1024 },
   fileFilter: (_req, file, cb) => {
     const ok = /^image\/(jpeg|png|webp)$/i.test(file.mimetype);
     cb(null, ok);
   },
 });
+
+function uploadToCloudinary(buffer: Buffer): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const stream = cloudinary.uploader.upload_stream(
+      { folder: "divinemarg/profiles", resource_type: "image" },
+      (error, result) => {
+        if (error || !result) return reject(error);
+        resolve(result.secure_url);
+      }
+    );
+    streamifier.createReadStream(buffer).pipe(stream);
+  });
+}
 
 const listQuerySchema = z.object({
   page: z.coerce.number().int().min(1).default(1),
@@ -551,18 +549,18 @@ router.post(
       return;
     }
     if (!req.file) {
-      res.status(400).json({
-        success: false,
-        error: "Image required (jpg, png, webp, max 2MB)",
-      });
+      res.status(400).json({ success: false, error: "No file uploaded" });
       return;
     }
 
-    const publicPath = `/uploads/${req.file.filename}`;
-    const host = req.get("host") ?? `localhost:${process.env.PORT ?? "4000"}`;
-    const proto =
-      req.get("x-forwarded-proto")?.split(",")[0]?.trim() ?? req.protocol;
-    const photoUrl = `${proto}://${host}${publicPath}`;
+    let photoUrl: string;
+    try {
+      photoUrl = await uploadToCloudinary(req.file.buffer);
+    } catch (e) {
+      console.error("Cloudinary upload failed:", e);
+      res.status(500).json({ success: false, error: "Photo upload failed" });
+      return;
+    }
 
     const aUp = await query(
       `UPDATE astrologers SET profile_photo_url = $1 WHERE user_id = $2`,

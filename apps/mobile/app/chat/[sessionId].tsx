@@ -1,11 +1,10 @@
 import { Ionicons } from "@expo/vector-icons";
 import { useLocalSearchParams, useRouter } from "expo-router";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   FlatList,
   Image,
   KeyboardAvoidingView,
-  Modal,
   Platform,
   Pressable,
   StyleSheet,
@@ -15,7 +14,7 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
-import { ChatBubble } from "../../components/ChatBubble";
+import api from "../../lib/api";
 import { connectSocket, disconnectSocket, socket } from "../../lib/socket";
 import { useAppStore } from "../../lib/store";
 
@@ -26,29 +25,84 @@ type Message = {
   mine: boolean;
 };
 
-export default function ActiveChatScreen() {
-  const { sessionId } = useLocalSearchParams<{ sessionId: string }>();
+const isValidUUID = (str: string) =>
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(str);
+
+export default function ChatScreen() {
+  const { sessionId, name, photo } = useLocalSearchParams<{
+    sessionId: string;
+    name?: string;
+    photo?: string;
+  }>();
   const router = useRouter();
   const token = useAppStore((state) => state.token);
-  const astrologers = useAppStore((state) => state.astrologers);
-  const astro = astrologers.find((a) => a.id === sessionId) ?? astrologers[0];
-  const [seconds, setSeconds] = useState(0);
+  const flatRef = useRef<FlatList>(null);
+
+  const [messages, setMessages] = useState<Message[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [sessionEnded, setSessionEnded] = useState(true);
+  const [astrologerName, setAstrologerName] = useState(name ?? "Astrologer");
+  const [astrologerPhoto, setAstrologerPhoto] = useState<string | null>(photo ?? null);
   const [input, setInput] = useState("");
-  const [incomingCall, setIncomingCall] = useState(false);
-  const [messages, setMessages] = useState<Message[]>([
-    { id: "m1", message: "Namaste, how may I help you today?", timestamp: "10:30", mine: false },
-  ]);
+
+  const fetchMessages = useCallback(async () => {
+    if (!sessionId || !isValidUUID(sessionId)) {
+      setLoading(false);
+      setSessionEnded(true);
+      return;
+    }
+
+    try {
+      setLoading(true);
+
+      // Run both calls in parallel
+      const [ctxRes, msgRes] = await Promise.all([
+        api.get(`/api/sessions/${sessionId}/context`),
+        api.get(`/api/chat/history/${sessionId}/messages`),
+      ]);
+
+      // Set astrologer info
+      if (ctxRes.data?.data) {
+        setAstrologerName(ctxRes.data.data.astrologer_name ?? "Astrologer");
+        setAstrologerPhoto(ctxRes.data.data.profile_photo_url ?? null);
+      }
+
+      // Map messages
+      const raw = msgRes.data?.data?.messages ?? [];
+      const userId = useAppStore.getState().user?.id;
+      const mapped: Message[] = raw.map((m: {
+        id?: string;
+        sender_role: "user" | "astrologer";
+        content: string;
+        created_at: string;
+      }) => ({
+        id: m.id ?? `msg-${Math.random()}`,
+        message: m.content,
+        timestamp: new Date(m.created_at).toLocaleTimeString([], {
+          hour: "2-digit",
+          minute: "2-digit",
+        }),
+        mine: m.sender_role === "user",
+      }));
+      setMessages(mapped);
+      setSessionEnded(true);
+    } catch (e) {
+      console.error("Failed to load chat:", e);
+      setSessionEnded(true);
+    } finally {
+      setLoading(false);
+    }
+  }, [sessionId]);
 
   useEffect(() => {
-    const timer = setInterval(() => setSeconds((s) => s + 1), 1000);
-    return () => clearInterval(timer);
-  }, []);
+    void fetchMessages();
+  }, [fetchMessages]);
 
+  // Only connect socket if session is active
   useEffect(() => {
-    if (!token) return;
+    if (sessionEnded || !token) return;
     connectSocket(token);
     socket.emit("join_session", { sessionId });
-
     socket.on("new_message", (payload: { content: string }) => {
       setMessages((prev) => [
         ...prev,
@@ -60,132 +114,143 @@ export default function ActiveChatScreen() {
         },
       ]);
     });
-    socket.on("incoming_call", () => setIncomingCall(true));
-
     return () => {
       socket.off("new_message");
-      socket.off("incoming_call");
       disconnectSocket();
     };
-  }, [sessionId, token]);
-
-  const timerText = useMemo(() => {
-    const mm = Math.floor(seconds / 60).toString().padStart(2, "0");
-    const ss = (seconds % 60).toString().padStart(2, "0");
-    return `${mm}:${ss}`;
-  }, [seconds]);
+  }, [sessionEnded, sessionId, token]);
 
   const send = () => {
-    const message = input.trim();
-    if (!message) return;
+    const msg = input.trim();
+    if (!msg || sessionEnded) return;
     setMessages((prev) => [
       ...prev,
-      { id: `u-${Date.now()}`, message, timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }), mine: true },
+      {
+        id: `u-${Date.now()}`,
+        message: msg,
+        timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+        mine: true,
+      },
     ]);
-    socket.emit("new_message", { sessionId, content: message });
+    socket.emit("new_message", { sessionId, content: msg });
     setInput("");
+    setTimeout(() => flatRef.current?.scrollToEnd({ animated: true }), 100);
   };
 
   return (
     <SafeAreaView style={styles.safe}>
+      {/* Header */}
+      <View style={styles.header}>
+        <Pressable onPress={() => router.back()} style={{ marginRight: 10 }}>
+          <Ionicons name="arrow-back" size={22} color="#1A1A2E" />
+        </Pressable>
+        <Image
+          source={{ uri: astrologerPhoto ?? "https://i.pravatar.cc/100?img=40" }}
+          style={styles.photo}
+        />
+        <Text style={styles.name}>{astrologerName}</Text>
+        {!sessionEnded && (
+          <View style={styles.activeBadge}>
+            <Text style={styles.activeTxt}>LIVE</Text>
+          </View>
+        )}
+      </View>
+
       <KeyboardAvoidingView
         style={{ flex: 1 }}
         behavior={Platform.OS === "ios" ? "padding" : undefined}
       >
-        <View style={styles.top}>
-          <Pressable onPress={() => router.back()}>
-            <Ionicons name="arrow-back" size={22} color="#1A1A2E" />
-          </Pressable>
-          <View style={styles.profile}>
-            <Image source={{ uri: astro?.profile_photo ?? "https://i.pravatar.cc/100?img=40" }} style={styles.photo} />
-            <Text style={styles.name}>{astro?.name ?? "Astrologer"}</Text>
-          </View>
-          <Text style={styles.timer}>{timerText}</Text>
-          <Pressable style={styles.endBtn} onPress={() => router.back()}>
-            <Text style={styles.endText}>End</Text>
-          </Pressable>
-        </View>
-
-        <View style={styles.callActions}>
-          <Pressable style={styles.iconBtn}>
-            <Ionicons name="call" size={18} color="#7C3AED" />
-          </Pressable>
-          <Pressable style={styles.iconBtn}>
-            <Ionicons name="videocam" size={20} color="#7C3AED" />
-          </Pressable>
-        </View>
-
         <FlatList
+          ref={flatRef}
           data={messages}
           keyExtractor={(item) => item.id}
-          renderItem={({ item }) => (
-            <ChatBubble message={item.message} timestamp={item.timestamp} mine={item.mine} />
-          )}
           contentContainerStyle={styles.messages}
+          onContentSizeChange={() => flatRef.current?.scrollToEnd({ animated: false })}
+          ListEmptyComponent={
+            loading ? null : (
+              <Text style={styles.empty}>No messages in this session.</Text>
+            )
+          }
+          renderItem={({ item }) => (
+            <View style={[styles.bubbleRow, item.mine ? styles.rowMine : styles.rowOther]}>
+              <View style={[styles.bubble, item.mine ? styles.bubbleMine : styles.bubbleOther]}>
+                <Text style={[styles.msgText, item.mine ? styles.msgMine : styles.msgOther]}>
+                  {item.message}
+                </Text>
+                <Text style={[styles.time, item.mine ? styles.timeMine : styles.timeOther]}>
+                  {item.timestamp}
+                </Text>
+              </View>
+            </View>
+          )}
         />
 
-        <View style={styles.composer}>
-          <TextInput
-            style={styles.input}
-            placeholder="Type a message..."
-            value={input}
-            onChangeText={setInput}
-          />
-          <Pressable style={styles.sendBtn} onPress={send}>
-            <Ionicons name="arrow-up" size={18} color="#FFFFFF" />
-          </Pressable>
-        </View>
-      </KeyboardAvoidingView>
-
-      <Modal visible={incomingCall} transparent animationType="fade">
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalCard}>
-            <Image source={{ uri: astro?.profile_photo ?? "https://i.pravatar.cc/100?img=40" }} style={styles.modalPhoto} />
-            <Text style={styles.modalName}>{astro?.name}</Text>
-            <Text style={styles.modalSub}>Incoming Voice Call...</Text>
-            <View style={styles.modalActions}>
-              <Pressable style={styles.accept} onPress={() => setIncomingCall(false)}>
-                <Text style={styles.modalActionText}>Accept</Text>
-              </Pressable>
-              <Pressable style={styles.decline} onPress={() => setIncomingCall(false)}>
-                <Text style={styles.modalActionText}>Decline</Text>
-              </Pressable>
-            </View>
+        {/* Show ended banner OR composer */}
+        {sessionEnded ? (
+          <View style={styles.endedBanner}>
+            <Text style={styles.endedText}>This session has ended</Text>
           </View>
-        </View>
-      </Modal>
+        ) : (
+          <View style={styles.composer}>
+            <TextInput
+              style={styles.input}
+              placeholder="Type a message..."
+              value={input}
+              onChangeText={setInput}
+              onSubmitEditing={send}
+            />
+            <Pressable style={styles.sendBtn} onPress={send}>
+              <Ionicons name="arrow-up" size={18} color="#FFFFFF" />
+            </Pressable>
+          </View>
+        )}
+      </KeyboardAvoidingView>
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: "#FFFFFF" },
-  top: {
+  header: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 8,
     paddingHorizontal: 12,
     paddingVertical: 10,
     borderBottomWidth: 1,
     borderColor: "#E5E7EB",
+    gap: 8,
   },
-  profile: { flexDirection: "row", alignItems: "center", gap: 6, flex: 1 },
-  photo: { width: 30, height: 30, borderRadius: 15 },
-  name: { color: "#1A1A2E", fontWeight: "700" },
-  timer: { color: "#10B981", fontWeight: "700", fontSize: 12 },
-  endBtn: { paddingHorizontal: 10, paddingVertical: 5, borderRadius: 8, backgroundColor: "#FEE2E2" },
-  endText: { color: "#EF4444", fontWeight: "700" },
-  callActions: { flexDirection: "row", justifyContent: "flex-end", gap: 8, paddingHorizontal: 12, paddingVertical: 8 },
-  iconBtn: {
-    width: 34,
-    height: 34,
-    borderRadius: 17,
-    borderWidth: 1,
-    borderColor: "#EDE9FE",
+  photo: { width: 34, height: 34, borderRadius: 17 },
+  name: { flex: 1, color: "#1A1A2E", fontWeight: "700", fontSize: 15 },
+  activeBadge: {
+    backgroundColor: "#10B981",
+    borderRadius: 6,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+  },
+  activeTxt: { color: "#fff", fontSize: 11, fontWeight: "700" },
+  messages: { padding: 12, paddingBottom: 20 },
+  bubbleRow: { marginBottom: 8, flexDirection: "row" },
+  rowMine: { justifyContent: "flex-end" },
+  rowOther: { justifyContent: "flex-start" },
+  bubble: { maxWidth: "80%", borderRadius: 16, paddingHorizontal: 12, paddingVertical: 8 },
+  bubbleMine: { backgroundColor: "#7C3AED" },
+  bubbleOther: { backgroundColor: "#F3F4F6", borderWidth: 1, borderColor: "#E5E7EB" },
+  msgText: { fontSize: 15, lineHeight: 20 },
+  msgMine: { color: "#FFFFFF" },
+  msgOther: { color: "#1A1A2E" },
+  time: { marginTop: 4, fontSize: 11, textAlign: "right" },
+  timeMine: { color: "rgba(255,255,255,0.7)" },
+  timeOther: { color: "#9CA3AF" },
+  empty: { textAlign: "center", color: "#9CA3AF", marginTop: 60 },
+  endedBanner: {
+    padding: 14,
+    backgroundColor: "#F9FAFB",
+    borderTopWidth: 1,
+    borderColor: "#E5E7EB",
     alignItems: "center",
-    justifyContent: "center",
   },
-  messages: { padding: 12 },
+  endedText: { color: "#6B7280", fontSize: 13 },
   composer: {
     flexDirection: "row",
     alignItems: "center",
@@ -210,18 +275,4 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: "rgba(0,0,0,0.5)",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  modalCard: { width: 280, borderRadius: 16, backgroundColor: "#FFFFFF", padding: 20, alignItems: "center" },
-  modalPhoto: { width: 80, height: 80, borderRadius: 40, marginBottom: 8 },
-  modalName: { fontSize: 18, color: "#1A1A2E", fontWeight: "700" },
-  modalSub: { marginTop: 4, color: "#6B7280" },
-  modalActions: { marginTop: 16, flexDirection: "row", gap: 10 },
-  accept: { backgroundColor: "#10B981", borderRadius: 10, paddingHorizontal: 16, paddingVertical: 10 },
-  decline: { backgroundColor: "#EF4444", borderRadius: 10, paddingHorizontal: 16, paddingVertical: 10 },
-  modalActionText: { color: "#FFFFFF", fontWeight: "700" },
 });
