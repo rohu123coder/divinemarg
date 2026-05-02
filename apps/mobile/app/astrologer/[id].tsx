@@ -1,9 +1,20 @@
 import { Ionicons } from "@expo/vector-icons";
 import { useLocalSearchParams, useRouter } from "expo-router";
-import { useMemo } from "react";
-import { FlatList, Image, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { useMemo, useState } from "react";
+import {
+  ActivityIndicator,
+  Alert,
+  FlatList,
+  Image,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
+} from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
+import api from "../../lib/api";
 import { useAppStore } from "../../lib/store";
 
 const reviews = [
@@ -17,6 +28,36 @@ export default function AstrologerProfileScreen() {
   const router = useRouter();
   const astrologers = useAppStore((state) => state.astrologers);
   const astro = useMemo(() => astrologers.find((a) => a.id === id) ?? astrologers[0], [astrologers, id]);
+
+  const [startingChat, setStartingChat] = useState(false);
+
+  const handleStartChat = async () => {
+    if (!astro) return;
+    if (startingChat) return;
+    setStartingChat(true);
+    try {
+      const res = await api.post("/api/chat/request", {
+        astrologer_id: astro.id,
+      });
+      const sessionId = res.data?.data?.session_id ?? res.data?.data?.sessionId ?? res.data?.sessionId;
+      if (!sessionId) {
+        Alert.alert("Error", "Could not start chat. Please try again.");
+        return;
+      }
+      router.push({
+        pathname: `/chat/${sessionId}`,
+        params: {
+          name: astro.name,
+          photo: astro.profile_photo ?? "",
+        },
+      });
+    } catch (e: unknown) {
+      const msg = (e as { response?: { data?: { error?: string } } })?.response?.data?.error ?? "Could not start chat";
+      Alert.alert("Error", msg);
+    } finally {
+      setStartingChat(false);
+    }
+  };
 
   if (!astro) {
     return (
@@ -61,8 +102,12 @@ export default function AstrologerProfileScreen() {
         </View>
 
         <View style={styles.actions}>
-          <Pressable style={styles.chatBtn} onPress={() => router.push(`/chat/${astro.id}`)}>
-            <Text style={styles.chatBtnTxt}>Start Chat</Text>
+          <Pressable style={styles.chatBtn} onPress={handleStartChat} disabled={startingChat}>
+            {startingChat ? (
+              <ActivityIndicator color="#FFFFFF" size="small" />
+            ) : (
+              <Text style={styles.chatBtnTxt}>Start Chat</Text>
+            )}
           </Pressable>
           <Pressable style={styles.callBtn} onPress={() => router.push(`/call/${astro.id}`)}>
             <Text style={styles.callBtnTxt}>Start Call</Text>

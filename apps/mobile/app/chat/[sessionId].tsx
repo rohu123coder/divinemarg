@@ -74,7 +74,6 @@ export default function ChatScreen() {
 
       // Map messages
       const raw = msgRes.data?.data?.messages ?? [];
-      const userId = useAppStore.getState().user?.id;
       const mapped: Message[] = raw.map((m: {
         id?: string;
         sender_role: "user" | "astrologer";
@@ -90,7 +89,18 @@ export default function ChatScreen() {
         mine: m.sender_role === "user",
       }));
       setMessages(mapped);
-      setSessionEnded(true);
+
+      // Check if this session is active (from history list)
+      try {
+        const histRes = await api.get("/api/chat/history?page=1&limit=50");
+        const sessions = histRes.data?.data?.sessions ?? [];
+        const thisSession = sessions.find(
+          (s: { id: string; status?: string }) => s.id === sessionId
+        );
+        setSessionEnded(thisSession?.status === "ended");
+      } catch {
+        setSessionEnded(false); // default to active if check fails
+      }
     } catch (e) {
       console.error("Failed to load chat:", e);
       setSessionEnded(true);
@@ -103,9 +113,8 @@ export default function ChatScreen() {
     void fetchMessages();
   }, [fetchMessages]);
 
-  // Only connect socket if session is active
   useEffect(() => {
-    if (sessionEnded || !token) return;
+    if (!token || !sessionId || !isValidUUID(sessionId)) return;
     connectSocket(token);
     socket.emit("join_session", { sessionId });
     socket.on("new_message", (payload: { content: string }) => {
@@ -114,16 +123,24 @@ export default function ChatScreen() {
         {
           id: `m-${Date.now()}`,
           message: payload.content,
-          timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+          timestamp: new Date().toLocaleTimeString([], {
+            hour: "2-digit",
+            minute: "2-digit",
+          }),
           mine: false,
         },
       ]);
+      setSessionEnded(false); // if we receive messages, session is active
+    });
+    socket.on("session_ended", () => {
+      setSessionEnded(true);
     });
     return () => {
       socket.off("new_message");
+      socket.off("session_ended");
       disconnectSocket();
     };
-  }, [sessionEnded, sessionId, token]);
+  }, [sessionId, token]);
 
   const send = () => {
     const msg = input.trim();
@@ -137,7 +154,7 @@ export default function ChatScreen() {
         mine: true,
       },
     ]);
-    socket.emit("new_message", { sessionId, content: msg });
+    socket.emit("send_message", { sessionId, content: msg });
     setInput("");
     setTimeout(() => flatRef.current?.scrollToEnd({ animated: true }), 100);
   };
