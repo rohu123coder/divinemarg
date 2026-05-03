@@ -49,6 +49,9 @@ export default function ChatScreen() {
     photo && photo !== "undefined" && photo !== "" ? photo : null
   );
   const [input, setInput] = useState("");
+  const [sessionStatus, setSessionStatus] = useState<"pending" | "active" | "ended">("pending");
+  const [elapsedSeconds, setElapsedSeconds] = useState(0);
+  const [summary, setSummary] = useState<{ totalMinutes: number; totalCharged: number } | null>(null);
 
   const fetchMessages = useCallback(async () => {
     if (!sessionId || !isValidUUID(sessionId)) {
@@ -97,9 +100,12 @@ export default function ChatScreen() {
         const thisSession = sessions.find(
           (s: { id: string; status?: string }) => s.id === sessionId
         );
-        setSessionEnded(thisSession?.status === "ended");
+        const status = thisSession?.status ?? "pending";
+        setSessionStatus(status as "pending" | "active" | "ended");
+        setSessionEnded(status === "ended");
       } catch {
         setSessionEnded(false); // default to active if check fails
+        setSessionStatus("active");
       }
     } catch (e) {
       console.error("Failed to load chat:", e);
@@ -117,10 +123,26 @@ export default function ChatScreen() {
     if (!token || !sessionId || !isValidUUID(sessionId)) return;
     connectSocket(token);
     socket.emit("join_session", { sessionId });
+    socket.on("session_starting", (_payload: { sessionId?: string }) => {
+      setSessionStatus("active");
+      setSessionEnded(false);
+      setElapsedSeconds(0);
+    });
+    socket.on("session_tick", (payload: { elapsedSeconds?: number; elapsedMinutes?: number }) => {
+      setSessionStatus((current) => {
+        if (current === "ended") return current; // don't update if ended
+        if (payload.elapsedSeconds !== undefined) {
+          setElapsedSeconds(payload.elapsedSeconds);
+        }
+        setSessionEnded(false);
+        return "active";
+      });
+    });
     socket.on("new_message", (payload: { content: string; sender_type?: string; senderType?: string }) => {
       const senderType = payload.sender_type ?? payload.senderType ?? "";
-      // Ignore messages sent by user themselves (already added locally)
       if (senderType === "user") return;
+      setSessionStatus("active");
+      setSessionEnded(false);
       setMessages((prev) => [
         ...prev,
         {
@@ -133,12 +155,23 @@ export default function ChatScreen() {
           mine: false,
         },
       ]);
-      setSessionEnded(false);
     });
-    socket.on("session_ended", () => {
+    socket.on("session_ended", (payload: {
+      sessionId?: string;
+      totalMinutes?: number;
+      totalCharged?: number;
+      duration?: number;
+      charge?: number;
+    }) => {
+      setSessionStatus("ended");
       setSessionEnded(true);
+      const minutes = payload.totalMinutes ?? payload.duration ?? 0;
+      const charged = payload.totalCharged ?? payload.charge ?? 0;
+      setSummary({ totalMinutes: minutes, totalCharged: charged });
     });
     return () => {
+      socket.off("session_starting");
+      socket.off("session_tick");
       socket.off("new_message");
       socket.off("session_ended");
       disconnectSocket();
@@ -147,7 +180,7 @@ export default function ChatScreen() {
 
   const send = () => {
     const msg = input.trim();
-    if (!msg || sessionEnded) return;
+    if (!msg || sessionEnded || sessionStatus !== "active") return;
     setMessages((prev) => [
       ...prev,
       {
@@ -160,6 +193,11 @@ export default function ChatScreen() {
     socket.emit("send_message", { sessionId, content: msg });
     setInput("");
     setTimeout(() => flatRef.current?.scrollToEnd({ animated: true }), 100);
+  };
+
+  const handleEndSession = () => {
+    if (sessionStatus !== "active") return;
+    socket.emit("end_session", { sessionId });
   };
 
   return (
@@ -179,6 +217,17 @@ export default function ChatScreen() {
           <View style={[styles.photo, styles.photoPlaceholder]} />
         )}
         <Text style={styles.name}>{firstName(astrologerName)}</Text>
+        {(sessionStatus === "active" || sessionStatus === "ended") && elapsedSeconds > 0 && (
+          <Text style={styles.timerText}>
+            {String(Math.floor(elapsedSeconds / 60)).padStart(2, "0")}:
+            {String(elapsedSeconds % 60).padStart(2, "0")}
+          </Text>
+        )}
+        {sessionStatus === "active" && (
+          <Pressable style={styles.endBtn} onPress={handleEndSession}>
+            <Text style={styles.endText}>End</Text>
+          </Pressable>
+        )}
         {!sessionEnded && (
           <View style={styles.activeBadge}>
             <Text style={styles.activeTxt}>LIVE</Text>
@@ -220,6 +269,10 @@ export default function ChatScreen() {
           <View style={styles.endedBanner}>
             <Text style={styles.endedText}>This session has ended</Text>
           </View>
+        ) : sessionStatus === "pending" ? (
+          <View style={styles.endedBanner}>
+            <Text style={styles.endedText}>⏳ Waiting for astrologer to accept...</Text>
+          </View>
         ) : (
           <View style={styles.composer}>
             <TextInput
@@ -235,6 +288,28 @@ export default function ChatScreen() {
           </View>
         )}
       </KeyboardAvoidingView>
+      {summary && (
+        <View style={styles.summaryOverlay}>
+          <View style={styles.summaryCard}>
+            <Text style={styles.summaryTitle}>Session Ended</Text>
+            <Text style={styles.summaryRow}>
+              Total time: <Text style={styles.summaryVal}>{summary.totalMinutes} min</Text>
+            </Text>
+            <Text style={styles.summaryRow}>
+              Amount charged: <Text style={styles.summaryVal}>₹{summary.totalCharged}</Text>
+            </Text>
+            <Pressable
+              style={styles.summaryBtn}
+              onPress={() => {
+                setSummary(null);
+                router.back();
+              }}
+            >
+              <Text style={styles.summaryBtnTxt}>Done</Text>
+            </Pressable>
+          </View>
+        </View>
+      )}
     </SafeAreaView>
   );
 }
@@ -253,6 +328,24 @@ const styles = StyleSheet.create({
   photo: { width: 34, height: 34, borderRadius: 17 },
   photoPlaceholder: { backgroundColor: "#E5E7EB" },
   name: { flex: 1, color: "#1A1A2E", fontWeight: "700", fontSize: 15 },
+  timerText: {
+    color: "#10B981",
+    fontWeight: "700",
+    fontSize: 13,
+    marginLeft: 8,
+  },
+  endBtn: {
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 8,
+    backgroundColor: "#FEE2E2",
+    marginLeft: 8,
+  },
+  endText: {
+    color: "#EF4444",
+    fontWeight: "700",
+    fontSize: 13,
+  },
   activeBadge: {
     backgroundColor: "#10B981",
     borderRadius: 6,
@@ -305,5 +398,49 @@ const styles = StyleSheet.create({
     backgroundColor: "#7C3AED",
     alignItems: "center",
     justifyContent: "center",
+  },
+  summaryOverlay: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: "rgba(0,0,0,0.5)",
+    alignItems: "center",
+    justifyContent: "center",
+    zIndex: 100,
+  },
+  summaryCard: {
+    width: 300,
+    backgroundColor: "#FFFFFF",
+    borderRadius: 20,
+    padding: 24,
+    alignItems: "center",
+  },
+  summaryTitle: {
+    fontSize: 18,
+    fontWeight: "800",
+    color: "#1A1A2E",
+    marginBottom: 16,
+  },
+  summaryRow: {
+    fontSize: 14,
+    color: "#6B7280",
+    marginBottom: 8,
+  },
+  summaryVal: {
+    fontWeight: "700",
+    color: "#1A1A2E",
+  },
+  summaryBtn: {
+    marginTop: 16,
+    backgroundColor: "#7C3AED",
+    borderRadius: 12,
+    paddingVertical: 12,
+    paddingHorizontal: 32,
+  },
+  summaryBtnTxt: {
+    color: "#FFFFFF",
+    fontWeight: "700",
   },
 });
