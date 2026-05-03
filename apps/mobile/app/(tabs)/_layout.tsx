@@ -15,9 +15,11 @@ export default function TabsLayout() {
           borderTopColor: "#E5E7EB",
           borderTopWidth: 1,
           backgroundColor: "#FFFFFF",
-          height: 60,
+          height: 70,
+          paddingBottom: 10,
+          paddingTop: 5,
         },
-        tabBarLabelStyle: { fontSize: 12, fontWeight: "600", marginBottom: 6 },
+        tabBarLabelStyle: { fontSize: 11, fontWeight: "600", marginBottom: 4 },
         tabBarIconStyle: { marginTop: 4 },
       }}
     >
