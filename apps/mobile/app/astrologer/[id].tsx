@@ -30,6 +30,7 @@ export default function AstrologerProfileScreen() {
   const astro = useMemo(() => astrologers.find((a) => a.id === id) ?? astrologers[0], [astrologers, id]);
 
   const [startingChat, setStartingChat] = useState(false);
+  const [startingCall, setStartingCall] = useState(false);
 
   const handleStartChat = async () => {
     if (!astro) return;
@@ -56,6 +57,32 @@ export default function AstrologerProfileScreen() {
       Alert.alert("Error", msg);
     } finally {
       setStartingChat(false);
+    }
+  };
+
+  const handleStartCall = async () => {
+    if (!astro) return;
+    if (startingCall) return;
+    setStartingCall(true);
+    try {
+      const res = await api.post("/api/chat/request", {
+        astrologer_id: astro.id,
+        session_type: "voice",
+      });
+      const sessionId = res.data?.data?.session_id ?? res.data?.data?.sessionId ?? res.data?.sessionId;
+      if (!sessionId) {
+        Alert.alert("Error", "Could not start call. Please try again.");
+        return;
+      }
+      router.push({
+        pathname: `/call/${sessionId}`,
+        params: { callType: "voice" },
+      });
+    } catch (e: unknown) {
+      const msg = (e as { response?: { data?: { error?: string } } })?.response?.data?.error ?? "Could not start call";
+      Alert.alert("Error", msg);
+    } finally {
+      setStartingCall(false);
     }
   };
 
@@ -109,8 +136,12 @@ export default function AstrologerProfileScreen() {
               <Text style={styles.chatBtnTxt}>Start Chat</Text>
             )}
           </Pressable>
-          <Pressable style={styles.callBtn} onPress={() => router.push(`/call/${astro.id}`)}>
-            <Text style={styles.callBtnTxt}>Start Call</Text>
+          <Pressable style={styles.callBtn} onPress={handleStartCall} disabled={startingCall}>
+            {startingCall ? (
+              <ActivityIndicator color="#7C3AED" size="small" />
+            ) : (
+              <Text style={styles.callBtnTxt}>Start Call</Text>
+            )}
           </Pressable>
         </View>
 
