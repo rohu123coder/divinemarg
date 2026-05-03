@@ -117,7 +117,10 @@ export default function ChatScreen() {
     if (!token || !sessionId || !isValidUUID(sessionId)) return;
     connectSocket(token);
     socket.emit("join_session", { sessionId });
-    socket.on("new_message", (payload: { content: string }) => {
+    socket.on("new_message", (payload: { content: string; sender_type?: string; senderType?: string }) => {
+      const senderType = payload.sender_type ?? payload.senderType ?? "";
+      // Ignore messages sent by user themselves (already added locally)
+      if (senderType === "user") return;
       setMessages((prev) => [
         ...prev,
         {
@@ -130,7 +133,7 @@ export default function ChatScreen() {
           mine: false,
         },
       ]);
-      setSessionEnded(false); // if we receive messages, session is active
+      setSessionEnded(false);
     });
     socket.on("session_ended", () => {
       setSessionEnded(true);
