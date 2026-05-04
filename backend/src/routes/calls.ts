@@ -89,6 +89,7 @@ router.post("/request", async (req: Request, res: Response) => {
   // Notify astrologer via socket
   try {
     const io = getSocketServer();
+    console.log("[CALLS] Emitting incoming_call_request to user:", astrologer.user_id, "session:", sessionId);
     io.to(`user:${astrologer.user_id}`).emit("incoming_call_request", {
       sessionId,
       callType: "voice",

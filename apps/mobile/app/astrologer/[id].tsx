@@ -68,6 +68,7 @@ export default function AstrologerProfileScreen() {
       const res = await api.post("/api/calls/request", {
         astrologer_id: astro.id,
       });
+      console.log("Call request response:", JSON.stringify(res.data));
       const sessionId = res.data?.data?.session_id ?? res.data?.data?.sessionId;
       if (!sessionId) {
         Alert.alert("Error", "Could not start call. Please try again.");
@@ -81,7 +82,8 @@ export default function AstrologerProfileScreen() {
           photo: astro.profile_photo ?? "",
         },
       });
-    } catch (e: unknown) {
+    } catch (e: any) {
+      console.error("Call request error:", JSON.stringify(e?.response?.data ?? e?.message));
       const msg = (e as { response?: { data?: { error?: string } } })?.response?.data?.error ?? "Could not start call";
       Alert.alert("Error", msg);
     } finally {

@@ -1,260 +1,63 @@
 import { Ionicons } from "@expo/vector-icons";
 import { useLocalSearchParams, useRouter } from "expo-router";
-import { useEffect, useRef, useState } from "react";
-import { ActivityIndicator, Alert, Pressable, StyleSheet, Text, View } from "react-native";
+import { useEffect } from "react";
+import { Alert, Pressable, StyleSheet, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import createAgoraRtcEngine, {
-  ChannelProfileType,
-  ClientRoleType,
-  IRtcEngine,
-  ChannelMediaOptions,
-} from "react-native-agora";
-
-import { connectSocket, disconnectSocket, socket } from "../../lib/socket";
+import api from "../../lib/api";
+import { connectSocket, socket } from "../../lib/socket";
 import { useAppStore } from "../../lib/store";
-import { firstName } from "../../lib/utils";
 
 export default function ActiveCallScreen() {
-  const { sessionId, callType: callTypeParam, name: nameProp } = useLocalSearchParams<{
-    sessionId: string;
-    callType?: string;
-    name?: string;
-  }>();
+  const { sessionId, name } = useLocalSearchParams<{ sessionId: string; name?: string }>();
   const router = useRouter();
   const token = useAppStore((state) => state.token);
-  const astrologers = useAppStore((state) => state.astrologers);
-  const astro = astrologers.find((a) => a.id === sessionId);
-  const displayName = nameProp ?? astro?.name ?? "Astrologer";
-
-  const [joined, setJoined] = useState(false);
-  const [muted, setMuted] = useState(false);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [waiting, setWaiting] = useState(true);
-  const [agoraParams, setAgoraParams] = useState<{
-    channelName: string;
-    rtcToken: string;
-    uid: number;
-    appId: string;
-  } | null>(null);
-  const engineRef = useRef<IRtcEngine | null>(null);
-  const callType = callTypeParam === "video" ? "video" : "voice";
 
   useEffect(() => {
-    if (!token || !sessionId) return;
-    connectSocket(token);
-    socket.emit("join_session", { sessionId });
+    // Test API call
+    api.get(`/api/sessions/${sessionId}/context`)
+      .then(res => console.log("Session context:", JSON.stringify(res.data)))
+      .catch(e => console.error("Session error:", e.response?.data ?? e.message));
 
-    socket.on("session_starting", () => {
-      // Session is now active, initiate the call
-      socket.emit("initiate_call", { sessionId, callType });
-    });
+    if (token) {
+      connectSocket(token);
+      socket.emit("join_session", { sessionId });
+      console.log("Socket connected, joining session:", sessionId);
 
-    socket.on("call_ready", (payload: {
-      channelName: string;
-      token: string;
-      uid: number;
-      appId: string;
-      callType?: string;
-    }) => {
-      setAgoraParams({
-        channelName: payload.channelName,
-        rtcToken: payload.token,
-        uid: payload.uid,
-        appId: payload.appId,
+      socket.on("incoming_call_request", (data) => {
+        console.log("incoming_call_request received:", JSON.stringify(data));
       });
-      setWaiting(false);
-    });
 
-    socket.on("call_declined", () => {
-      Alert.alert("Call Declined", "Astrologer declined the call.");
-      router.back();
-    });
-
-    socket.on("session_cancelled", () => {
-      Alert.alert("Request Cancelled", "Session was cancelled.");
-      router.back();
-    });
-
-    return () => {
-      socket.off("session_starting");
-      socket.off("call_ready");
-      socket.off("call_declined");
-      socket.off("session_cancelled");
-      disconnectSocket();
-    };
-  }, [sessionId, token, callType]);
-
-  useEffect(() => {
-    if (waiting || !agoraParams) return;
-    let cancelled = false;
-
-    const startCall = async () => {
-      try {
-        setLoading(true);
-        const { appId, channelName, rtcToken, uid } = agoraParams;
-
-        if (!appId || !channelName || !rtcToken) {
-          setError("Could not get call credentials.");
-          return;
-        }
-        if (cancelled) return;
-
-        const engine = createAgoraRtcEngine();
-        engineRef.current = engine;
-        engine.initialize({ appId });
-        engine.setChannelProfile(ChannelProfileType.ChannelProfileCommunication);
-        engine.setClientRole(ClientRoleType.ClientRoleBroadcaster);
-        engine.enableAudio();
-
-        engine.addListener("onJoinChannelSuccess", () => {
-          if (!cancelled) setJoined(true);
-        });
-
-        engine.addListener("onUserOffline", () => {
-          if (!cancelled) {
-            Alert.alert("Call Ended", "The other person has left.");
-            router.back();
-          }
-        });
-
-        const options: ChannelMediaOptions = {
-          publishMicrophoneTrack: true,
-          autoSubscribeAudio: true,
-          clientRoleType: ClientRoleType.ClientRoleBroadcaster,
-          channelProfile: ChannelProfileType.ChannelProfileCommunication,
-        };
-
-        engine.joinChannel(rtcToken, channelName, uid, options);
-      } catch (e) {
-        if (!cancelled) setError("Failed to start call.");
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
-    };
-
-    void startCall();
-
-    return () => {
-      cancelled = true;
-      engineRef.current?.leaveChannel();
-      engineRef.current?.release();
-      engineRef.current = null;
-    };
-  }, [waiting, agoraParams]);
-
-  const handleEndCall = () => {
-    engineRef.current?.leaveChannel();
-    engineRef.current?.release();
-    engineRef.current = null;
-    router.back();
-  };
-
-  const toggleMute = () => {
-    engineRef.current?.muteLocalAudioStream(!muted);
-    setMuted(!muted);
-  };
-
-  if (waiting) {
-    return (
-      <SafeAreaView style={styles.container}>
-        <View style={styles.header}>
-          <Text style={styles.connectedTxt}>Calling...</Text>
-          <Text style={styles.nameTxt}>{firstName(displayName)}</Text>
-        </View>
-        <View style={styles.avatarWrap}>
-          <ActivityIndicator color="#D4AF37" size="large" />
-        </View>
-        <Pressable
-          style={styles.endCallBtn}
-          onPress={() => {
-            socket.emit("end_session", { sessionId });
-            router.back();
-          }}
-        >
-          <Ionicons name="call" size={24} color="#FFFFFF" />
-        </Pressable>
-      </SafeAreaView>
-    );
-  }
-
-  if (error) {
-    return (
-      <SafeAreaView style={styles.container}>
-        <Text style={styles.errorText}>{error}</Text>
-        <Pressable style={styles.endCallBtn} onPress={() => router.back()}>
-          <Text style={{ color: "#fff", fontWeight: "700" }}>Go Back</Text>
-        </Pressable>
-      </SafeAreaView>
-    );
-  }
+      socket.on("connect", () => {
+        console.log("Socket connected!");
+      });
+    }
+  }, [sessionId, token]);
 
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
-        <Text style={styles.connectedTxt}>
-          {loading ? "Connecting..." : joined ? "Connected" : "Waiting..."}
+        <Text style={styles.connectedTxt}>Calling...</Text>
+        <Text style={styles.nameTxt}>{name ?? "Astrologer"}</Text>
+        <Text style={{ color: "#999", fontSize: 12, marginTop: 4 }}>
+          Session: {sessionId?.slice(0, 8)}...
         </Text>
-        <Text style={styles.nameTxt}>{firstName(displayName)}</Text>
       </View>
       <View style={styles.avatarWrap}>
-        {loading ? (
-          <ActivityIndicator color="#D4AF37" size="large" />
-        ) : (
-          <Text style={styles.avatarInitial}>
-            {displayName.slice(0, 1).toUpperCase()}
-          </Text>
-        )}
+        <Text style={styles.avatarInitial}>📞</Text>
       </View>
-      <View style={styles.controls}>
-        <Pressable style={styles.controlBtn} onPress={toggleMute}>
-          <Ionicons name={muted ? "mic-off" : "mic"} size={22} color="#FFFFFF" />
-        </Pressable>
-        <Pressable style={styles.endCallBtn} onPress={handleEndCall}>
-          <Ionicons name="call" size={24} color="#FFFFFF" />
-        </Pressable>
-      </View>
+      <Pressable style={styles.endCallBtn} onPress={() => router.back()}>
+        <Ionicons name="call" size={24} color="#FFFFFF" />
+      </Pressable>
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: "#0F0A1E",
-    alignItems: "center",
-    justifyContent: "space-between",
-    paddingVertical: 48,
-  },
+  container: { flex: 1, backgroundColor: "#0F0A1E", alignItems: "center", justifyContent: "space-between", paddingVertical: 48 },
   header: { alignItems: "center", gap: 8 },
   connectedTxt: { color: "#D4AF37", fontSize: 18, fontWeight: "700" },
   nameTxt: { color: "#E5E7EB", fontSize: 16 },
-  avatarWrap: {
-    width: 160,
-    height: 160,
-    borderRadius: 80,
-    backgroundColor: "#7C3AED",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  avatarInitial: { fontSize: 60, color: "#FFFFFF", fontWeight: "800" },
-  controls: { flexDirection: "row", gap: 20, alignItems: "center" },
-  controlBtn: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    backgroundColor: "#7C3AED",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  endCallBtn: {
-    width: 68,
-    height: 68,
-    borderRadius: 34,
-    backgroundColor: "#EF4444",
-    alignItems: "center",
-    justifyContent: "center",
-    transform: [{ rotate: "135deg" }],
-  },
-  errorText: { color: "#EF4444", fontSize: 16, textAlign: "center", paddingHorizontal: 24 },
+  avatarWrap: { width: 160, height: 160, borderRadius: 80, backgroundColor: "#7C3AED", alignItems: "center", justifyContent: "center" },
+  avatarInitial: { fontSize: 60 },
+  endCallBtn: { width: 68, height: 68, borderRadius: 34, backgroundColor: "#EF4444", alignItems: "center", justifyContent: "center", transform: [{ rotate: "135deg" }] },
 });
