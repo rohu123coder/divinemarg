@@ -527,7 +527,7 @@ async function autoCancelWaitingSession(
 
     await client.query(
       `UPDATE chat_sessions
-       SET status = 'cancelled',
+       SET status = 'ended',
            ended_at = now(),
            total_minutes = 0,
            total_charged = 0
