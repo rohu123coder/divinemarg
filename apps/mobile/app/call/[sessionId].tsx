@@ -45,10 +45,11 @@ export default function ActiveCallScreen() {
     connectSocket(token);
     socket.emit("join_session", { sessionId });
 
-    // Initiate the call - backend will send incoming_call to astrologer
-    socket.emit("initiate_call", { sessionId, callType });
+    socket.on("session_starting", () => {
+      // Session is now active, initiate the call
+      socket.emit("initiate_call", { sessionId, callType });
+    });
 
-    // Backend sends call_ready when we can join Agora
     socket.on("call_ready", (payload: {
       channelName: string;
       token: string;
@@ -70,15 +71,16 @@ export default function ActiveCallScreen() {
       router.back();
     });
 
-    socket.on("call_accepted", () => {
-      // Caller already has call_ready, this confirms astrologer joined
-      setWaiting(false);
+    socket.on("session_cancelled", () => {
+      Alert.alert("Request Cancelled", "Session was cancelled.");
+      router.back();
     });
 
     return () => {
+      socket.off("session_starting");
       socket.off("call_ready");
       socket.off("call_declined");
-      socket.off("call_accepted");
+      socket.off("session_cancelled");
       disconnectSocket();
     };
   }, [sessionId, token, callType]);

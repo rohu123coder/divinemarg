@@ -61,22 +61,25 @@ export default function AstrologerProfileScreen() {
   };
 
   const handleStartCall = async () => {
-    if (!astro) return;
     if (startingCall) return;
+    if (!astro) return;
     setStartingCall(true);
     try {
-      const res = await api.post("/api/chat/request", {
+      const res = await api.post("/api/calls/request", {
         astrologer_id: astro.id,
-        session_type: "voice",
       });
-      const sessionId = res.data?.data?.session_id ?? res.data?.data?.sessionId ?? res.data?.sessionId;
+      const sessionId = res.data?.data?.session_id ?? res.data?.data?.sessionId;
       if (!sessionId) {
         Alert.alert("Error", "Could not start call. Please try again.");
         return;
       }
       router.push({
         pathname: `/call/${sessionId}`,
-        params: { callType: "voice" },
+        params: {
+          callType: "voice",
+          name: astro.name,
+          photo: astro.profile_photo ?? "",
+        },
       });
     } catch (e: unknown) {
       const msg = (e as { response?: { data?: { error?: string } } })?.response?.data?.error ?? "Could not start call";
