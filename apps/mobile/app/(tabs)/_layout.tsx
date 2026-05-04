@@ -1,10 +1,13 @@
 import { Ionicons } from "@expo/vector-icons";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { Tabs } from "expo-router";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 const PRIMARY = "#7C3AED";
 
 export default function TabsLayout() {
+  const insets = useSafeAreaInsets();
+
   return (
     <Tabs
       screenOptions={{
@@ -15,8 +18,8 @@ export default function TabsLayout() {
           borderTopColor: "#F3F4F6",
           borderTopWidth: 1,
           backgroundColor: "#FFFFFF",
-          height: 65,
-          paddingBottom: 8,
+          height: 56 + insets.bottom,
+          paddingBottom: insets.bottom + 4,
           paddingTop: 6,
           elevation: 12,
           shadowColor: "#000",
@@ -27,56 +30,15 @@ export default function TabsLayout() {
         tabBarLabelStyle: {
           fontSize: 10,
           fontWeight: "600",
-          marginTop: 2,
         },
         tabBarIconStyle: { marginTop: 2 },
       }}
     >
-      <Tabs.Screen
-        name="index"
-        options={{
-          title: "Home",
-          tabBarIcon: ({ color, focused }) => (
-            <Ionicons name={focused ? "home" : "home-outline"} color={color} size={22} />
-          ),
-        }}
-      />
-      <Tabs.Screen
-        name="chat"
-        options={{
-          title: "Chat",
-          tabBarIcon: ({ color, focused }) => (
-            <Ionicons name={focused ? "chatbubble-ellipses" : "chatbubble-ellipses-outline"} color={color} size={22} />
-          ),
-        }}
-      />
-      <Tabs.Screen
-        name="live"
-        options={{
-          title: "Live",
-          tabBarIcon: ({ color, focused }) => (
-            <Ionicons name={focused ? "play-circle" : "play-circle-outline"} color={color} size={22} />
-          ),
-        }}
-      />
-      <Tabs.Screen
-        name="call"
-        options={{
-          title: "Call",
-          tabBarIcon: ({ color, focused }) => (
-            <Ionicons name={focused ? "call" : "call-outline"} color={color} size={22} />
-          ),
-        }}
-      />
-      <Tabs.Screen
-        name="remedies"
-        options={{
-          title: "Remedies",
-          tabBarIcon: ({ color, size }) => (
-            <MaterialCommunityIcons name="hands-pray" color={color} size={22} />
-          ),
-        }}
-      />
+      <Tabs.Screen name="index" options={{ title: "Home", tabBarIcon: ({ color, focused }) => <Ionicons name={focused ? "home" : "home-outline"} color={color} size={22} /> }} />
+      <Tabs.Screen name="chat" options={{ title: "Chat", tabBarIcon: ({ color, focused }) => <Ionicons name={focused ? "chatbubble-ellipses" : "chatbubble-ellipses-outline"} color={color} size={22} /> }} />
+      <Tabs.Screen name="live" options={{ title: "Live", tabBarIcon: ({ color, focused }) => <Ionicons name={focused ? "play-circle" : "play-circle-outline"} color={color} size={22} /> }} />
+      <Tabs.Screen name="call" options={{ title: "Call", tabBarIcon: ({ color, focused }) => <Ionicons name={focused ? "call" : "call-outline"} color={color} size={22} /> }} />
+      <Tabs.Screen name="remedies" options={{ title: "Remedies", tabBarIcon: ({ color }) => <MaterialCommunityIcons name="hands-pray" color={color} size={22} /> }} />
     </Tabs>
   );
 }
