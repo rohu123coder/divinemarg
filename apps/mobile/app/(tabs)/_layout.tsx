@@ -9,27 +9,35 @@ export default function TabsLayout() {
     <Tabs
       screenOptions={{
         headerShown: false,
-        tabBarActiveTintColor: PRIMARY,
+        tabBarActiveTintColor: "#7C3AED",
         tabBarInactiveTintColor: "#9CA3AF",
         tabBarStyle: {
-          borderTopColor: "#E5E7EB",
+          borderTopColor: "#F3F4F6",
           borderTopWidth: 1,
           backgroundColor: "#FFFFFF",
-          height: 90,
-          paddingBottom: 30,
-          paddingTop: 5,
-          elevation: 8,
+          height: 65,
+          paddingBottom: 8,
+          paddingTop: 6,
+          elevation: 12,
+          shadowColor: "#000",
+          shadowOffset: { width: 0, height: -2 },
+          shadowOpacity: 0.08,
+          shadowRadius: 8,
         },
-        tabBarLabelStyle: { fontSize: 11, fontWeight: "600", marginBottom: 4 },
-        tabBarIconStyle: { marginTop: 4 },
+        tabBarLabelStyle: {
+          fontSize: 10,
+          fontWeight: "600",
+          marginTop: 2,
+        },
+        tabBarIconStyle: { marginTop: 2 },
       }}
     >
       <Tabs.Screen
         name="index"
         options={{
           title: "Home",
-          tabBarIcon: ({ color, size }) => (
-            <Ionicons name="home" color={color} size={size} />
+          tabBarIcon: ({ color, focused }) => (
+            <Ionicons name={focused ? "home" : "home-outline"} color={color} size={22} />
           ),
         }}
       />
@@ -37,8 +45,8 @@ export default function TabsLayout() {
         name="chat"
         options={{
           title: "Chat",
-          tabBarIcon: ({ color, size }) => (
-            <Ionicons name="chatbubble-ellipses" color={color} size={size} />
+          tabBarIcon: ({ color, focused }) => (
+            <Ionicons name={focused ? "chatbubble-ellipses" : "chatbubble-ellipses-outline"} color={color} size={22} />
           ),
         }}
       />
@@ -46,8 +54,8 @@ export default function TabsLayout() {
         name="live"
         options={{
           title: "Live",
-          tabBarIcon: ({ color, size }) => (
-            <Ionicons name="play-circle" color={color} size={size} />
+          tabBarIcon: ({ color, focused }) => (
+            <Ionicons name={focused ? "play-circle" : "play-circle-outline"} color={color} size={22} />
           ),
         }}
       />
@@ -55,8 +63,8 @@ export default function TabsLayout() {
         name="call"
         options={{
           title: "Call",
-          tabBarIcon: ({ color, size }) => (
-            <Ionicons name="call" color={color} size={size} />
+          tabBarIcon: ({ color, focused }) => (
+            <Ionicons name={focused ? "call" : "call-outline"} color={color} size={22} />
           ),
         }}
       />
@@ -65,7 +73,7 @@ export default function TabsLayout() {
         options={{
           title: "Remedies",
           tabBarIcon: ({ color, size }) => (
-            <MaterialCommunityIcons name="hands-pray" color={color} size={size} />
+            <MaterialCommunityIcons name="hands-pray" color={color} size={22} />
           ),
         }}
       />
