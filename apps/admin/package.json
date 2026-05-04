@@ -9,11 +9,10 @@
     "lint": "next lint"
   },
   "dependencies": {
-    "divinemarg-shared": "*",
     "axios": "^1.15.0",
     "next": "14.2.35",
-    "react": "^18",
-    "react-dom": "^18",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
     "react-hook-form": "^7.72.1",
     "socket.io-client": "^4.8.3",
     "zod": "^3.25.76",

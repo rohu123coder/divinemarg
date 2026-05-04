@@ -1,11 +1,15 @@
 import type { Metadata } from "next";
-import { Inter } from "next/font/google";
-
-import { AdminShell } from "@/components/AdminShell";
-
+import dynamic from "next/dynamic";
 import "./globals.css";
 
-const inter = Inter({ subsets: ["latin"] });
+const AdminShellWrapper = dynamic(() => import("./AdminShellWrapper"), {
+  ssr: false,
+  loading: () => (
+    <div style={{ display: "flex", minHeight: "100vh", alignItems: "center", justifyContent: "center" }}>
+      Loading…
+    </div>
+  ),
+});
 
 export const metadata: Metadata = {
   title: "DivineMarg Admin",
@@ -14,13 +18,13 @@ export const metadata: Metadata = {
 
 export default function RootLayout({
   children,
-}: Readonly<{
+}: {
   children: React.ReactNode;
-}>) {
+}) {
   return (
     <html lang="en">
-      <body className={`${inter.className} antialiased text-slate-900`}>
-        <AdminShell>{children}</AdminShell>
+      <body className="antialiased text-slate-900">
+        <AdminShellWrapper>{children}</AdminShellWrapper>
       </body>
     </html>
   );
