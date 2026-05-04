@@ -10,7 +10,6 @@ import createAgoraRtcEngine, {
   ChannelMediaOptions,
 } from "react-native-agora";
 
-import api from "../../lib/api";
 import { connectSocket, disconnectSocket, socket } from "../../lib/socket";
 import { useAppStore } from "../../lib/store";
 import { firstName } from "../../lib/utils";
@@ -32,6 +31,12 @@ export default function ActiveCallScreen() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [waiting, setWaiting] = useState(true);
+  const [agoraParams, setAgoraParams] = useState<{
+    channelName: string;
+    rtcToken: string;
+    uid: number;
+    appId: string;
+  } | null>(null);
   const engineRef = useRef<IRtcEngine | null>(null);
   const callType = callTypeParam === "video" ? "video" : "voice";
 
@@ -39,29 +44,53 @@ export default function ActiveCallScreen() {
     if (!token || !sessionId) return;
     connectSocket(token);
     socket.emit("join_session", { sessionId });
-    socket.on("session_starting", () => {
+
+    // Initiate the call - backend will send incoming_call to astrologer
+    socket.emit("initiate_call", { sessionId, callType });
+
+    // Backend sends call_ready when we can join Agora
+    socket.on("call_ready", (payload: {
+      channelName: string;
+      token: string;
+      uid: number;
+      appId: string;
+      callType?: string;
+    }) => {
+      setAgoraParams({
+        channelName: payload.channelName,
+        rtcToken: payload.token,
+        uid: payload.uid,
+        appId: payload.appId,
+      });
       setWaiting(false);
     });
-    socket.on("session_cancelled", () => {
+
+    socket.on("call_declined", () => {
       Alert.alert("Call Declined", "Astrologer declined the call.");
       router.back();
     });
+
+    socket.on("call_accepted", () => {
+      // Caller already has call_ready, this confirms astrologer joined
+      setWaiting(false);
+    });
+
     return () => {
-      socket.off("session_starting");
-      socket.off("session_cancelled");
+      socket.off("call_ready");
+      socket.off("call_declined");
+      socket.off("call_accepted");
       disconnectSocket();
     };
-  }, [sessionId, token]);
+  }, [sessionId, token, callType]);
 
   useEffect(() => {
-    if (waiting) return;
+    if (waiting || !agoraParams) return;
     let cancelled = false;
 
     const startCall = async () => {
       try {
         setLoading(true);
-        const res = await api.get(`/api/sessions/${sessionId}/call-token?type=${callType}`);
-        const { appId, channelName, token: rtcToken, uid } = res.data?.data ?? {};
+        const { appId, channelName, rtcToken, uid } = agoraParams;
 
         if (!appId || !channelName || !rtcToken) {
           setError("Could not get call credentials.");
@@ -94,7 +123,7 @@ export default function ActiveCallScreen() {
           channelProfile: ChannelProfileType.ChannelProfileCommunication,
         };
 
-        engine.joinChannel(rtcToken, channelName, uid ?? 1, options);
+        engine.joinChannel(rtcToken, channelName, uid, options);
       } catch (e) {
         if (!cancelled) setError("Failed to start call.");
       } finally {
@@ -110,7 +139,7 @@ export default function ActiveCallScreen() {
       engineRef.current?.release();
       engineRef.current = null;
     };
-  }, [waiting, sessionId, callType]);
+  }, [waiting, agoraParams]);
 
   const handleEndCall = () => {
     engineRef.current?.leaveChannel();
