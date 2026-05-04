@@ -139,6 +139,24 @@ export default function AstrologerDashboardPage() {
       socket.emit("get_waitlist");
     });
 
+    socket.on("incoming_call_request", (payload: {
+      sessionId: string;
+      callType: string;
+      callerName: string;
+      pricePerMinute: number;
+    }) => {
+      const next = {
+        sessionId: payload.sessionId,
+        userName: payload.callerName,
+        type: "voice",
+        pricePerMinute: payload.pricePerMinute,
+        userId: "",
+      } as IncomingRequest;
+      incomingRef.current = next;
+      setIncoming(next);
+      setCountdown(30);
+    });
+
     socket.on("incoming_request", (payload: IncomingRequest) => {
       incomingRef.current = payload;
       setIncoming(payload);
@@ -178,6 +196,7 @@ export default function AstrologerDashboardPage() {
     });
 
     return () => {
+      socket.off("incoming_call_request");
       socket.disconnect();
       socketRef.current = null;
     };
