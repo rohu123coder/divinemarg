@@ -1,6 +1,5 @@
 import type { Metadata } from "next";
 import "./globals.css";
-import ClientWrapper from "./ClientWrapper";
 
 export const metadata: Metadata = {
   title: "DivineMarg Admin",
@@ -15,7 +14,7 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body className="antialiased text-slate-900">
-        <ClientWrapper>{children}</ClientWrapper>
+        {children}
       </body>
     </html>
   );

@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 
+import ClientWrapper from "../ClientWrapper";
 import api from "@/lib/api";
 
 const KEYS = {
@@ -19,7 +20,7 @@ type FormVals = {
   supportPhone: string;
 };
 
-export default function SettingsPage() {
+function SettingsPageContent() {
   const [loadError, setLoadError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
   const {
@@ -175,5 +176,13 @@ export default function SettingsPage() {
         </button>
       </form>
     </div>
+  );
+}
+
+export default function SettingsPage() {
+  return (
+    <ClientWrapper>
+      <SettingsPageContent />
+    </ClientWrapper>
   );
 }

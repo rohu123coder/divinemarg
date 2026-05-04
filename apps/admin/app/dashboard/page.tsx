@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 
+import ClientWrapper from "../ClientWrapper";
 import api from "@/lib/api";
 
 type Stats = {
@@ -36,7 +37,7 @@ function StatusBadge({ status }: { status: string }) {
   );
 }
 
-export default function DashboardPage() {
+function DashboardPageContent() {
   const [stats, setStats] = useState<Stats | null>(null);
   const [transactions, setTransactions] = useState<TxRow[]>([]);
   const [error, setError] = useState<string | null>(null);
@@ -156,5 +157,13 @@ export default function DashboardPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function DashboardPage() {
+  return (
+    <ClientWrapper>
+      <DashboardPageContent />
+    </ClientWrapper>
   );
 }

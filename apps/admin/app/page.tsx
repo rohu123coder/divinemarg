@@ -2,7 +2,9 @@
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 
-export default function HomePage() {
+import ClientWrapper from "./ClientWrapper";
+
+function HomePageContent() {
   const router = useRouter();
 
   useEffect(() => {
@@ -23,5 +25,13 @@ export default function HomePage() {
     <div className="flex min-h-screen items-center justify-center bg-slate-50 text-slate-500">
       Loading…
     </div>
+  );
+}
+
+export default function HomePage() {
+  return (
+    <ClientWrapper>
+      <HomePageContent />
+    </ClientWrapper>
   );
 }

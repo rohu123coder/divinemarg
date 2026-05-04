@@ -1,5 +1,6 @@
 "use client";
 
+import ClientWrapper from "../ClientWrapper";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
@@ -13,7 +14,7 @@ type Form = {
   password: string;
 };
 
-export default function LoginPage() {
+function LoginPageContent() {
   const router = useRouter();
   const hydrated = useAdminHydrated();
   const isLoggedIn = useAdminStore((s) => s.isLoggedIn);
@@ -115,5 +116,13 @@ export default function LoginPage() {
         </form>
       </div>
     </div>
+  );
+}
+
+export default function LoginPage() {
+  return (
+    <ClientWrapper>
+      <LoginPageContent />
+    </ClientWrapper>
   );
 }

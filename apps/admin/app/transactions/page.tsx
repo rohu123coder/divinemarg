@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 
+import ClientWrapper from "../ClientWrapper";
 import api from "@/lib/api";
 
 type TxRow = {
@@ -79,7 +80,7 @@ function toCsv(rows: TxRow[]): string {
   return lines.join("\n");
 }
 
-export default function TransactionsPage() {
+function TransactionsPageContent() {
   const [items, setItems] = useState<TxRow[]>([]);
   const [page, setPage] = useState(1);
   const [total, setTotal] = useState(0);
@@ -300,5 +301,13 @@ export default function TransactionsPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function TransactionsPage() {
+  return (
+    <ClientWrapper>
+      <TransactionsPageContent />
+    </ClientWrapper>
   );
 }

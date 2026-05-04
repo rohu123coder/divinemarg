@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 
+import ClientWrapper from "../ClientWrapper";
 import api from "@/lib/api";
 
 type AstroRow = {
@@ -31,7 +32,7 @@ function VerifiedBadge({ verified }: { verified: boolean }) {
 
 const webBase = process.env.NEXT_PUBLIC_WEB_URL ?? "http://localhost:3000";
 
-export default function AstrologersPage() {
+function AstrologersPageContent() {
   const [items, setItems] = useState<AstroRow[]>([]);
   const [page, setPage] = useState(1);
   const [total, setTotal] = useState(0);
@@ -228,5 +229,13 @@ export default function AstrologersPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function AstrologersPage() {
+  return (
+    <ClientWrapper>
+      <AstrologersPageContent />
+    </ClientWrapper>
   );
 }

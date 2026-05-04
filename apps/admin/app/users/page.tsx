@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 
+import ClientWrapper from "../ClientWrapper";
 import api from "@/lib/api";
 
 type UserRow = {
@@ -14,7 +15,7 @@ type UserRow = {
   join_date: string;
 };
 
-export default function UsersPage() {
+function UsersPageContent() {
   const [items, setItems] = useState<UserRow[]>([]);
   const [page, setPage] = useState(1);
   const [total, setTotal] = useState(0);
@@ -190,5 +191,13 @@ export default function UsersPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function UsersPage() {
+  return (
+    <ClientWrapper>
+      <UsersPageContent />
+    </ClientWrapper>
   );
 }
