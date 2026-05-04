@@ -224,6 +224,25 @@ export default function ChatScreen() {
           </Text>
         )}
         {sessionStatus === "active" && (
+          <View style={styles.callActions}>
+            <Pressable
+              onPress={async () => {
+                try {
+                  socket.emit("initiate_call", { sessionId, callType: "voice" });
+                  router.push({
+                    pathname: `/call/${sessionId}`,
+                    params: { callType: "voice", name: astrologerName },
+                  });
+                } catch (e) {
+                  console.error("Call initiate failed:", e);
+                }
+              }}
+            >
+              <Ionicons name="call" size={22} color="#7C3AED" />
+            </Pressable>
+          </View>
+        )}
+        {sessionStatus === "active" && (
           <Pressable style={styles.endBtn} onPress={handleEndSession}>
             <Text style={styles.endText}>End</Text>
           </Pressable>
@@ -334,6 +353,7 @@ const styles = StyleSheet.create({
     fontSize: 13,
     marginLeft: 8,
   },
+  callActions: { justifyContent: "center", alignItems: "center", marginLeft: 8 },
   endBtn: {
     paddingHorizontal: 10,
     paddingVertical: 5,
