@@ -1,7 +1,7 @@
 import { Ionicons } from "@expo/vector-icons";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useEffect, useRef, useState } from "react";
-import { Alert, AppState, Pressable, StyleSheet, Text, View } from "react-native";
+import { AppState, Pressable, StyleSheet, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { connectSocket, socket } from "../../lib/socket";
 import { useAppStore } from "../../lib/store";
@@ -14,8 +14,6 @@ export default function ActiveCallScreen() {
   const [status, setStatus] = useState<"calling" | "connected" | "ended">("calling");
   const [elapsed, setElapsed] = useState(0);
   const [muted, setMuted] = useState(false);
-
-  const appStateRef = useRef(AppState.currentState);
   const endedRef = useRef(false);
 
   useEffect(() => {
@@ -24,50 +22,39 @@ export default function ActiveCallScreen() {
     connectSocket(token);
     socket.emit("join_session", { sessionId });
 
-    socket.on("session_started", (data: { sessionId: string }) => {
-      if (data.sessionId === sessionId) {
-        setStatus("connected");
-      }
-    });
-
-    socket.on("session_starting", (data: { sessionId: string }) => {
-      if (data.sessionId === sessionId) {
-        setStatus("connected");
-      }
-    });
-
-    // Keep socket alive when app goes to background
     const appStateSub = AppState.addEventListener("change", (nextState) => {
-      appStateRef.current = nextState;
       if (nextState === "active") {
         connectSocket(token);
         socket.emit("join_session", { sessionId });
       }
     });
 
+    socket.on("session_started", (data: { sessionId: string }) => {
+      if (data.sessionId === sessionId) setStatus("connected");
+    });
+
+    socket.on("session_starting", (data: { sessionId: string }) => {
+      if (data.sessionId === sessionId) setStatus("connected");
+    });
+
     socket.on("session_tick", (data: { elapsedSeconds: number }) => {
       setElapsed(data.elapsedSeconds);
-      if (status === "calling") setStatus("connected");
+      setStatus("connected");
     });
 
     socket.on("session_cancelled", () => {
       if (!endedRef.current) {
         endedRef.current = true;
-        cleanupAndExit();
+        setStatus("ended");
+        setTimeout(() => router.back(), 1500);
       }
     });
 
     socket.on("session_ended", () => {
       if (!endedRef.current) {
         endedRef.current = true;
-        cleanupAndExit();
-      }
-    });
-
-    socket.on("call_declined", () => {
-      if (!endedRef.current) {
-        endedRef.current = true;
-        cleanupAndExit();
+        setStatus("ended");
+        setTimeout(() => router.back(), 1500);
       }
     });
 
@@ -78,25 +65,15 @@ export default function ActiveCallScreen() {
       socket.off("session_tick");
       socket.off("session_cancelled");
       socket.off("session_ended");
-      socket.off("call_declined");
     };
   }, [sessionId, token]);
 
-  const cleanupAndExit = async () => {
-    setStatus("ended");
-    setTimeout(() => router.back(), 1000);
-  };
-
   const handleEndCall = () => {
-    if (!endedRef.current) {
-      endedRef.current = true;
-      socket.emit("end_session", { sessionId });
-      cleanupAndExit();
-    }
-  };
-
-  const toggleMute = async () => {
-    setMuted(!muted);
+    if (endedRef.current) return;
+    endedRef.current = true;
+    socket.emit("end_session", { sessionId });
+    setStatus("ended");
+    setTimeout(() => router.back(), 500);
   };
 
   const formatTime = (secs: number) => {
@@ -122,10 +99,7 @@ export default function ActiveCallScreen() {
       </View>
 
       <View style={styles.controls}>
-        <Pressable
-          style={[styles.controlBtn, muted && styles.controlBtnActive]}
-          onPress={toggleMute}
-        >
+        <Pressable style={styles.controlBtn}>
           <Ionicons name={muted ? "mic-off" : "mic"} size={22} color="#FFFFFF" />
         </Pressable>
 
@@ -174,9 +148,6 @@ const styles = StyleSheet.create({
     backgroundColor: "#374151",
     alignItems: "center",
     justifyContent: "center",
-  },
-  controlBtnActive: {
-    backgroundColor: "#7C3AED",
   },
   endCallBtn: {
     width: 68,
