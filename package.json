@@ -2,7 +2,8 @@
   "name": "divinemarg-platform",
   "private": true,
   "workspaces": [
-    "apps/*",
+    "apps/web",
+    "apps/admin",
     "backend",
     "shared"
   ],
