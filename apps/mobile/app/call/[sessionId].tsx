@@ -3,8 +3,16 @@ import { useLocalSearchParams, useRouter } from "expo-router";
 import { useEffect, useRef, useState } from "react";
 import { AppState, Pressable, StyleSheet, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import {
+  createAgoraRtcEngine,
+  ChannelProfileType,
+  ClientRoleType,
+  IRtcEngine,
+} from "react-native-agora";
 import { connectSocket, socket } from "../../lib/socket";
 import { useAppStore } from "../../lib/store";
+
+const AGORA_APP_ID = "4fb8572dc9c2444aaebd591e33b2bde5";
 
 export default function ActiveCallScreen() {
   const { sessionId, name } = useLocalSearchParams<{ sessionId: string; name?: string }>();
@@ -14,7 +22,28 @@ export default function ActiveCallScreen() {
   const [status, setStatus] = useState<"calling" | "connected" | "ended">("calling");
   const [elapsed, setElapsed] = useState(0);
   const [muted, setMuted] = useState(false);
+
+  const engineRef = useRef<IRtcEngine | null>(null);
   const endedRef = useRef(false);
+  const callInitiatedRef = useRef(false);
+
+  const cleanupAgora = async () => {
+    try {
+      if (engineRef.current) {
+        engineRef.current.leaveChannel();
+        engineRef.current.release();
+        engineRef.current = null;
+      }
+    } catch (e) {
+      console.error("Agora cleanup:", e);
+    }
+  };
+
+  const cleanupAndExit = async () => {
+    await cleanupAgora();
+    setStatus("ended");
+    setTimeout(() => router.back(), 1000);
+  };
 
   useEffect(() => {
     if (!token || !sessionId) return;
@@ -30,31 +59,86 @@ export default function ActiveCallScreen() {
     });
 
     socket.on("session_started", (data: { sessionId: string }) => {
-      if (data.sessionId === sessionId) setStatus("connected");
+      if (data.sessionId !== sessionId) return;
+      setStatus("connected");
+      if (!callInitiatedRef.current) {
+        callInitiatedRef.current = true;
+        socket.emit("initiate_call", { sessionId, callType: "voice" });
+      }
     });
 
     socket.on("session_starting", (data: { sessionId: string }) => {
-      if (data.sessionId === sessionId) setStatus("connected");
+      if (data.sessionId !== sessionId) return;
+      setStatus("connected");
+      if (!callInitiatedRef.current) {
+        callInitiatedRef.current = true;
+        socket.emit("initiate_call", { sessionId, callType: "voice" });
+      }
     });
 
     socket.on("session_tick", (data: { elapsedSeconds: number }) => {
       setElapsed(data.elapsedSeconds);
       setStatus("connected");
+      if (!callInitiatedRef.current) {
+        callInitiatedRef.current = true;
+        socket.emit("initiate_call", { sessionId, callType: "voice" });
+      }
+    });
+
+    socket.on("call_ready", async (data: {
+      channelName: string;
+      token: string;
+      uid: number;
+      appId: string;
+    }) => {
+      try {
+        const engine = createAgoraRtcEngine();
+        engineRef.current = engine;
+
+        engine.initialize({
+          appId: AGORA_APP_ID,
+          channelProfile: ChannelProfileType.ChannelProfileCommunication,
+        });
+
+        engine.enableAudio();
+        engine.disableVideo();
+        engine.setClientRole(ClientRoleType.ClientRoleBroadcaster);
+
+        engine.addListener("onUserJoined", () => {
+          setStatus("connected");
+        });
+
+        engine.addListener("onError", (err) => {
+          console.error("Agora error:", err);
+        });
+
+        await engine.joinChannel(data.token, data.channelName, data.uid, {
+          clientRoleType: ClientRoleType.ClientRoleBroadcaster,
+          publishMicrophoneTrack: true,
+          autoSubscribeAudio: true,
+        });
+
+        setStatus("connected");
+      } catch (e) {
+        console.error("Agora init error:", e);
+      }
+    });
+
+    socket.on("call_declined", () => {
+      callInitiatedRef.current = false;
     });
 
     socket.on("session_cancelled", () => {
       if (!endedRef.current) {
         endedRef.current = true;
-        setStatus("ended");
-        setTimeout(() => router.back(), 1500);
+        cleanupAndExit();
       }
     });
 
     socket.on("session_ended", () => {
       if (!endedRef.current) {
         endedRef.current = true;
-        setStatus("ended");
-        setTimeout(() => router.back(), 1500);
+        cleanupAndExit();
       }
     });
 
@@ -63,6 +147,8 @@ export default function ActiveCallScreen() {
       socket.off("session_started");
       socket.off("session_starting");
       socket.off("session_tick");
+      socket.off("call_ready");
+      socket.off("call_declined");
       socket.off("session_cancelled");
       socket.off("session_ended");
     };
@@ -72,8 +158,14 @@ export default function ActiveCallScreen() {
     if (endedRef.current) return;
     endedRef.current = true;
     socket.emit("end_session", { sessionId });
-    setStatus("ended");
-    setTimeout(() => router.back(), 500);
+    cleanupAndExit();
+  };
+
+  const toggleMute = () => {
+    if (engineRef.current) {
+      engineRef.current.muteLocalAudioStream(!muted);
+      setMuted(!muted);
+    }
   };
 
   const formatTime = (secs: number) => {
@@ -99,7 +191,10 @@ export default function ActiveCallScreen() {
       </View>
 
       <View style={styles.controls}>
-        <Pressable style={styles.controlBtn}>
+        <Pressable
+          style={[styles.controlBtn, muted && styles.controlBtnActive]}
+          onPress={toggleMute}
+        >
           <Ionicons name={muted ? "mic-off" : "mic"} size={22} color="#FFFFFF" />
         </Pressable>
 
@@ -148,6 +243,9 @@ const styles = StyleSheet.create({
     backgroundColor: "#374151",
     alignItems: "center",
     justifyContent: "center",
+  },
+  controlBtnActive: {
+    backgroundColor: "#7C3AED",
   },
   endCallBtn: {
     width: 68,
