@@ -1,44 +1,80 @@
 import { Ionicons } from "@expo/vector-icons";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useEffect, useRef, useState } from "react";
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import { Alert, Pressable, StyleSheet, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import RtcEngine, {
+  ChannelProfileType,
+  ClientRoleType,
+  RtcConnection,
+} from "react-native-agora";
 import { connectSocket, socket } from "../../lib/socket";
 import { useAppStore } from "../../lib/store";
+
+const AGORA_APP_ID = "4fb8572dc9c2444aaebd591e33b2bde5";
 
 export default function ActiveCallScreen() {
   const { sessionId, name } = useLocalSearchParams<{ sessionId: string; name?: string }>();
   const router = useRouter();
   const token = useAppStore((state) => state.token);
+
   const [status, setStatus] = useState<"calling" | "connected" | "ended">("calling");
   const [elapsed, setElapsed] = useState(0);
+  const [muted, setMuted] = useState(false);
+
+  const engineRef = useRef<RtcEngine | null>(null);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   useEffect(() => {
     if (!token || !sessionId) return;
 
     connectSocket(token);
-
     socket.emit("join_session", { sessionId });
-    console.log("[CALL] Joining session:", sessionId);
 
     socket.on("session_started", (data: { sessionId: string }) => {
-      console.log("[CALL] session_started received:", data);
       if (data.sessionId === sessionId) {
-        setStatus("connected");
-        timerRef.current = setInterval(() => {
-          setElapsed((e) => e + 1);
-        }, 1000);
+        socket.emit("initiate_call", { sessionId, callType: "voice" });
       }
     });
 
     socket.on("session_starting", (data: { sessionId: string }) => {
-      console.log("[CALL] session_starting received:", data);
       if (data.sessionId === sessionId) {
+        socket.emit("initiate_call", { sessionId, callType: "voice" });
+      }
+    });
+
+    socket.on("call_ready", async (data: {
+      channelName: string;
+      token: string;
+      uid: number;
+      appId: string;
+      callType: string;
+    }) => {
+      try {
+        const engine = await RtcEngine.create(AGORA_APP_ID);
+        engineRef.current = engine;
+
+        await engine.setChannelProfile(ChannelProfileType.ChannelProfileCommunication);
+        await engine.setClientRole(ClientRoleType.ClientRoleBroadcaster);
+        await engine.enableAudio();
+        await engine.disableVideo();
+
+        engine.addListener("onUserJoined", () => {
+          setStatus("connected");
+          timerRef.current = setInterval(() => {
+            setElapsed((e) => e + 1);
+          }, 1000);
+        });
+
+        engine.addListener("onUserOffline", () => {
+          handleEndCall();
+        });
+
+        await engine.joinChannel(data.token, data.channelName, data.uid, {});
         setStatus("connected");
-        timerRef.current = setInterval(() => {
-          setElapsed((e) => e + 1);
-        }, 1000);
+      } catch (e) {
+        console.error("Agora error:", e);
+        Alert.alert("Call Error", "Could not connect audio");
       }
     });
 
@@ -49,34 +85,56 @@ export default function ActiveCallScreen() {
 
     socket.on("session_cancelled", () => {
       setStatus("ended");
-      setTimeout(() => router.back(), 2000);
+      cleanupAndExit();
     });
 
     socket.on("session_ended", () => {
       setStatus("ended");
-      if (timerRef.current) clearInterval(timerRef.current);
-      setTimeout(() => router.back(), 2000);
+      cleanupAndExit();
+    });
+
+    socket.on("call_declined", () => {
+      Alert.alert("Call Declined", "The other party declined the call");
+      cleanupAndExit();
     });
 
     return () => {
       socket.off("session_started");
       socket.off("session_starting");
+      socket.off("call_ready");
       socket.off("session_tick");
       socket.off("session_cancelled");
       socket.off("session_ended");
-      if (timerRef.current) clearInterval(timerRef.current);
+      socket.off("call_declined");
     };
   }, [sessionId, token]);
+
+  const cleanupAndExit = async () => {
+    if (timerRef.current) clearInterval(timerRef.current);
+    if (engineRef.current) {
+      await engineRef.current.leaveChannel();
+      engineRef.current.removeAllListeners();
+      engineRef.current = null;
+    }
+    setTimeout(() => router.back(), 1500);
+  };
+
+  const handleEndCall = () => {
+    socket.emit("end_session", { sessionId });
+    cleanupAndExit();
+  };
+
+  const toggleMute = async () => {
+    if (engineRef.current) {
+      await engineRef.current.muteLocalAudioStream(!muted);
+      setMuted(!muted);
+    }
+  };
 
   const formatTime = (secs: number) => {
     const m = Math.floor(secs / 60).toString().padStart(2, "0");
     const s = (secs % 60).toString().padStart(2, "0");
     return `${m}:${s}`;
-  };
-
-  const handleEndCall = () => {
-    socket.emit("end_session", { sessionId });
-    router.back();
   };
 
   return (
@@ -95,13 +153,22 @@ export default function ActiveCallScreen() {
         <Text style={styles.avatarIcon}>📞</Text>
       </View>
 
-      <Pressable
-        style={[styles.endCallBtn, status === "ended" && styles.endCallBtnDisabled]}
-        onPress={handleEndCall}
-        disabled={status === "ended"}
-      >
-        <Ionicons name="call" size={24} color="#FFFFFF" />
-      </Pressable>
+      <View style={styles.controls}>
+        <Pressable
+          style={[styles.controlBtn, muted && styles.controlBtnActive]}
+          onPress={toggleMute}
+        >
+          <Ionicons name={muted ? "mic-off" : "mic"} size={22} color="#FFFFFF" />
+        </Pressable>
+
+        <Pressable
+          style={[styles.endCallBtn, status === "ended" && styles.endCallBtnDisabled]}
+          onPress={handleEndCall}
+          disabled={status === "ended"}
+        >
+          <Ionicons name="call" size={24} color="#FFFFFF" />
+        </Pressable>
+      </View>
     </SafeAreaView>
   );
 }
@@ -127,6 +194,22 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   avatarIcon: { fontSize: 60 },
+  controls: {
+    flexDirection: "row",
+    gap: 24,
+    alignItems: "center",
+  },
+  controlBtn: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: "#374151",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  controlBtnActive: {
+    backgroundColor: "#7C3AED",
+  },
   endCallBtn: {
     width: 68,
     height: 68,
