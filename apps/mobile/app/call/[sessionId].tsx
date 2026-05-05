@@ -1,12 +1,13 @@
 import { Ionicons } from "@expo/vector-icons";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useEffect, useRef, useState } from "react";
-import { Alert, Pressable, StyleSheet, Text, View } from "react-native";
+import { Alert, AppState, Pressable, StyleSheet, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import RtcEngine, {
+import {
+  createAgoraRtcEngine,
   ChannelProfileType,
   ClientRoleType,
-  RtcConnection,
+  IRtcEngine,
 } from "react-native-agora";
 import { connectSocket, socket } from "../../lib/socket";
 import { useAppStore } from "../../lib/store";
@@ -22,14 +23,24 @@ export default function ActiveCallScreen() {
   const [elapsed, setElapsed] = useState(0);
   const [muted, setMuted] = useState(false);
 
-  const engineRef = useRef<RtcEngine | null>(null);
-  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const engineRef = useRef<IRtcEngine | null>(null);
+  const appStateRef = useRef(AppState.currentState);
+  const endedRef = useRef(false);
 
   useEffect(() => {
     if (!token || !sessionId) return;
 
     connectSocket(token);
     socket.emit("join_session", { sessionId });
+
+    // Keep socket alive when app goes to background
+    const appStateSub = AppState.addEventListener("change", (nextState) => {
+      appStateRef.current = nextState;
+      if (nextState === "active") {
+        connectSocket(token);
+        socket.emit("join_session", { sessionId });
+      }
+    });
 
     socket.on("session_started", (data: { sessionId: string }) => {
       if (data.sessionId === sessionId) {
@@ -48,33 +59,44 @@ export default function ActiveCallScreen() {
       token: string;
       uid: number;
       appId: string;
-      callType: string;
     }) => {
       try {
-        const engine = await RtcEngine.create(AGORA_APP_ID);
+        const engine = createAgoraRtcEngine();
         engineRef.current = engine;
 
-        await engine.setChannelProfile(ChannelProfileType.ChannelProfileCommunication);
-        await engine.setClientRole(ClientRoleType.ClientRoleBroadcaster);
-        await engine.enableAudio();
-        await engine.disableVideo();
+        engine.initialize({
+          appId: AGORA_APP_ID,
+          channelProfile: ChannelProfileType.ChannelProfileCommunication,
+        });
+
+        engine.enableAudio();
+        engine.disableVideo();
+        engine.setClientRole(ClientRoleType.ClientRoleBroadcaster);
 
         engine.addListener("onUserJoined", () => {
           setStatus("connected");
-          timerRef.current = setInterval(() => {
-            setElapsed((e) => e + 1);
-          }, 1000);
         });
 
         engine.addListener("onUserOffline", () => {
-          handleEndCall();
+          if (!endedRef.current) {
+            endedRef.current = true;
+            cleanupAndExit();
+          }
         });
 
-        await engine.joinChannel(data.token, data.channelName, data.uid, {});
+        engine.addListener("onError", (err) => {
+          console.error("Agora error:", err);
+        });
+
+        engine.joinChannel(data.token, data.channelName, data.uid, {
+          clientRoleType: ClientRoleType.ClientRoleBroadcaster,
+          publishMicrophoneTrack: true,
+          autoSubscribeAudio: true,
+        });
+
         setStatus("connected");
       } catch (e) {
-        console.error("Agora error:", e);
-        Alert.alert("Call Error", "Could not connect audio");
+        console.error("Agora init error:", e);
       }
     });
 
@@ -84,21 +106,28 @@ export default function ActiveCallScreen() {
     });
 
     socket.on("session_cancelled", () => {
-      setStatus("ended");
-      cleanupAndExit();
+      if (!endedRef.current) {
+        endedRef.current = true;
+        cleanupAndExit();
+      }
     });
 
     socket.on("session_ended", () => {
-      setStatus("ended");
-      cleanupAndExit();
+      if (!endedRef.current) {
+        endedRef.current = true;
+        cleanupAndExit();
+      }
     });
 
     socket.on("call_declined", () => {
-      Alert.alert("Call Declined", "The other party declined the call");
-      cleanupAndExit();
+      if (!endedRef.current) {
+        endedRef.current = true;
+        cleanupAndExit();
+      }
     });
 
     return () => {
+      appStateSub.remove();
       socket.off("session_started");
       socket.off("session_starting");
       socket.off("call_ready");
@@ -110,23 +139,30 @@ export default function ActiveCallScreen() {
   }, [sessionId, token]);
 
   const cleanupAndExit = async () => {
-    if (timerRef.current) clearInterval(timerRef.current);
-    if (engineRef.current) {
-      await engineRef.current.leaveChannel();
-      engineRef.current.removeAllListeners();
-      engineRef.current = null;
+    try {
+      if (engineRef.current) {
+        engineRef.current.leaveChannel();
+        engineRef.current.release();
+        engineRef.current = null;
+      }
+    } catch (e) {
+      console.error("Agora cleanup error:", e);
     }
-    setTimeout(() => router.back(), 1500);
+    setStatus("ended");
+    setTimeout(() => router.back(), 1000);
   };
 
   const handleEndCall = () => {
-    socket.emit("end_session", { sessionId });
-    cleanupAndExit();
+    if (!endedRef.current) {
+      endedRef.current = true;
+      socket.emit("end_session", { sessionId });
+      cleanupAndExit();
+    }
   };
 
   const toggleMute = async () => {
     if (engineRef.current) {
-      await engineRef.current.muteLocalAudioStream(!muted);
+      engineRef.current.muteLocalAudioStream(!muted);
       setMuted(!muted);
     }
   };
