@@ -300,7 +300,12 @@ export default function AstrologerDashboardPage() {
     socketRef.current.emit("join_session", { sessionId });
     setIncoming(null);
     const q = encodeURIComponent(userName);
-    router.push(`/astrologer/chat/${sessionId}?name=${q}`);
+    const isVoiceCall = (incoming as { type?: string }).type === "voice";
+    if (isVoiceCall) {
+      router.push(`/astrologer/call/${sessionId}?name=${q}`);
+    } else {
+      router.push(`/astrologer/chat/${sessionId}?name=${q}`);
+    }
   };
 
   const onDecline = () => {
