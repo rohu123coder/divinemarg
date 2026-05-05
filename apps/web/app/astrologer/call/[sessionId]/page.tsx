@@ -1,12 +1,15 @@
 "use client";
-import { useLocalSearchParams } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { io, type Socket } from "socket.io-client";
 import { getSocketApiBase } from "@/lib/socketBase";
 import { useAuthStore } from "@/lib/store";
 
-export default function AstrologerCallPage({ params }: { params: { sessionId: string } }) {
+export default function AstrologerCallPage({
+  params,
+}: {
+  params: { sessionId: string };
+}) {
   const { sessionId } = params;
   const searchParams = useSearchParams();
   const name = searchParams.get("name") ?? "User";
@@ -14,7 +17,8 @@ export default function AstrologerCallPage({ params }: { params: { sessionId: st
   const { token } = useAuthStore();
   const socketRef = useRef<Socket | null>(null);
   const [elapsed, setElapsed] = useState(0);
-  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const [status, setStatus] = useState<"connected" | "ended">("connected");
+  const endedRef = useRef(false);
 
   useEffect(() => {
     if (!token) return;
@@ -22,6 +26,9 @@ export default function AstrologerCallPage({ params }: { params: { sessionId: st
     const socket = io(getSocketApiBase(), {
       auth: { token },
       transports: ["websocket", "polling"],
+      reconnection: true,
+      reconnectionAttempts: 10,
+      reconnectionDelay: 1000,
     });
     socketRef.current = socket;
 
@@ -29,16 +36,28 @@ export default function AstrologerCallPage({ params }: { params: { sessionId: st
       socket.emit("join_session", { sessionId });
     });
 
+    socket.io.on("reconnect", () => {
+      socket.emit("join_session", { sessionId });
+    });
+
     socket.on("session_tick", (data: { elapsedSeconds: number }) => {
       setElapsed(data.elapsedSeconds);
     });
 
-    socket.on("session_ended", () => {
-      if (timerRef.current) clearInterval(timerRef.current);
-      router.push("/astrologer/dashboard");
-    });
+    const handleEnd = () => {
+      if (endedRef.current) return;
+      endedRef.current = true;
+      setStatus("ended");
+      setTimeout(() => router.push("/astrologer/dashboard"), 1500);
+    };
+
+    socket.on("session_ended", handleEnd);
+    socket.on("session_cancelled", handleEnd);
 
     return () => {
+      socket.off("session_ended");
+      socket.off("session_cancelled");
+      socket.off("session_tick");
       socket.disconnect();
     };
   }, [sessionId, token, router]);
@@ -50,8 +69,11 @@ export default function AstrologerCallPage({ params }: { params: { sessionId: st
   };
 
   const handleEndCall = () => {
+    if (endedRef.current) return;
+    endedRef.current = true;
     socketRef.current?.emit("end_session", { sessionId });
-    router.push("/astrologer/dashboard");
+    setStatus("ended");
+    setTimeout(() => router.push("/astrologer/dashboard"), 1000);
   };
 
   return (
@@ -60,6 +82,9 @@ export default function AstrologerCallPage({ params }: { params: { sessionId: st
         <p className="text-lg font-bold text-amber-400">Voice Call</p>
         <p className="text-xl font-semibold text-gray-200">{name}</p>
         <p className="font-mono text-gray-400">{formatTime(elapsed)}</p>
+        <p className={`text-sm font-semibold ${status === "ended" ? "text-red-400" : "text-emerald-400"}`}>
+          {status === "ended" ? "Call Ended" : "● Connected"}
+        </p>
       </div>
 
       <div className="flex h-40 w-40 items-center justify-center rounded-full bg-violet-600 text-6xl">
@@ -68,7 +93,8 @@ export default function AstrologerCallPage({ params }: { params: { sessionId: st
 
       <button
         onClick={handleEndCall}
-        className="flex h-16 w-16 items-center justify-center rounded-full bg-red-500 text-white shadow-lg"
+        disabled={status === "ended"}
+        className="flex h-16 w-16 items-center justify-center rounded-full bg-red-500 text-white shadow-lg disabled:opacity-50"
       >
         📵
       </button>
