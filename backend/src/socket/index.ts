@@ -1488,6 +1488,15 @@ export function registerSocketHandlers(io: Server): void {
         appId,
         pricePerMinute: Number(session.price_per_minute ?? 0),
       });
+      // Also emit to user's room so mobile receives call_ready
+      io.to(`user:${callerUserId}`).emit("call_ready", {
+        channelName,
+        token,
+        uid: callerUid,
+        appId,
+        callType,
+        pricePerMinute: Number(session.price_per_minute ?? 0),
+      });
       socket.emit("call_ready", {
         channelName,
         token,
