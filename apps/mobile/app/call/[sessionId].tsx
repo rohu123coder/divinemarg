@@ -61,28 +61,16 @@ export default function ActiveCallScreen() {
     socket.on("session_started", (data: { sessionId: string }) => {
       if (data.sessionId !== sessionId) return;
       setStatus("connected");
-      if (!callInitiatedRef.current) {
-        callInitiatedRef.current = true;
-        socket.emit("initiate_call", { sessionId, callType: "voice" });
-      }
     });
 
     socket.on("session_starting", (data: { sessionId: string }) => {
       if (data.sessionId !== sessionId) return;
       setStatus("connected");
-      if (!callInitiatedRef.current) {
-        callInitiatedRef.current = true;
-        socket.emit("initiate_call", { sessionId, callType: "voice" });
-      }
     });
 
     socket.on("session_tick", (data: { elapsedSeconds: number }) => {
       setElapsed(data.elapsedSeconds);
       setStatus("connected");
-      if (!callInitiatedRef.current) {
-        callInitiatedRef.current = true;
-        socket.emit("initiate_call", { sessionId, callType: "voice" });
-      }
     });
 
     socket.on("call_ready", async (data: {
