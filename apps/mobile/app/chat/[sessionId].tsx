@@ -169,14 +169,33 @@ export default function ChatScreen() {
       const charged = payload.totalCharged ?? payload.charge ?? 0;
       setSummary({ totalMinutes: minutes, totalCharged: charged });
     });
+    socket.on("call_ready", (data: {
+      channelName: string;
+      token: string;
+      uid: number;
+      appId: string;
+      callType?: string;
+    }) => {
+      router.push({
+        pathname: `/call/${sessionId}`,
+        params: {
+          channelName: data.channelName,
+          agoraToken: data.token,
+          uid: String(data.uid),
+          appId: data.appId,
+          name: astrologerName,
+        },
+      });
+    });
     return () => {
       socket.off("session_starting");
       socket.off("session_tick");
       socket.off("new_message");
       socket.off("session_ended");
+      socket.off("call_ready");
       disconnectSocket();
     };
-  }, [sessionId, token]);
+  }, [astrologerName, router, sessionId, token]);
 
   const send = () => {
     const msg = input.trim();
@@ -226,16 +245,8 @@ export default function ChatScreen() {
         {sessionStatus === "active" && (
           <View style={styles.callActions}>
             <Pressable
-              onPress={async () => {
-                try {
-                  socket.emit("initiate_call", { sessionId, callType: "voice" });
-                  router.push({
-                    pathname: `/call/${sessionId}`,
-                    params: { callType: "voice", name: astrologerName },
-                  });
-                } catch (e) {
-                  console.error("Call initiate failed:", e);
-                }
+              onPress={() => {
+                socket.emit("initiate_call", { sessionId, callType: "voice" });
               }}
             >
               <Ionicons name="call" size={22} color="#7C3AED" />
