@@ -99,6 +99,8 @@ export function AstrologerChatClient({ sessionId }: Props) {
   const [callUi, setCallUi] = useState<CallUiState | null>(null);
   const [callInitiated, setCallInitiated] = useState(false);
   const callInitiatedRef = useRef(false);
+  const autoInitiateDoneRef = useRef(false);
+  const autoCall = searchParams.get("autoCall") ?? searchParams.get("callType");
   const [waitlistNotice, setWaitlistNotice] = useState<WaitlistEntry | null>(null);
   const [waitlistQueue, setWaitlistQueue] = useState<WaitlistEntry[]>([]);
   const [waitlistCollapsed, setWaitlistCollapsed] = useState(true);
@@ -119,6 +121,7 @@ export function AstrologerChatClient({ sessionId }: Props) {
     setCallUi(null);
     setCallInitiated(false);
     callInitiatedRef.current = false;
+    autoInitiateDoneRef.current = false;
   }, [sessionId]);
 
   useEffect(() => {
@@ -466,6 +469,20 @@ export function AstrologerChatClient({ sessionId }: Props) {
     const s = totalSeconds % 60;
     return `${m}:${s.toString().padStart(2, "0")}`;
   }
+
+  useEffect(() => {
+    if (!mounted) return;
+    if (status !== "active") return;
+    if (autoInitiateDoneRef.current) return;
+    if (!autoCall) return;
+    if (autoCall === "voice" || autoCall === "video") {
+      autoInitiateDoneRef.current = true;
+      const t = setTimeout(() => {
+        initiateCall(autoCall as "voice" | "video");
+      }, 1000);
+      return () => clearTimeout(t);
+    }
+  }, [mounted, status, autoCall, initiateCall]);
 
   const statusBadge = useMemo(() => {
     const base =
