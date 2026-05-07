@@ -1,7 +1,7 @@
 import { Ionicons } from "@expo/vector-icons";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useEffect, useRef, useState } from "react";
-import { AppState, Pressable, StyleSheet, Text, View } from "react-native";
+import { Pressable, StyleSheet, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import {
   createAgoraRtcEngine,
@@ -12,115 +12,34 @@ import {
 import { connectSocket, socket } from "../../lib/socket";
 import { useAppStore } from "../../lib/store";
 
-const AGORA_APP_ID = "4fb8572dc9c2444aaebd591e33b2bde5";
-
 export default function ActiveCallScreen() {
-  const { sessionId, name } = useLocalSearchParams<{ sessionId: string; name?: string }>();
+  const { sessionId, name, channelName, agoraToken, uid, appId } =
+    useLocalSearchParams<{
+      sessionId: string;
+      name?: string;
+      channelName?: string;
+      agoraToken?: string;
+      uid?: string;
+      appId?: string;
+    }>();
   const router = useRouter();
   const token = useAppStore((state) => state.token);
 
-  const [status, setStatus] = useState<"calling" | "connected" | "ended">("calling");
+  const [status, setStatus] = useState<"connecting" | "connected" | "ended">("connecting");
   const [elapsed, setElapsed] = useState(0);
   const [muted, setMuted] = useState(false);
 
   const engineRef = useRef<IRtcEngine | null>(null);
   const endedRef = useRef(false);
-  const callInitiatedRef = useRef(false);
-
-  const cleanupAgora = async () => {
-    try {
-      if (engineRef.current) {
-        engineRef.current.leaveChannel();
-        engineRef.current.release();
-        engineRef.current = null;
-      }
-    } catch (e) {
-      console.error("Agora cleanup:", e);
-    }
-  };
-
-  const cleanupAndExit = async () => {
-    await cleanupAgora();
-    setStatus("ended");
-    setTimeout(() => router.back(), 1000);
-  };
 
   useEffect(() => {
     if (!token || !sessionId) return;
-
     connectSocket(token);
     socket.emit("join_session", { sessionId });
-
-    const appStateSub = AppState.addEventListener("change", (nextState) => {
-      if (nextState === "active") {
-        connectSocket(token);
-        socket.emit("join_session", { sessionId });
-      }
-    });
-
-    socket.on("session_started", (data: { sessionId: string }) => {
-      if (data.sessionId !== sessionId) return;
-      setStatus("connected");
-    });
-
-    socket.on("session_starting", (data: { sessionId: string }) => {
-      if (data.sessionId !== sessionId) return;
-      setStatus("connected");
-    });
 
     socket.on("session_tick", (data: { elapsedSeconds: number }) => {
       setElapsed(data.elapsedSeconds);
       setStatus("connected");
-    });
-
-    socket.on("call_ready", async (data: {
-      channelName: string;
-      token: string;
-      uid: number;
-      appId: string;
-    }) => {
-      try {
-        const engine = createAgoraRtcEngine();
-        engineRef.current = engine;
-
-        engine.initialize({
-          appId: AGORA_APP_ID,
-          channelProfile: ChannelProfileType.ChannelProfileCommunication,
-        });
-
-        engine.enableAudio();
-        engine.disableVideo();
-        engine.setClientRole(ClientRoleType.ClientRoleBroadcaster);
-
-        engine.addListener("onUserJoined", () => {
-          setStatus("connected");
-        });
-
-        engine.addListener("onError", (err) => {
-          console.error("Agora error:", err);
-        });
-
-        await engine.joinChannel(data.token, data.channelName, data.uid, {
-          clientRoleType: ClientRoleType.ClientRoleBroadcaster,
-          publishMicrophoneTrack: true,
-          autoSubscribeAudio: true,
-        });
-
-        setStatus("connected");
-      } catch (e) {
-        console.error("Agora init error:", e);
-      }
-    });
-
-    socket.on("call_declined", () => {
-      callInitiatedRef.current = false;
-    });
-
-    socket.on("session_cancelled", () => {
-      if (!endedRef.current) {
-        endedRef.current = true;
-        cleanupAndExit();
-      }
     });
 
     socket.on("session_ended", () => {
@@ -130,17 +49,72 @@ export default function ActiveCallScreen() {
       }
     });
 
+    socket.on("session_cancelled", () => {
+      if (!endedRef.current) {
+        endedRef.current = true;
+        cleanupAndExit();
+      }
+    });
+
+    // Join Agora if params available
+    if (channelName && agoraToken && uid && appId) {
+      joinAgora();
+    }
+
     return () => {
-      appStateSub.remove();
-      socket.off("session_started");
-      socket.off("session_starting");
       socket.off("session_tick");
-      socket.off("call_ready");
-      socket.off("call_declined");
-      socket.off("session_cancelled");
       socket.off("session_ended");
+      socket.off("session_cancelled");
     };
   }, [sessionId, token]);
+
+  const joinAgora = async () => {
+    try {
+      const engine = createAgoraRtcEngine();
+      engineRef.current = engine;
+
+      engine.initialize({
+        appId: appId ?? "4fb8572dc9c2444aaebd591e33b2bde5",
+        channelProfile: ChannelProfileType.ChannelProfileCommunication,
+      });
+
+      engine.enableAudio();
+      engine.disableVideo();
+      engine.setClientRole(ClientRoleType.ClientRoleBroadcaster);
+
+      engine.addListener("onUserJoined", () => {
+        setStatus("connected");
+      });
+
+      engine.addListener("onError", (err) => {
+        console.error("Agora error:", err);
+      });
+
+      await engine.joinChannel(agoraToken!, channelName!, parseInt(uid!), {
+        clientRoleType: ClientRoleType.ClientRoleBroadcaster,
+        publishMicrophoneTrack: true,
+        autoSubscribeAudio: true,
+      });
+
+      setStatus("connected");
+    } catch (e) {
+      console.error("Agora join error:", e);
+    }
+  };
+
+  const cleanupAndExit = async () => {
+    try {
+      if (engineRef.current) {
+        engineRef.current.leaveChannel();
+        engineRef.current.release();
+        engineRef.current = null;
+      }
+    } catch (e) {
+      console.error("Agora cleanup:", e);
+    }
+    setStatus("ended");
+    setTimeout(() => router.back(), 1000);
+  };
 
   const handleEndCall = () => {
     if (endedRef.current) return;
@@ -166,7 +140,7 @@ export default function ActiveCallScreen() {
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
         <Text style={styles.statusTxt}>
-          {status === "calling" ? "Calling..." : status === "connected" ? "Connected" : "Call Ended"}
+          {status === "connecting" ? "Connecting..." : status === "connected" ? "Connected" : "Call Ended"}
         </Text>
         <Text style={styles.nameTxt}>{name ?? "Astrologer"}</Text>
         {status === "connected" && (
@@ -232,9 +206,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  controlBtnActive: {
-    backgroundColor: "#7C3AED",
-  },
+  controlBtnActive: { backgroundColor: "#7C3AED" },
   endCallBtn: {
     width: 68,
     height: 68,
