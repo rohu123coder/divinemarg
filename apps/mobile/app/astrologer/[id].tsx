@@ -75,12 +75,10 @@ export default function AstrologerProfileScreen() {
         return;
       }
       router.push({
-        pathname: `/call/${sessionId}`,
-        params: {
-          callType: "voice",
-          name: astro.name,
-          photo: astro.profile_photo ?? "",
-        },
+      pathname: `/chat/${sessionId}`,
+      params: {
+        name: astro.name,
+      },
       });
     } catch (e: any) {
       console.error("Call request error:", JSON.stringify(e?.response?.data ?? e?.message));
