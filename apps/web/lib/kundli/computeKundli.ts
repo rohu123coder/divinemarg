@@ -17,13 +17,6 @@ import {
   rashiFromIndex,
   signLordPlanetKey,
 } from "./ephemerisUtils";
-import * as solar from "astronomia/solar";
-import * as moonposition from "astronomia/moonposition";
-import * as planetposition from "astronomia/planetposition";
-import * as sidereal from "astronomia/sidereal";
-import * as coord from "astronomia/coord";
-import * as deltat from "astronomia/deltat";
-import * as base from "astronomia/base";
 
 const JD_UNIX_EPOCH = 2440587.5;
 const J2000 = 2451545.0;
@@ -180,42 +173,12 @@ function ayanamsaLahiri(jd: number): number {
   return 23.85 + (50.27 / 3600.0) * (jd - 2396758.0) / 365.25;
 }
 
-// Convert JD to Julian Date in astronomia format (jde)
-function toJDE(jd: number): number {
-  // delta T correction (approximate)
-  const year = 2000 + (jd - J2000) / 365.25;
-  let dt = 0;
-  if (year >= 2000 && year <= 2030) {
-    dt = 64.184 + 0.37 * (year - 2000);
-  } else {
-    dt = 64.184;
-  }
-  return jd + dt / 86400;
-}
-
-// Accurate Sun longitude using astronomia
 function accurateSun(jd: number): number {
-  try {
-    const jde = toJDE(jd);
-    console.log("[KUNDLI DEBUG] jde:", jde, "J2000Century:", base.J2000Century(jde));
-    const lon = solar.apparentLongitude(base.J2000Century(jde));
-    const tropical = normalizeLon((lon * 180) / Math.PI);
-    return normalizeLon(tropical - ayanamsaLahiri(jd));
-  } catch {
-    return siderealSunFallback(jd);
-  }
+  return siderealSunFallback(jd);
 }
 
-// Accurate Moon longitude using astronomia
 function accurateMoon(jd: number): number {
-  try {
-    const jde = toJDE(jd);
-    const pos = moonposition.position(jde);
-    const tropical = normalizeLon((pos.lon * 180) / Math.PI);
-    return normalizeLon(tropical - ayanamsaLahiri(jd));
-  } catch {
-    return siderealMoonFallback(jd);
-  }
+  return siderealMoonFallback(jd);
 }
 
 // Fallback calculations (original simplified formulas)
