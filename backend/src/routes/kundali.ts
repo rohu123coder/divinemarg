@@ -1,5 +1,8 @@
 import express from "express";
+import { createRequire } from "module";
 import path from "path";
+
+const require = createRequire(import.meta.url);
 
 const router = express.Router();
 
