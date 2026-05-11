@@ -76,10 +76,19 @@ function getPlanetLon(jd: number, planet: number): number {
 }
 
 function getAscendant(jd: number, lat: number, lon: number): number {
-  swisseph.swe_set_sid_mode(SE_SIDM_LAHIRI, 0, 0);
-  const houses = swisseph.swe_houses_ex(jd, SEFLG_SIDEREAL, lat, lon, "W");
+  // Use tropical houses then convert to sidereal manually
+  const houses = swisseph.swe_houses(jd, lat, lon, "P");
   if (houses.error) throw new Error(houses.error);
-  return houses.ascendant;
+  
+  // Get ayanamsa
+  swisseph.swe_set_sid_mode(SE_SIDM_LAHIRI, 0, 0);
+  const ayanamsa = swisseph.swe_get_ayanamsa_ut(jd);
+  
+  // Convert tropical ascendant to sidereal
+  let siderealAsc = houses.ascendant - ayanamsa;
+  if (siderealAsc < 0) siderealAsc += 360;
+  if (siderealAsc >= 360) siderealAsc -= 360;
+  return siderealAsc;
 }
 
 function rashiFromLon(lon: number): number {
