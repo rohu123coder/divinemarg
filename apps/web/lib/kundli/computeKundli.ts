@@ -197,6 +197,7 @@ function toJDE(jd: number): number {
 function accurateSun(jd: number): number {
   try {
     const jde = toJDE(jd);
+    console.log("[KUNDLI DEBUG] jde:", jde, "J2000Century:", base.J2000Century(jde));
     const lon = solar.apparentLongitude(base.J2000Century(jde));
     const tropical = normalizeLon((lon * 180) / Math.PI);
     return normalizeLon(tropical - ayanamsaLahiri(jd));
