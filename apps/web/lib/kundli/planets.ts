@@ -55,44 +55,62 @@ export function moonLongitude(jd: number): number {
   const T2 = T * T;
   const T3 = T2 * T;
   const T4 = T3 * T;
-
-  let L = 218.3164477 + 481267.88123421 * T - 0.0015786 * T2 + T3 / 538841 - T4 / 65194000;
-  let D = 297.8501921 + 445267.1114034 * T - 0.0018819 * T2 + T3 / 545868 - T4 / 113065000;
-  let M = 357.5291092 + 35999.0502909 * T - 0.0001536 * T2 + T3 / 24490000;
-  let Mp = 134.9633964 + 477198.8675055 * T + 0.0087414 * T2 + T3 / 69699 - T4 / 14712000;
-  let F = 93.2720950 + 483202.0175233 * T - 0.0036539 * T2 - T3 / 3526000 + T4 / 863310000;
-
   const norm = (x: number) => ((x % 360) + 360) % 360;
-  L = norm(L); D = norm(D); M = norm(M); Mp = norm(Mp); F = norm(F);
-
   const toR = (x: number) => (x * Math.PI) / 180;
+
+  // Mean longitude - keep full precision, normalize at end
+  const L = 218.3164477 + 481267.88123421 * T
+    - 0.0015786 * T2 + T3 / 538841 - T4 / 65194000;
+
+  // Mean elongation
+  const D = norm(297.8501921 + 445267.1114034 * T
+    - 0.0018819 * T2 + T3 / 545868 - T4 / 113065000);
+
+  // Sun mean anomaly
+  const M = norm(357.5291092 + 35999.0502909 * T
+    - 0.0001536 * T2 + T3 / 24490000);
+
+  // Moon mean anomaly
+  const Mp = norm(134.9633964 + 477198.8675055 * T
+    + 0.0087414 * T2 + T3 / 69699 - T4 / 14712000);
+
+  // Moon argument of latitude
+  const F = norm(93.2720950 + 483202.0175233 * T
+    - 0.0036539 * T2 - T3 / 3526000 + T4 / 863310000);
+
   const Dr = toR(D), Mr = toR(M), Mpr = toR(Mp), Fr = toR(F);
+  const E = 1 - 0.002516 * T - 0.0000074 * T2;
 
   let sumL = 0;
   sumL += 6288774 * Math.sin(Mpr);
   sumL += 1274027 * Math.sin(2*Dr - Mpr);
   sumL += 658314 * Math.sin(2*Dr);
   sumL += 213618 * Math.sin(2*Mpr);
-  sumL -= 185116 * Math.sin(Mr);
+  sumL -= 185116 * E * Math.sin(Mr);
   sumL -= 114332 * Math.sin(2*Fr);
   sumL += 58793 * Math.sin(2*Dr - 2*Mpr);
-  sumL += 57066 * Math.sin(2*Dr - Mr - Mpr);
+  sumL += 57066 * E * Math.sin(2*Dr - Mr - Mpr);
   sumL += 53322 * Math.sin(2*Dr + Mpr);
-  sumL += 45758 * Math.sin(2*Dr - Mr);
-  sumL -= 40923 * Math.sin(Mr - Mpr);
+  sumL += 45758 * E * Math.sin(2*Dr - Mr);
+  sumL -= 40923 * E * Math.sin(Mr - Mpr);
   sumL -= 34720 * Math.sin(Dr);
-  sumL -= 30383 * Math.sin(Mr + Mpr);
+  sumL -= 30383 * E * Math.sin(Mr + Mpr);
   sumL += 15327 * Math.sin(2*Dr - 2*Fr);
   sumL -= 12528 * Math.sin(Mpr + 2*Fr);
   sumL += 10980 * Math.sin(Mpr - 2*Fr);
   sumL += 10675 * Math.sin(4*Dr - Mpr);
   sumL += 10034 * Math.sin(3*Mpr);
   sumL += 8548 * Math.sin(4*Dr - 2*Mpr);
-  sumL -= 7888 * Math.sin(2*Dr + Mr - Mpr);
-  sumL -= 6766 * Math.sin(2*Dr + Mr);
+  sumL -= 7888 * E * Math.sin(2*Dr + Mr - Mpr);
+  sumL -= 6766 * E * Math.sin(2*Dr + Mr);
   sumL -= 5163 * Math.sin(Dr - Mpr);
+  sumL += 4987 * E * Math.sin(Dr + Mr);
+  sumL += 4036 * E * Math.sin(2*Dr - Mr + Mpr);
+  sumL += 3994 * Math.sin(2*Dr + 2*Mpr);
+  sumL += 3861 * Math.sin(4*Dr);
+  sumL += 3665 * Math.sin(2*Dr - 3*Mpr);
 
-  // sumL is in units of 0.000001 degrees
+  // sumL in units of 0.000001 degrees
   const moonLon = norm(L + sumL / 1000000);
   return norm(moonLon - lahiriAyanamsa(jd));
 }
