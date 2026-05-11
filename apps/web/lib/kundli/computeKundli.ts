@@ -167,13 +167,10 @@ function utcHourFractionFromJd(jd: number): number {
   );
 }
 
-/** Lahiri ayanamsa (simplified), using UTC calendar month/year at JD. */
 function ayanamsaSimplified(jd: number): number {
-  const ms = (jd - JD_UNIX_EPOCH) * 86400000;
-  const d = new Date(ms);
-  const year = d.getUTCFullYear();
-  const month = d.getUTCMonth() + 1;
-  return 23.85 + (year - 1900) * 0.013611 + (month - 1) * 0.001134;
+  // Lahiri ayanamsa - more accurate formula
+  const T = (jd - J2000) / 36525.0;
+  return 23.85 + 50.27 / 3600.0 * (jd - 2396758.0) / 365.25;
 }
 
 function julianDayUTFromBirth(
@@ -485,7 +482,6 @@ function conjunctionException(
   return sameHouse(marsLon, jupiterLon, asc);
 }
 
-/** Sidereal ascendant: LMST-based when birth time known; else Sun longitude. */
 function computeSiderealAscendant(
   birthJd: number,
   input: KundliInput,
@@ -495,15 +491,38 @@ function computeSiderealAscendant(
   if (approximate) {
     return sunSidereal;
   }
-  const T = (birthJd - J2000) / 36525;
-  const ut = utcHourFractionFromJd(birthJd);
-  let LMST = 100.4606184 + 36000.77004 * T + input.lng / 15 + ut;
-  LMST = normalizeLon(LMST);
-  const obliquity = 23.44;
-  const ascDeg = normalizeLon(
-    LMST + obliquity * Math.sin((LMST * Math.PI) / 180)
-  );
-  return normalizeLon(ascDeg - ayanamsaSimplified(birthJd));
+
+  // Step 1: Greenwich Mean Sidereal Time (GMST) in degrees
+  const T = (birthJd - J2000) / 36525.0;
+  const T2 = T * T;
+  const T3 = T2 * T;
+
+  // GMST at 0h UT
+  let GMST0 = 100.4606184 + 36000.770053608 * T + 0.000387933 * T2 - T3 / 38710000.0;
+  GMST0 = normalizeLon(GMST0);
+
+  // Add rotation for current UT time
+  const utHours = utcHourFractionFromJd(birthJd);
+  const GMST = normalizeLon(GMST0 + 360.98564724 * (utHours / 24.0));
+
+  // Step 2: Local Sidereal Time (LST) in degrees
+  const LST = normalizeLon(GMST + input.lng);
+
+  // Step 3: Tropical Ascendant using standard formula
+  // tan(ASC) = -cos(LST) / (sin(LST) * cos(obliquity) + tan(lat) * sin(obliquity))
+  const obliquity = 23.4392911 - 0.013004167 * T; // degrees
+  const oblRad = (obliquity * Math.PI) / 180.0;
+  const lstRad = (LST * Math.PI) / 180.0;
+  const latRad = (input.lat * Math.PI) / 180.0;
+
+  const y = -Math.cos(lstRad);
+  const x = Math.sin(lstRad) * Math.cos(oblRad) + Math.tan(latRad) * Math.sin(oblRad);
+
+  let tropAsc = (Math.atan2(y, x) * 180.0) / Math.PI;
+  tropAsc = normalizeLon(tropAsc);
+
+  // Step 4: Convert to sidereal using Lahiri ayanamsa
+  return normalizeLon(tropAsc - ayanamsaSimplified(birthJd));
 }
 
 export function computeKundli(input: KundliInput) {
