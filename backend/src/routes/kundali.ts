@@ -69,10 +69,9 @@ function dateToJD(year: number, month: number, day: number, hour: number, minute
 }
 
 function getPlanetLon(jd: number, planet: number): number {
-  swisseph.swe_set_sid_mode(SE_SIDM_LAHIRI, 0, 0);
   const result = swisseph.swe_calc_ut(jd, planet, SEFLG_SIDEREAL | SEFLG_SPEED);
   if (result.error) throw new Error(result.error);
-  return result.longitude;
+  return ((result.longitude % 360) + 360) % 360;
 }
 
 function getAscendant(jd: number, lat: number, lon: number): number {
@@ -109,6 +108,9 @@ function nakshatraFromLon(lon: number): { name: string; lord: string; pada: numb
 
 router.post("/calculate", async (req, res) => {
   try {
+    // Set sidereal mode ONCE before all calculations
+    swisseph.swe_set_sid_mode(SE_SIDM_LAHIRI, 0, 0);
+
     if (!swisseph) {
       return res.status(500).json({ error: "Swiss Ephemeris not available" });
     }
