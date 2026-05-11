@@ -11,11 +11,12 @@ function toRad(deg: number): number {
   return (deg * Math.PI) / 180;
 }
 
-// Lahiri Ayanamsa - official Indian government standard
 export function lahiriAyanamsa(jd: number): number {
-  const T = (jd - J2000) / 36525.0;
-  // Accurate Lahiri formula
-  return 23.85045 + (50.27972 / 3600) * (jd - 2396758.203) / 365.25;
+  // Lahiri ayanamsa - correct formula
+  // Value at J2000 (Jan 1.5, 2000) = 23.85 degrees
+  // Annual precession = 50.27 arcseconds = 0.013964 degrees/year
+  const T = (jd - 2451545.0) / 365.25;
+  return 23.85 + 0.013964 * T;
 }
 
 // Accurate Sun longitude using full VSOP87 series
