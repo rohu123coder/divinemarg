@@ -17,6 +17,13 @@ import {
   rashiFromIndex,
   signLordPlanetKey,
 } from "./ephemerisUtils";
+import * as solar from "astronomia/solar";
+import * as moonposition from "astronomia/moonposition";
+import * as planetposition from "astronomia/planetposition";
+import * as sidereal from "astronomia/sidereal";
+import * as coord from "astronomia/coord";
+import * as deltat from "astronomia/deltat";
+import * as base from "astronomia/base";
 
 const JD_UNIX_EPOCH = 2440587.5;
 const J2000 = 2451545.0;
@@ -167,11 +174,177 @@ function utcHourFractionFromJd(jd: number): number {
   );
 }
 
-function ayanamsaSimplified(jd: number): number {
-  // Lahiri ayanamsa - more accurate formula
+// Lahiri ayanamsa - accurate formula
+function ayanamsaLahiri(jd: number): number {
   const T = (jd - J2000) / 36525.0;
-  return 23.85 + 50.27 / 3600.0 * (jd - 2396758.0) / 365.25;
+  return 23.85 + (50.27 / 3600.0) * (jd - 2396758.0) / 365.25;
 }
+
+// Convert JD to Julian Date in astronomia format (jde)
+function toJDE(jd: number): number {
+  // delta T correction (approximate)
+  const year = 2000 + (jd - J2000) / 365.25;
+  let dt = 0;
+  if (year >= 2000 && year <= 2030) {
+    dt = 64.184 + 0.37 * (year - 2000);
+  } else {
+    dt = 64.184;
+  }
+  return jd + dt / 86400;
+}
+
+// Accurate Sun longitude using astronomia
+function accurateSun(jd: number): number {
+  try {
+    const jde = toJDE(jd);
+    const lon = solar.apparentLongitude(base.J2000Century(jde));
+    const tropical = normalizeLon((lon * 180) / Math.PI);
+    return normalizeLon(tropical - ayanamsaLahiri(jd));
+  } catch {
+    return siderealSunFallback(jd);
+  }
+}
+
+// Accurate Moon longitude using astronomia
+function accurateMoon(jd: number): number {
+  try {
+    const jde = toJDE(jd);
+    const pos = moonposition.position(jde);
+    const tropical = normalizeLon((pos.lon * 180) / Math.PI);
+    return normalizeLon(tropical - ayanamsaLahiri(jd));
+  } catch {
+    return siderealMoonFallback(jd);
+  }
+}
+
+// Fallback calculations (original simplified formulas)
+function siderealSunFallback(jd: number): number {
+  const D = jd - J2000;
+  const L = 280.46 + 0.9856474 * D;
+  const gDeg = 357.528 + 0.9856003 * D;
+  const g = (gDeg * Math.PI) / 180;
+  const tropical = normalizeLon(
+    L + 1.915 * Math.sin(g) + 0.02 * Math.sin(2 * g)
+  );
+  return normalizeLon(tropical - ayanamsaLahiri(jd));
+}
+
+function siderealMoonFallback(jd: number): number {
+  const D = jd - J2000;
+  const L0 = 218.316 + 13.176396 * D;
+  const M = 134.963 + 13.064993 * D;
+  const tropical = normalizeLon(L0 + 6.289 * Math.sin((M * Math.PI) / 180));
+  return normalizeLon(tropical - ayanamsaLahiri(jd));
+}
+
+function siderealFromTropical(jd: number, tropical: number): number {
+  return normalizeLon(tropical - ayanamsaLahiri(jd));
+}
+
+function tropicalMean(jd: number, L0: number, coeff: number): number {
+  const D = jd - J2000;
+  return L0 + coeff * D;
+}
+
+function siderealMercury(jd: number): number {
+  return siderealFromTropical(jd, tropicalMean(jd, 252.251, 4.092338));
+}
+
+function siderealVenus(jd: number): number {
+  return siderealFromTropical(jd, tropicalMean(jd, 181.98, 1.602136));
+}
+
+function siderealMars(jd: number): number {
+  return siderealFromTropical(jd, tropicalMean(jd, 355.433, 0.524033));
+}
+
+function siderealJupiter(jd: number): number {
+  return siderealFromTropical(jd, tropicalMean(jd, 34.351, 0.083056));
+}
+
+function siderealSaturn(jd: number): number {
+  return siderealFromTropical(jd, tropicalMean(jd, 50.077, 0.033459));
+}
+
+function siderealRahu(jd: number): number {
+  const D = jd - J2000;
+  const L = 125.044 - 0.052954 * D;
+  return siderealFromTropical(jd, L);
+}
+
+function siderealKetu(jd: number): number {
+  return normalizeLon(siderealRahu(jd) + 180);
+}
+
+// Accurate ascendant calculation
+function computeAccurateAscendant(
+  birthJd: number,
+  lat: number,
+  lng: number,
+  approximate: boolean,
+  sunSidereal: number
+): number {
+  if (approximate) return sunSidereal;
+
+  try {
+    const T = (birthJd - J2000) / 36525.0;
+    const T2 = T * T;
+    const T3 = T2 * T;
+
+    // GMST in degrees
+    let GMST0 =
+      100.4606184 +
+      36000.770053608 * T +
+      0.000387933 * T2 -
+      T3 / 38710000.0;
+    GMST0 = normalizeLon(GMST0);
+    const utHours = utcHourFractionFromJd(birthJd);
+    const GMST = normalizeLon(GMST0 + 360.98564724 * (utHours / 24.0));
+    const LST = normalizeLon(GMST + lng);
+
+    // Obliquity
+    const obliquity = 23.4392911 - 0.013004167 * T;
+    const oblRad = (obliquity * Math.PI) / 180.0;
+    const lstRad = (LST * Math.PI) / 180.0;
+    const latRad = (lat * Math.PI) / 180.0;
+
+    const y = -Math.cos(lstRad);
+    const x =
+      Math.sin(lstRad) * Math.cos(oblRad) +
+      Math.tan(latRad) * Math.sin(oblRad);
+    let tropAsc = (Math.atan2(y, x) * 180.0) / Math.PI;
+    tropAsc = normalizeLon(tropAsc);
+
+    return normalizeLon(tropAsc - ayanamsaLahiri(birthJd));
+  } catch {
+    return sunSidereal;
+  }
+}
+
+function centralLongitudeSpeed(
+  jd: number,
+  siderealLon: (j: number) => number
+): number {
+  const e = 0.01;
+  const a = siderealLon(jd - e);
+  const b = siderealLon(jd + e);
+  let diff = normalizeLon(b - a);
+  if (diff > 180) diff -= 360;
+  if (diff < -180) diff += 360;
+  return diff / (2 * e);
+}
+
+const SIDEREAL_GETTERS: Record<PlanetKey, (jd: number) => number> = {
+  Sun: accurateSun,
+  Moon: accurateMoon,
+  Mars: siderealMars,
+  Mercury: siderealMercury,
+  Jupiter: siderealJupiter,
+  Venus: siderealVenus,
+  Saturn: siderealSaturn,
+  Rahu: siderealRahu,
+  Ketu: siderealKetu,
+};
 
 function julianDayUTFromBirth(
   input: KundliInput,
@@ -302,93 +475,6 @@ function vimshottariStateSimple(
   };
 }
 
-function tropicalSun(jd: number): number {
-  const D = jd - J2000;
-  const L = 280.46 + 0.9856474 * D;
-  const gDeg = 357.528 + 0.9856003 * D;
-  const g = (gDeg * Math.PI) / 180;
-  return L + 1.915 * Math.sin(g) + 0.02 * Math.sin(2 * g);
-}
-
-function tropicalMoon(jd: number): number {
-  const D = jd - J2000;
-  const L0 = 218.316 + 13.176396 * D;
-  const M = 134.963 + 13.064993 * D;
-  return L0 + 6.289 * Math.sin((M * Math.PI) / 180);
-}
-
-function tropicalMean(jd: number, L0: number, coeff: number): number {
-  const D = jd - J2000;
-  return L0 + coeff * D;
-}
-
-function siderealFromTropical(jd: number, tropical: number): number {
-  return normalizeLon(tropical - ayanamsaSimplified(jd));
-}
-
-function siderealSun(jd: number): number {
-  return siderealFromTropical(jd, tropicalSun(jd));
-}
-
-function siderealMoon(jd: number): number {
-  return siderealFromTropical(jd, tropicalMoon(jd));
-}
-
-function siderealMercury(jd: number): number {
-  return siderealFromTropical(jd, tropicalMean(jd, 252.251, 4.092338));
-}
-
-function siderealVenus(jd: number): number {
-  return siderealFromTropical(jd, tropicalMean(jd, 181.98, 1.602136));
-}
-
-function siderealMars(jd: number): number {
-  return siderealFromTropical(jd, tropicalMean(jd, 355.433, 0.524033));
-}
-
-function siderealJupiter(jd: number): number {
-  return siderealFromTropical(jd, tropicalMean(jd, 34.351, 0.083056));
-}
-
-function siderealSaturn(jd: number): number {
-  return siderealFromTropical(jd, tropicalMean(jd, 50.077, 0.033459));
-}
-
-function siderealRahu(jd: number): number {
-  const D = jd - J2000;
-  const L = 125.044 - 0.052954 * D;
-  return siderealFromTropical(jd, L);
-}
-
-function siderealKetu(jd: number): number {
-  return normalizeLon(siderealRahu(jd) + 180);
-}
-
-const SIDEREAL_GETTERS: Record<PlanetKey, (jd: number) => number> = {
-  Sun: siderealSun,
-  Moon: siderealMoon,
-  Mars: siderealMars,
-  Mercury: siderealMercury,
-  Jupiter: siderealJupiter,
-  Venus: siderealVenus,
-  Saturn: siderealSaturn,
-  Rahu: siderealRahu,
-  Ketu: siderealKetu,
-};
-
-function centralLongitudeSpeed(
-  jd: number,
-  siderealLon: (j: number) => number
-): number {
-  const e = 0.01;
-  const a = siderealLon(jd - e);
-  const b = siderealLon(jd + e);
-  let diff = normalizeLon(b - a);
-  if (diff > 180) diff -= 360;
-  if (diff < -180) diff += 360;
-  return diff / (2 * e);
-}
-
 function saturnLongitude(jd: number): number {
   return siderealSaturn(jd);
 }
@@ -482,49 +568,6 @@ function conjunctionException(
   return sameHouse(marsLon, jupiterLon, asc);
 }
 
-function computeSiderealAscendant(
-  birthJd: number,
-  input: KundliInput,
-  approximate: boolean,
-  sunSidereal: number
-): number {
-  if (approximate) {
-    return sunSidereal;
-  }
-
-  // Step 1: Greenwich Mean Sidereal Time (GMST) in degrees
-  const T = (birthJd - J2000) / 36525.0;
-  const T2 = T * T;
-  const T3 = T2 * T;
-
-  // GMST at 0h UT
-  let GMST0 = 100.4606184 + 36000.770053608 * T + 0.000387933 * T2 - T3 / 38710000.0;
-  GMST0 = normalizeLon(GMST0);
-
-  // Add rotation for current UT time
-  const utHours = utcHourFractionFromJd(birthJd);
-  const GMST = normalizeLon(GMST0 + 360.98564724 * (utHours / 24.0));
-
-  // Step 2: Local Sidereal Time (LST) in degrees
-  const LST = normalizeLon(GMST + input.lng);
-
-  // Step 3: Tropical Ascendant using standard formula
-  // tan(ASC) = -cos(LST) / (sin(LST) * cos(obliquity) + tan(lat) * sin(obliquity))
-  const obliquity = 23.4392911 - 0.013004167 * T; // degrees
-  const oblRad = (obliquity * Math.PI) / 180.0;
-  const lstRad = (LST * Math.PI) / 180.0;
-  const latRad = (input.lat * Math.PI) / 180.0;
-
-  const y = -Math.cos(lstRad);
-  const x = Math.sin(lstRad) * Math.cos(oblRad) + Math.tan(latRad) * Math.sin(oblRad);
-
-  let tropAsc = (Math.atan2(y, x) * 180.0) / Math.PI;
-  tropAsc = normalizeLon(tropAsc);
-
-  // Step 4: Convert to sidereal using Lahiri ayanamsa
-  return normalizeLon(tropAsc - ayanamsaSimplified(birthJd));
-}
-
 export function computeKundli(input: KundliInput) {
   const utcOffset = resolveUtcOffset(input);
   const merged: KundliInput = { ...input, utcOffset };
@@ -555,9 +598,10 @@ export function computeKundli(input: KundliInput) {
     };
   }
 
-  const ascDeg = computeSiderealAscendant(
+  const ascDeg = computeAccurateAscendant(
     birthJd,
-    merged,
+    merged.lat,
+    merged.lng,
     approximate,
     raw["Sun"].longitude
   );
