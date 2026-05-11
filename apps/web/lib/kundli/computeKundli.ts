@@ -17,6 +17,18 @@ import {
   rashiFromIndex,
   signLordPlanetKey,
 } from "./ephemerisUtils";
+import {
+  sunLongitude,
+  moonLongitude,
+  mercuryLongitude,
+  venusLongitude,
+  marsLongitude,
+  jupiterLongitude,
+  saturnLongitude,
+  rahuLongitude,
+  ketuLongitude,
+  ascendantLongitude,
+} from "./planets";
 
 const JD_UNIX_EPOCH = 2440587.5;
 const J2000 = 2451545.0;
@@ -299,15 +311,15 @@ function centralLongitudeSpeed(
 }
 
 const SIDEREAL_GETTERS: Record<PlanetKey, (jd: number) => number> = {
-  Sun: accurateSun,
-  Moon: accurateMoon,
-  Mars: siderealMars,
-  Mercury: siderealMercury,
-  Jupiter: siderealJupiter,
-  Venus: siderealVenus,
-  Saturn: siderealSaturn,
-  Rahu: siderealRahu,
-  Ketu: siderealKetu,
+  Sun: sunLongitude,
+  Moon: moonLongitude,
+  Mars: marsLongitude,
+  Mercury: mercuryLongitude,
+  Jupiter: jupiterLongitude,
+  Venus: venusLongitude,
+  Saturn: saturnLongitude,
+  Rahu: rahuLongitude,
+  Ketu: ketuLongitude,
 };
 
 function julianDayUTFromBirth(
@@ -439,10 +451,6 @@ function vimshottariStateSimple(
   };
 }
 
-function saturnLongitude(jd: number): number {
-  return siderealSaturn(jd);
-}
-
 function sadeSatiInfo(
   natalMoonRashi: number,
   nowJd: number
@@ -562,7 +570,7 @@ export function computeKundli(input: KundliInput) {
     };
   }
 
-  const ascDeg = computeAccurateAscendant(
+  const ascDeg = ascendantLongitude(
     birthJd,
     merged.lat,
     merged.lng,
