@@ -6,11 +6,22 @@ const router = express.Router();
 let swisseph: any = null;
 try {
   swisseph = require("swisseph");
-  // Set ephemeris path
-  const ephePath = path.join(process.cwd(), "ephe");
-  swisseph.swe_set_ephe_path(ephePath);
+  // Try multiple ephe paths
+  const paths = [
+    path.join(process.cwd(), "ephe"),
+    path.join(process.cwd(), "node_modules/swisseph/ephe"),
+    path.join(__dirname, "../../node_modules/swisseph/ephe"),
+    "/app/node_modules/swisseph/ephe",
+  ];
+  for (const p of paths) {
+    try {
+      swisseph.swe_set_ephe_path(p);
+      break;
+    } catch {}
+  }
+  console.log("[Kundali] swisseph loaded successfully");
 } catch (e) {
-  console.error("swisseph not available:", e);
+  console.error("[Kundali] swisseph load error:", e);
 }
 
 const SE_SUN = 0;
