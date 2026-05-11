@@ -69,9 +69,19 @@ function dateToJD(year: number, month: number, day: number, hour: number, minute
 }
 
 function getPlanetLon(jd: number, planet: number): number {
-  const result = swisseph.swe_calc_ut(jd, planet, SEFLG_SIDEREAL | SEFLG_SPEED);
+  // Get tropical position first (no sidereal flag)
+  const result = swisseph.swe_calc_ut(jd, planet, SEFLG_SPEED);
   if (result.error) throw new Error(result.error);
-  return ((result.longitude % 360) + 360) % 360;
+  const tropical = ((result.longitude % 360) + 360) % 360;
+  
+  // Get Lahiri ayanamsa
+  swisseph.swe_set_sid_mode(SE_SIDM_LAHIRI, 0, 0);
+  const ayanamsa = swisseph.swe_get_ayanamsa_ut(jd);
+  
+  // Subtract ayanamsa to get sidereal
+  let sidereal = tropical - ayanamsa;
+  if (sidereal < 0) sidereal += 360;
+  return sidereal;
 }
 
 function getAscendant(jd: number, lat: number, lon: number): number {
