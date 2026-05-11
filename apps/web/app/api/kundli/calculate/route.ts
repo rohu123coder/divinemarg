@@ -98,7 +98,7 @@ export async function POST(req: Request) {
             pada: bd.nakshatra.pada,
           };
           
-          return NextResponse.json({ success: true, data: localKundli });
+          return NextResponse.json(localKundli);
         }
       }
     } catch (backendError) {
