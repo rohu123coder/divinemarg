@@ -19,20 +19,17 @@ export function lahiriAyanamsa(jd: number): number {
   return 23.85 + 0.013964 * T;
 }
 
-// Accurate Sun longitude using full VSOP87 series
 export function sunLongitude(jd: number): number {
-  const T = (jd - J2000) / 36525.0;
+  const T = (jd - 2451545.0) / 36525.0;
   const T2 = T * T;
-  const T3 = T2 * T;
 
-  // Geometric mean longitude of Sun
+  // Mean longitude
   let L0 = 280.46646 + 36000.76983 * T + 0.0003032 * T2;
-  L0 = normLon(L0);
 
   // Mean anomaly
   let M = 357.52911 + 35999.05029 * T - 0.0001537 * T2;
-  M = normLon(M);
-  const Mrad = toRad(M);
+  M = ((M % 360) + 360) % 360;
+  const Mrad = (M * Math.PI) / 180;
 
   // Equation of center
   const C = (1.914602 - 0.004817 * T - 0.000014 * T2) * Math.sin(Mrad)
@@ -40,80 +37,64 @@ export function sunLongitude(jd: number): number {
     + 0.000289 * Math.sin(3 * Mrad);
 
   // Sun true longitude
-  const sunLon = L0 + C;
+  let sunLon = L0 + C;
 
-  // Apparent longitude (aberration + nutation)
+  // Apparent longitude
   const omega = 125.04 - 1934.136 * T;
-  const apparent = sunLon - 0.00569 - 0.00478 * Math.sin(toRad(omega));
+  sunLon = sunLon - 0.00569 - 0.00478 * Math.sin((omega * Math.PI) / 180);
 
-  return normLon(apparent - lahiriAyanamsa(jd));
+  // Normalize
+  sunLon = ((sunLon % 360) + 360) % 360;
+
+  // Convert to sidereal
+  return ((sunLon - lahiriAyanamsa(jd)) % 360 + 360) % 360;
 }
 
-// Accurate Moon longitude
 export function moonLongitude(jd: number): number {
-  const T = (jd - J2000) / 36525.0;
+  const T = (jd - 2451545.0) / 36525.0;
   const T2 = T * T;
   const T3 = T2 * T;
   const T4 = T3 * T;
 
-  // Moon mean longitude
-  let L = 218.3164477 + 481267.88123421 * T
-    - 0.0015786 * T2 + T3 / 538841 - T4 / 65194000;
+  let L = 218.3164477 + 481267.88123421 * T - 0.0015786 * T2 + T3 / 538841 - T4 / 65194000;
+  let D = 297.8501921 + 445267.1114034 * T - 0.0018819 * T2 + T3 / 545868 - T4 / 113065000;
+  let M = 357.5291092 + 35999.0502909 * T - 0.0001536 * T2 + T3 / 24490000;
+  let Mp = 134.9633964 + 477198.8675055 * T + 0.0087414 * T2 + T3 / 69699 - T4 / 14712000;
+  let F = 93.2720950 + 483202.0175233 * T - 0.0036539 * T2 - T3 / 3526000 + T4 / 863310000;
 
-  // Mean elongation
-  let D = 297.8501921 + 445267.1114034 * T
-    - 0.0018819 * T2 + T3 / 545868 - T4 / 113065000;
+  const norm = (x: number) => ((x % 360) + 360) % 360;
+  L = norm(L); D = norm(D); M = norm(M); Mp = norm(Mp); F = norm(F);
 
-  // Sun mean anomaly
-  let M = 357.5291092 + 35999.0502909 * T
-    - 0.0001536 * T2 + T3 / 24490000;
+  const toR = (x: number) => (x * Math.PI) / 180;
+  const Dr = toR(D), Mr = toR(M), Mpr = toR(Mp), Fr = toR(F);
 
-  // Moon mean anomaly
-  let Mp = 134.9633964 + 477198.8675055 * T
-    + 0.0087414 * T2 + T3 / 69699 - T4 / 14712000;
-
-  // Moon argument of latitude
-  let F = 93.2720950 + 483202.0175233 * T
-    - 0.0036539 * T2 - T3 / 3526000 + T4 / 863310000;
-
-  L = normLon(L);
-  D = normLon(D);
-  M = normLon(M);
-  Mp = normLon(Mp);
-  F = normLon(F);
-
-  const Drad = toRad(D);
-  const Mrad = toRad(M);
-  const Mprad = toRad(Mp);
-  const Frad = toRad(F);
-
-  // Periodic terms for longitude (Meeus, Astronomical Algorithms Ch 47)
   let sumL = 0;
-  sumL += 6288774 * Math.sin(Mprad);
-  sumL += 1274027 * Math.sin(2 * Drad - Mprad);
-  sumL += 658314 * Math.sin(2 * Drad);
-  sumL += 213618 * Math.sin(2 * Mprad);
-  sumL -= 185116 * Math.sin(Mrad);
-  sumL -= 114332 * Math.sin(2 * Frad);
-  sumL += 58793 * Math.sin(2 * Drad - 2 * Mprad);
-  sumL += 57066 * Math.sin(2 * Drad - Mrad - Mprad);
-  sumL += 53322 * Math.sin(2 * Drad + Mprad);
-  sumL += 45758 * Math.sin(2 * Drad - Mrad);
-  sumL -= 40923 * Math.sin(Mrad - Mprad);
-  sumL -= 34720 * Math.sin(Drad);
-  sumL -= 30383 * Math.sin(Mrad + Mprad);
-  sumL += 15327 * Math.sin(2 * Drad - 2 * Frad);
-  sumL -= 12528 * Math.sin(Mprad + 2 * Frad);
-  sumL += 10980 * Math.sin(Mprad - 2 * Frad);
-  sumL += 10675 * Math.sin(4 * Drad - Mprad);
-  sumL += 10034 * Math.sin(3 * Mprad);
-  sumL += 8548 * Math.sin(4 * Drad - 2 * Mprad);
-  sumL -= 7888 * Math.sin(2 * Drad + Mrad - Mprad);
-  sumL -= 6766 * Math.sin(2 * Drad + Mrad);
-  sumL -= 5163 * Math.sin(Drad - Mprad);
+  sumL += 6288774 * Math.sin(Mpr);
+  sumL += 1274027 * Math.sin(2*Dr - Mpr);
+  sumL += 658314 * Math.sin(2*Dr);
+  sumL += 213618 * Math.sin(2*Mpr);
+  sumL -= 185116 * Math.sin(Mr);
+  sumL -= 114332 * Math.sin(2*Fr);
+  sumL += 58793 * Math.sin(2*Dr - 2*Mpr);
+  sumL += 57066 * Math.sin(2*Dr - Mr - Mpr);
+  sumL += 53322 * Math.sin(2*Dr + Mpr);
+  sumL += 45758 * Math.sin(2*Dr - Mr);
+  sumL -= 40923 * Math.sin(Mr - Mpr);
+  sumL -= 34720 * Math.sin(Dr);
+  sumL -= 30383 * Math.sin(Mr + Mpr);
+  sumL += 15327 * Math.sin(2*Dr - 2*Fr);
+  sumL -= 12528 * Math.sin(Mpr + 2*Fr);
+  sumL += 10980 * Math.sin(Mpr - 2*Fr);
+  sumL += 10675 * Math.sin(4*Dr - Mpr);
+  sumL += 10034 * Math.sin(3*Mpr);
+  sumL += 8548 * Math.sin(4*Dr - 2*Mpr);
+  sumL -= 7888 * Math.sin(2*Dr + Mr - Mpr);
+  sumL -= 6766 * Math.sin(2*Dr + Mr);
+  sumL -= 5163 * Math.sin(Dr - Mpr);
 
-  const moonLon = L + sumL / 1000000;
-  return normLon(moonLon - lahiriAyanamsa(jd));
+  // sumL is in units of 0.000001 degrees
+  const moonLon = norm(L + sumL / 1000000);
+  return norm(moonLon - lahiriAyanamsa(jd));
 }
 
 // Mercury - full series
