@@ -216,6 +216,10 @@ export function ascendantLongitude(
   const y = -Math.cos(LSTrad);
   const x = Math.sin(LSTrad) * Math.cos(epsRad) + Math.tan(latRad) * Math.sin(epsRad);
   let asc = (Math.atan2(y, x) * 180) / Math.PI;
+  // Ensure correct quadrant
+  if (Math.cos(LSTrad) < 0) {
+    asc = asc + 180;
+  }
   asc = normLon(asc);
 
   // Convert to sidereal
