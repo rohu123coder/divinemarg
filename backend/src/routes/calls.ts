@@ -3,6 +3,7 @@ import { z } from "zod";
 
 import { pool } from "../db/index.js";
 import { authMiddleware } from "../middleware/auth.js";
+import { notifyIncomingCall } from "../services/pushNotifications.js";
 import { getSocketServer } from "../socket/io.js";
 
 const router = Router();
@@ -99,6 +100,12 @@ router.post("/request", async (req: Request, res: Response) => {
   } catch (e) {
     console.error("Socket emit failed:", e);
   }
+
+  void notifyIncomingCall({
+    astrologerUserId: astrologer.user_id,
+    userName,
+    sessionId,
+  }).catch((err) => console.error("[Push] Failed to notify call request:", err));
 
   res.json({
     success: true,

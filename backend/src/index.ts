@@ -11,6 +11,7 @@ import { authRouter } from "./routes/auth.js";
 import { callsRouter } from "./routes/calls.js";
 import { chatRouter } from "./routes/chat.js";
 import kundaliRouter from "./routes/kundali.js";
+import { notificationsRouter } from "./routes/notifications.js";
 import { setSocketServer } from "./socket/io.js";
 import { registerSocketHandlers } from "./socket/index.js";
 import { sessionsRouter } from "./routes/sessions.js";
@@ -40,6 +41,7 @@ app.use("/api/kundali", kundaliRouter);
 app.use("/api/calls", callsRouter);
 app.use("/api/sessions", sessionsRouter);
 app.use("/api/wallet", walletRouter);
+app.use("/api/notifications", notificationsRouter);
 
 const httpServer = createServer(app);
 const io = new Server(httpServer, {

@@ -6,6 +6,7 @@ import { z } from "zod";
 
 import { pool, query } from "../db/index.js";
 import { authMiddleware } from "../middleware/auth.js";
+import { notifyWalletCredited } from "../services/pushNotifications.js";
 
 const router = Router();
 
@@ -190,11 +191,18 @@ router.post("/verify-payment", async (req: Request, res: Response) => {
       [userId]
     );
 
+    const newWalletBalance = Number(balResult.rows[0]?.wallet_balance ?? 0);
+    void notifyWalletCredited({
+      userId,
+      amount: creditAmount,
+      newBalance: newWalletBalance,
+    }).catch((err) => console.error("[Push] Failed to notify wallet credit:", err));
+
     res.json({
       success: true,
       data: {
         credited: creditAmount,
-        wallet_balance: Number(balResult.rows[0]?.wallet_balance ?? 0),
+        wallet_balance: newWalletBalance,
       },
     });
   } catch (e) {

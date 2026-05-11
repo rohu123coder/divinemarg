@@ -5,6 +5,7 @@ import { z } from "zod";
 
 import { pool } from "../db/index.js";
 import { generateAgoraToken, generateChannelName } from "../services/agoraService.js";
+import { notifyNewMessage, notifySessionEnded } from "../services/pushNotifications.js";
 
 declare module "socket.io" {
   interface SocketData {
@@ -774,6 +775,13 @@ async function finalizeChatSession(
       totalCharged,
     });
 
+    void notifySessionEnded({
+      userId,
+      astrologerName,
+      duration: effectiveDuration,
+      cost: totalCharged,
+    }).catch((err) => console.error("[Push] Failed to notify session end:", err));
+
     await emitWaitlistUpdated(
       io,
       row.astrologer_user_id,
@@ -1342,6 +1350,25 @@ export function registerSocketHandlers(io: Server): void {
         content,
         createdAt: row.created_at.toISOString(),
       });
+
+      const recipientUserId =
+        uid === session.user_id ? session.astrologer_user_id : session.user_id;
+      const senderName =
+        uid === session.astrologer_user_id
+          ? session.astrologer_name
+          : (
+              await pool.query<{ name: string }>(
+                `SELECT name FROM users WHERE id = $1`,
+                [uid]
+              )
+            ).rows[0]?.name ?? "User";
+
+      void notifyNewMessage({
+        recipientId: recipientUserId,
+        senderName,
+        message: content,
+        sessionId,
+      }).catch((err) => console.error("[Push] Failed to notify new message:", err));
     });
 
     socket.on("typing", async (payload: unknown) => {

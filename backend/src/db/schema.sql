@@ -19,7 +19,11 @@ CREATE TABLE users (
   wallet_balance NUMERIC(14, 2) NOT NULL DEFAULT 0,
   password_hash TEXT,
   is_suspended BOOLEAN NOT NULL DEFAULT false,
-  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  expo_push_token TEXT,
+  push_token_updated_at TIMESTAMPTZ,
+  push_platform VARCHAR(10),
+  push_enabled BOOLEAN DEFAULT true
 );
 
 CREATE TABLE astrologers (

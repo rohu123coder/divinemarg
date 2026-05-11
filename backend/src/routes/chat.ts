@@ -3,6 +3,7 @@ import { z } from "zod";
 
 import { pool, query } from "../db/index.js";
 import { authMiddleware } from "../middleware/auth.js";
+import { notifyIncomingChat } from "../services/pushNotifications.js";
 import { getSocketServer } from "../socket/io.js";
 
 const router = Router();
@@ -148,6 +149,11 @@ router.post(
       } catch {
         // socket server not ready in tests
       }
+      void notifyIncomingChat({
+        astrologerUserId: notify.astrologer_user_id,
+        userName: notify.user_name,
+        sessionId: session.id,
+      }).catch((err) => console.error("[Push] Failed to notify chat request:", err));
     }
 
     res.status(201).json({
