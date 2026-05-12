@@ -5,6 +5,89 @@ import { pool } from "../db/index.js";
 import { authMiddleware } from "../middleware/auth.js";
 
 const router = Router();
+
+/**
+ * POST /api/notifications/test-send
+ * Direct test endpoint — phone number specify karke notification bhejo
+ *
+ * Body:
+ *   - phone: string (e.g. "9699661788")
+ *   - title: string (optional, default: "Test Notification")
+ *   - body: string (optional, default: "Hello from DivineMarg!")
+ *
+ * NOTE: Yeh DEV/TEST endpoint hai. Production mein remove ya admin-only kar dena.
+ * Registered before authMiddleware so Postman/curl can trigger without a JWT.
+ */
+router.post("/test-send", async (req: Request, res: Response) => {
+  try {
+    const { phone, title, body } = req.body as {
+      phone?: string;
+      title?: string;
+      body?: string;
+    };
+
+    if (!phone || typeof phone !== "string") {
+      res.status(400).json({ error: "phone is required" });
+      return;
+    }
+
+    const userResult = await pool.query<{
+      id: string;
+      name: string;
+      expo_push_token: string | null;
+      push_enabled: boolean | null;
+    }>(
+      `SELECT id, name, expo_push_token, push_enabled
+       FROM users WHERE phone = $1`,
+      [phone]
+    );
+
+    if (!userResult.rows.length) {
+      res.status(404).json({ error: "User not found" });
+      return;
+    }
+
+    const user = userResult.rows[0];
+
+    if (!user.expo_push_token) {
+      res.status(400).json({ error: "User has no push token registered" });
+      return;
+    }
+
+    if (!user.push_enabled) {
+      res.status(400).json({ error: "Push notifications disabled for user" });
+      return;
+    }
+
+    const { sendPushNotification } = await import("../services/pushNotifications.js");
+
+    const success = await sendPushNotification({
+      userId: user.id,
+      title: title || "🙏 DivineMarg Test",
+      body: body || `Hello ${user.name}! Pehla push notification aa gaya! 🎉`,
+      type: "promotional",
+      channelId: "default",
+      priority: "high",
+      data: { test: true },
+    });
+
+    res.json({
+      success,
+      message: success ? "Notification sent!" : "Notification failed (check backend logs)",
+      user: {
+        id: user.id,
+        name: user.name,
+        phone: phone,
+        token_preview: user.expo_push_token.substring(0, 40) + "...",
+      },
+    });
+  } catch (error: unknown) {
+    console.error("[Test Push] Error:", error);
+    const message = error instanceof Error ? error.message : "Internal error";
+    res.status(500).json({ error: message });
+  }
+});
+
 router.use(authMiddleware);
 
 const expoTokenRegex = /^(ExponentPushToken|ExpoPushToken)\[/;
