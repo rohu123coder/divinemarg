@@ -15,6 +15,8 @@ import { AstrologerNavbar } from "@/components/AstrologerNavbar";
 import { getSocketApiBase } from "@/lib/socketBase";
 import { useAuthStore } from "@/lib/store";
 
+import CustomerKundaliPanel from "./CustomerKundaliPanel";
+
 const AgoraCallScreen = dynamic(
   () => import("@/components/AgoraCallScreen").then((m) => m.AgoraCallScreen),
   { ssr: false }
@@ -521,7 +523,7 @@ export function AstrologerChatClient({ sessionId }: Props) {
       ) : null}
 
       <header className="sticky top-16 z-10 border-b border-slate-200 bg-white px-4 py-3 shadow-sm sm:px-6">
-        <div className="mx-auto flex max-w-3xl flex-wrap items-center justify-between gap-3">
+        <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-3">
           <div>
             <h1 className="text-lg font-bold text-slate-900">{peerName}</h1>
             <div className="mt-1 flex flex-wrap items-center gap-2 text-sm text-slate-600">
@@ -580,7 +582,8 @@ export function AstrologerChatClient({ sessionId }: Props) {
         </div>
       </header>
 
-      <main className="mx-auto flex w-full max-w-3xl flex-1 flex-col px-2 pb-28 pt-4 sm:px-4">
+      <div className="mx-auto flex w-full max-w-7xl flex-1 gap-4 px-2 pb-28 pt-4 sm:px-4">
+      <main className="flex min-w-0 flex-1 flex-col">
         <section className="mb-3 rounded-2xl border border-slate-200 bg-white p-3 shadow-sm">
           <button
             type="button"
@@ -704,6 +707,24 @@ export function AstrologerChatClient({ sessionId }: Props) {
           </div>
         </div>
       </main>
+
+        <aside className="hidden w-80 flex-shrink-0 lg:block xl:w-96">
+          <div className="sticky top-24 flex max-h-[calc(100vh-7rem)] flex-col overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm">
+            <div className="bg-gradient-to-r from-purple-600 to-violet-600 px-4 py-3 font-semibold text-white">
+              🔮 Customer Kundali
+            </div>
+            <div className="flex-1 overflow-y-auto">
+              {token ? (
+                <CustomerKundaliPanel
+                  sessionId={sessionId}
+                  authToken={token}
+                  apiBase={getSocketApiBase()}
+                />
+              ) : null}
+            </div>
+          </div>
+        </aside>
+      </div>
 
       {summary ? (
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 p-4">
