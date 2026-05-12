@@ -176,6 +176,12 @@ function ensureLiveSession(
   return next;
 }
 
+/** Counts automated user intro toward session billing participation. */
+export function noteAutomatedUserIntro(sessionId: string): void {
+  const state = ensureLiveSession(sessionId);
+  state.userMessageCount = (state.userMessageCount ?? 0) + 1;
+}
+
 function clearWaitingSessionTimeout(sessionId: string): void {
   const t = waitingSessionTimeouts.get(sessionId);
   if (!t) {
@@ -1314,8 +1320,8 @@ export function registerSocketHandlers(io: Server): void {
         id: string;
         created_at: Date;
       }>(
-        `INSERT INTO messages (session_id, sender_id, sender_type, content)
-         VALUES ($1, $2, $3::message_sender_type, $4)
+        `INSERT INTO messages (session_id, sender_id, sender_type, content, is_automated)
+         VALUES ($1, $2, $3::message_sender_type, $4, false)
          RETURNING id, created_at`,
         [sessionId, uid, senderType, content]
       );
@@ -1348,6 +1354,7 @@ export function registerSocketHandlers(io: Server): void {
         senderId: uid,
         senderType,
         content,
+        isAutomated: false,
         createdAt: row.created_at.toISOString(),
       });
 

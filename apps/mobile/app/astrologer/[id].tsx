@@ -29,34 +29,36 @@ export default function AstrologerProfileScreen() {
   const astrologers = useAppStore((state) => state.astrologers);
   const astro = useMemo(() => astrologers.find((a) => a.id === id) ?? astrologers[0], [astrologers, id]);
 
-  const [startingChat, setStartingChat] = useState(false);
   const [startingCall, setStartingCall] = useState(false);
 
   const handleStartChat = async () => {
     if (!astro) return;
-    if (startingChat) return;
-    setStartingChat(true);
     try {
-      const res = await api.post("/api/chat/request", {
-        astrologer_id: astro.id,
-      });
-      const sessionId = res.data?.data?.session_id ?? res.data?.data?.sessionId ?? res.data?.sessionId;
-      if (!sessionId) {
-        Alert.alert("Error", "Could not start chat. Please try again.");
+      const birthRes = await api.get("/api/users/birth-details");
+      const bd = birthRes.data;
+      if (!bd?.hasDetails || !bd?.data?.dateOfBirth) {
+        Alert.alert(
+          "Profile required",
+          "Pehle apni birth details add karein for accurate predictions",
+          [
+            { text: "Cancel", style: "cancel" },
+            {
+              text: "Add now",
+              onPress: () => router.push("/profile/birth-details"),
+            },
+          ]
+        );
         return;
       }
       router.push({
-        pathname: `/chat/${sessionId}`,
+        pathname: "/chat/problem-area",
         params: {
-          name: astro.name,
-          photo: astro.profile_photo ?? "",
+          astrologerId: astro.id,
+          astrologerName: encodeURIComponent(astro.name),
         },
       });
-    } catch (e: unknown) {
-      const msg = (e as { response?: { data?: { error?: string } } })?.response?.data?.error ?? "Could not start chat";
-      Alert.alert("Error", msg);
-    } finally {
-      setStartingChat(false);
+    } catch {
+      Alert.alert("Error", "Could not verify profile");
     }
   };
 
@@ -132,12 +134,8 @@ export default function AstrologerProfileScreen() {
         </View>
 
         <View style={styles.actions}>
-          <Pressable style={styles.chatBtn} onPress={handleStartChat} disabled={startingChat}>
-            {startingChat ? (
-              <ActivityIndicator color="#FFFFFF" size="small" />
-            ) : (
-              <Text style={styles.chatBtnTxt}>Start Chat</Text>
-            )}
+          <Pressable style={styles.chatBtn} onPress={() => void handleStartChat()}>
+            <Text style={styles.chatBtnTxt}>Start Chat</Text>
           </Pressable>
           <Pressable style={styles.callBtn} onPress={handleStartCall} disabled={startingCall}>
             {startingCall ? (

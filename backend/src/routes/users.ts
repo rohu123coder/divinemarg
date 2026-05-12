@@ -24,6 +24,14 @@ const birthDetailsPatchBody = z
     lng: z.coerce.number().finite(),
     utcOffset: z.coerce.number().finite().optional(),
     gender: z.string().max(20).optional().nullable(),
+    maritalStatus: z
+      .enum(["single", "married", "engaged", "divorced", "widowed"])
+      .optional()
+      .nullable(),
+    occupation: z
+      .enum(["student", "job", "business", "housewife", "retired", "other"])
+      .optional()
+      .nullable(),
   })
   .superRefine((val, ctx) => {
     const t = val.timeOfBirth;
@@ -211,6 +219,8 @@ router.patch("/birth-details", async (req: Request, res: Response) => {
     lng,
     utcOffset,
     gender,
+    maritalStatus,
+    occupation,
   } = parsed.data;
 
   const utc = utcOffset ?? 5.5;
@@ -228,8 +238,10 @@ router.patch("/birth-details", async (req: Request, res: Response) => {
         birth_lat = $4,
         birth_lng = $5,
         birth_utc_offset = $6,
-        gender = $7
-       WHERE id = $8`,
+        gender = $7,
+        marital_status = $8,
+        occupation = $9
+       WHERE id = $10`,
       [
         dateOfBirth,
         tob,
@@ -238,6 +250,8 @@ router.patch("/birth-details", async (req: Request, res: Response) => {
         lng,
         utc,
         gender?.trim() || null,
+        maritalStatus ?? null,
+        occupation ?? null,
         userId,
       ]
     );
@@ -266,6 +280,8 @@ router.get("/birth-details", async (req: Request, res: Response) => {
       birth_lng: string | null;
       birth_utc_offset: string | null;
       gender: string | null;
+      marital_status: string | null;
+      occupation: string | null;
     }>(
       `SELECT
         date_of_birth,
@@ -274,7 +290,9 @@ router.get("/birth-details", async (req: Request, res: Response) => {
         birth_lat,
         birth_lng,
         birth_utc_offset,
-        gender
+        gender,
+        marital_status,
+        occupation
        FROM users WHERE id = $1`,
       [userId]
     );
@@ -311,6 +329,8 @@ router.get("/birth-details", async (req: Request, res: Response) => {
             ? Number(row.birth_utc_offset)
             : 5.5,
         gender: row.gender,
+        maritalStatus: row.marital_status,
+        occupation: row.occupation,
       },
     });
   } catch (e: unknown) {

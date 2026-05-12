@@ -30,7 +30,9 @@ CREATE TABLE users (
   birth_lat NUMERIC(10, 7),
   birth_lng NUMERIC(10, 7),
   birth_utc_offset NUMERIC(4, 2) DEFAULT 5.5,
-  gender VARCHAR(20)
+  gender VARCHAR(20),
+  marital_status VARCHAR(30),
+  occupation VARCHAR(50)
 );
 
 CREATE INDEX IF NOT EXISTS idx_users_has_birth_details
@@ -60,7 +62,8 @@ CREATE TABLE chat_sessions (
   started_at TIMESTAMPTZ,
   ended_at TIMESTAMPTZ,
   total_minutes INTEGER,
-  total_charged NUMERIC(14, 2)
+  total_charged NUMERIC(14, 2),
+  problem_area VARCHAR(100)
 );
 
 CREATE TABLE astrologer_waitlist (
@@ -84,6 +87,7 @@ CREATE TABLE messages (
   sender_id UUID NOT NULL REFERENCES users (id) ON DELETE CASCADE,
   sender_type message_sender_type NOT NULL,
   content TEXT NOT NULL,
+  is_automated BOOLEAN NOT NULL DEFAULT false,
   created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 

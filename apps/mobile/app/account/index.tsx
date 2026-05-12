@@ -31,6 +31,21 @@ export default function AccountScreen() {
         <Text style={styles.name}>{user?.name ?? "Guest User"}</Text>
         <Text style={styles.phone}>{user?.phone ?? "-"}</Text>
       </View>
+      <Pressable
+        style={[styles.row, styles.rowBetween]}
+        onPress={() => router.push("/profile/birth-details")}
+      >
+        <View style={{ flexDirection: "row", alignItems: "center" }}>
+          <Text style={{ fontSize: 24, marginRight: 12 }}>🎂</Text>
+          <View>
+            <Text style={styles.rowText}>My details</Text>
+            <Text style={{ fontSize: 12, color: "#6B7280", marginTop: 2 }}>
+              Birth + profile info for predictions
+            </Text>
+          </View>
+        </View>
+        <Text style={{ color: "#9CA3AF", fontSize: 18 }}>›</Text>
+      </Pressable>
       <Pressable style={styles.row} onPress={() => router.push("/account/sessions")}>
         <Text style={styles.rowText}>My Sessions</Text>
       </Pressable>
@@ -71,6 +86,11 @@ const styles = StyleSheet.create({
     marginBottom: 10,
   },
   rowText: { color: "#1A1A2E", fontWeight: "700" },
+  rowBetween: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
   logout: {
     marginTop: 8,
     borderRadius: 12,

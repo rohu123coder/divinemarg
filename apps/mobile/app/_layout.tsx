@@ -1,10 +1,12 @@
-import { useEffect, useMemo, useState } from "react";
+import * as Notifications from "expo-notifications";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { router, Stack, useSegments } from "expo-router";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 
 import { AppSplashScreen } from "../components/SplashScreen";
 import { getTokenAsync } from "../lib/auth";
 import api from "../lib/api";
+import { setupPushNotifications } from "../lib/pushNotifications";
 import { useAppStore, type User } from "../lib/store";
 
 export default function RootLayout() {
@@ -16,6 +18,45 @@ export default function RootLayout() {
   const logout = useAppStore((state) => state.logout);
 
   const inAuthGroup = useMemo(() => segments[0] === "auth", [segments]);
+
+  const notificationListener = useRef<ReturnType<
+    typeof Notifications.addNotificationReceivedListener
+  > | null>(null);
+  const responseListener = useRef<ReturnType<
+    typeof Notifications.addNotificationResponseReceivedListener
+  > | null>(null);
+
+  useEffect(() => {
+    notificationListener.current = Notifications.addNotificationReceivedListener((notification) => {
+      console.log("[Push] Notification received (foreground):", notification.request.identifier);
+    });
+
+    responseListener.current = Notifications.addNotificationResponseReceivedListener((response) => {
+      const data = response.notification.request.content.data as Record<string, unknown> | undefined;
+      console.log("[Push] Notification opened, data:", data);
+
+      const type = typeof data?.type === "string" ? data.type : "";
+      const sessionId = typeof data?.sessionId === "string" ? data.sessionId : undefined;
+
+      if (type === "incoming_call" && sessionId) {
+        router.push(`/call/${sessionId}`);
+      } else if (type === "incoming_chat" && sessionId) {
+        router.push(`/chat/${sessionId}`);
+      } else if (type === "wallet_credited") {
+        router.push("/wallet");
+      } else if (type === "promotional" && typeof data?.deepLink === "string") {
+        const path = data.deepLink;
+        if (path.startsWith("/")) {
+          router.push(path);
+        }
+      }
+    });
+
+    return () => {
+      notificationListener.current?.remove();
+      responseListener.current?.remove();
+    };
+  }, []);
 
   useEffect(() => {
     (async () => {
@@ -44,6 +85,7 @@ export default function RootLayout() {
               profile_photo: payload.profile_photo ?? payload.avatar_url ?? null,
             };
             hydrateAuth({ user, token });
+            void setupPushNotifications(token);
           } else {
             logout();
           }
@@ -88,6 +130,8 @@ export default function RootLayout() {
         <Stack.Screen name="auth/register" />
         <Stack.Screen name="astrologer/[id]" />
         <Stack.Screen name="chat/[sessionId]" options={{ headerShown: false }} />
+        <Stack.Screen name="chat/problem-area" options={{ headerShown: false }} />
+        <Stack.Screen name="profile/birth-details" options={{ headerShown: false }} />
         <Stack.Screen name="call/[sessionId]" options={{ headerShown: false }} />
         <Stack.Screen name="wallet/index" />
         <Stack.Screen name="wallet/recharge" />

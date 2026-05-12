@@ -1,6 +1,7 @@
 import { Router, type Request, type Response } from "express";
 import { z } from "zod";
 
+import { autoInjectIntroMessage } from "../lib/chatAutoIntro.js";
 import { pool, query } from "../db/index.js";
 import { authMiddleware } from "../middleware/auth.js";
 import { notifyIncomingChat } from "../services/pushNotifications.js";
@@ -23,6 +24,8 @@ function requireUserRole(req: Request, res: Response, next: () => void): void {
 
 const chatRequestBody = z.object({
   astrologer_id: z.string().uuid(),
+  problem_area: z.string().max(100).optional().nullable(),
+  problemArea: z.string().max(100).optional().nullable(),
 });
 
 router.post(
@@ -45,14 +48,23 @@ router.post(
     }
 
     const { astrologer_id } = parsed.data;
+    const problemAreaRaw =
+      parsed.data.problem_area ?? parsed.data.problemArea ?? null;
+    const problem_area =
+      problemAreaRaw != null && String(problemAreaRaw).trim() !== ""
+        ? String(problemAreaRaw).trim().slice(0, 100)
+        : null;
 
     const astroResult = await query<{
       id: string;
       price_per_minute: string | null;
       is_verified: boolean;
+      name: string;
     }>(
-      `SELECT id, price_per_minute, is_verified
-       FROM astrologers WHERE id = $1`,
+      `SELECT a.id, a.price_per_minute, a.is_verified, u.name
+       FROM astrologers a
+       INNER JOIN users u ON u.id = a.user_id
+       WHERE a.id = $1`,
       [astrologer_id]
     );
 
@@ -114,10 +126,10 @@ router.post(
     }
 
     const sessionResult = await query<{ id: string }>(
-      `INSERT INTO chat_sessions (user_id, astrologer_id, status, started_at)
-       VALUES ($1, $2, 'waiting', now())
+      `INSERT INTO chat_sessions (user_id, astrologer_id, status, started_at, problem_area)
+       VALUES ($1, $2, 'waiting', now(), $3)
        RETURNING id`,
-      [userId, astrologer_id]
+      [userId, astrologer_id, problem_area]
     );
 
     const session = sessionResult.rows[0];
@@ -125,6 +137,13 @@ router.post(
       res.status(500).json({ success: false, error: "Could not create session" });
       return;
     }
+
+    void autoInjectIntroMessage(
+      session.id,
+      userId,
+      astro.name,
+      problem_area
+    ).catch((err) => console.error("[Auto-Inject] Error:", err));
 
     const notifyResult = await query<{
       astrologer_user_id: string;
@@ -449,9 +468,10 @@ router.get("/history/:sessionId/messages", async (req: Request, res: Response) =
   const sessionId = idParse.data;
 
   const accessCheck = await query<{ id: string }>(
-    `SELECT id
-     FROM chat_sessions
-     WHERE id = $1 AND user_id = $2
+    `SELECT cs.id
+     FROM chat_sessions cs
+     INNER JOIN astrologers a ON a.id = cs.astrologer_id
+     WHERE cs.id = $1 AND (cs.user_id = $2 OR a.user_id = $2)
      LIMIT 1`,
     [sessionId, userId]
   );
@@ -461,14 +481,22 @@ router.get("/history/:sessionId/messages", async (req: Request, res: Response) =
   }
 
   const messagesResult = await query<{
-    sender_role: "user" | "astrologer";
+    id: string;
+    sender_id: string;
+    sender_type: "user" | "astrologer";
     content: string;
     created_at: Date;
+    is_automated: boolean;
   }>(
-    `SELECT sender_role, content, created_at
-     FROM session_messages_archive
-     WHERE session_id = $1
-     ORDER BY created_at ASC`,
+    `SELECT m.id,
+            m.sender_id,
+            m.sender_type::text AS sender_type,
+            m.content,
+            m.created_at,
+            COALESCE(m.is_automated, false) AS is_automated
+     FROM messages m
+     WHERE m.session_id = $1
+     ORDER BY m.created_at ASC`,
     [sessionId]
   );
 
@@ -476,9 +504,12 @@ router.get("/history/:sessionId/messages", async (req: Request, res: Response) =
     success: true,
     data: {
       messages: messagesResult.rows.map((row) => ({
-        sender_role: row.sender_role,
+        id: row.id,
+        sender_id: row.sender_id,
+        sender_role: row.sender_type,
         content: row.content,
         created_at: row.created_at.toISOString(),
+        is_automated: row.is_automated,
       })),
     },
   });

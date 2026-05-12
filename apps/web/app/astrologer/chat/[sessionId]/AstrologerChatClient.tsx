@@ -12,6 +12,7 @@ import {
 import { io, type Socket } from "socket.io-client";
 
 import { AstrologerNavbar } from "@/components/AstrologerNavbar";
+import api from "@/lib/api";
 import { getSocketApiBase } from "@/lib/socketBase";
 import { useAuthStore } from "@/lib/store";
 
@@ -29,6 +30,7 @@ type ChatMessage = {
   senderType: "user" | "astrologer";
   content: string;
   createdAt: string;
+  isAutomated?: boolean;
 };
 
 type WaitlistEntry = {
@@ -149,8 +151,44 @@ export function AstrologerChatClient({ sessionId }: Props) {
     socketRef.current = socket;
 
     socket.on("connect", () => {
-      socket.emit("join_session", { sessionId });
-      socket.emit("get_waitlist");
+      void (async () => {
+        try {
+          const res = await api.get(`/api/chat/history/${sessionId}/messages`);
+          const raw = (res.data?.data?.messages ?? []) as Array<{
+            id?: string;
+            sender_id?: string;
+            sender_role: "user" | "astrologer";
+            content: string;
+            created_at: string;
+            is_automated?: boolean;
+          }>;
+          const mapped: ChatMessage[] = raw.map((m) => ({
+            id: m.id ?? `hist-${Math.random()}`,
+            sessionId,
+            senderId: m.sender_id ?? "",
+            senderType: m.sender_role,
+            content: m.content,
+            createdAt: m.created_at,
+            isAutomated: m.is_automated,
+          }));
+          setMessages((prev) => {
+            if (prev.length === 0) return mapped;
+            const byId = new Map(prev.map((p) => [p.id, p]));
+            for (const m of mapped) {
+              if (!byId.has(m.id)) byId.set(m.id, m);
+            }
+            return [...byId.values()].sort(
+              (a, b) =>
+                new Date(a.createdAt).getTime() -
+                new Date(b.createdAt).getTime()
+            );
+          });
+        } catch {
+          // keep existing / empty
+        }
+        socket.emit("join_session", { sessionId });
+        socket.emit("get_waitlist");
+      })();
     });
 
     socket.on("connect_error", () => {
@@ -193,7 +231,9 @@ export function AstrologerChatClient({ sessionId }: Props) {
       if (msg.sessionId !== sessionId) {
         return;
       }
-      setMessages((prev) => [...prev, msg]);
+      setMessages((prev) =>
+        prev.some((p) => p.id === msg.id) ? prev : [...prev, msg]
+      );
     });
 
     socket.on(

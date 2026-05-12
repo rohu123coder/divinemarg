@@ -77,20 +77,23 @@ export default function ChatScreen() {
 
       // Map messages
       const raw = msgRes.data?.data?.messages ?? [];
-      const mapped: Message[] = raw.map((m: {
-        id?: string;
-        sender_role: "user" | "astrologer";
-        content: string;
-        created_at: string;
-      }) => ({
-        id: m.id ?? `msg-${Math.random()}`,
-        message: m.content,
-        timestamp: new Date(m.created_at).toLocaleTimeString([], {
-          hour: "2-digit",
-          minute: "2-digit",
-        }),
-        mine: m.sender_role === "user",
-      }));
+      const mapped: Message[] = raw.map(
+        (m: {
+          id?: string;
+          sender_role: "user" | "astrologer";
+          content: string;
+          created_at: string;
+          is_automated?: boolean;
+        }) => ({
+          id: m.id ?? `msg-${Math.random()}`,
+          message: m.content,
+          timestamp: new Date(m.created_at).toLocaleTimeString([], {
+            hour: "2-digit",
+            minute: "2-digit",
+          }),
+          mine: m.sender_role === "user",
+        })
+      );
       setMessages(mapped);
 
       // Check if this session is active (from history list)
@@ -138,24 +141,33 @@ export default function ChatScreen() {
         return "active";
       });
     });
-    socket.on("new_message", (payload: { content: string; sender_type?: string; senderType?: string }) => {
-      const senderType = payload.sender_type ?? payload.senderType ?? "";
-      if (senderType === "user") return;
-      setSessionStatus("active");
-      setSessionEnded(false);
-      setMessages((prev) => [
-        ...prev,
-        {
-          id: `m-${Date.now()}`,
-          message: payload.content,
-          timestamp: new Date().toLocaleTimeString([], {
-            hour: "2-digit",
-            minute: "2-digit",
-          }),
-          mine: false,
-        },
-      ]);
-    });
+    socket.on(
+      "new_message",
+      (payload: {
+        id?: string;
+        content: string;
+        sender_type?: string;
+        senderType?: string;
+        isAutomated?: boolean;
+      }) => {
+        const senderType = payload.sender_type ?? payload.senderType ?? "";
+        if (senderType === "user" && !payload.isAutomated) return;
+        setSessionStatus("active");
+        setSessionEnded(false);
+        setMessages((prev) => [
+          ...prev,
+          {
+            id: payload.id ?? `m-${Date.now()}`,
+            message: payload.content,
+            timestamp: new Date().toLocaleTimeString([], {
+              hour: "2-digit",
+              minute: "2-digit",
+            }),
+            mine: senderType === "user",
+          },
+        ]);
+      }
+    );
     socket.on("session_ended", (payload: {
       sessionId?: string;
       totalMinutes?: number;

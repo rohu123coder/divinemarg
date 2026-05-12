@@ -28,6 +28,7 @@ type ChatMessage = {
   senderType: "user" | "astrologer";
   content: string;
   createdAt: string;
+  isAutomated?: boolean;
 };
 
 function apiBase(): string {
@@ -176,7 +177,43 @@ export function ChatSessionClient({ sessionId }: ChatSessionClientProps) {
     socketRef.current = socket;
 
     socket.on("connect", () => {
-      socket.emit("join_session", { sessionId });
+      void (async () => {
+        try {
+          const res = await api.get(`/api/chat/history/${sessionId}/messages`);
+          const raw = (res.data?.data?.messages ?? []) as Array<{
+            id?: string;
+            sender_id?: string;
+            sender_role: "user" | "astrologer";
+            content: string;
+            created_at: string;
+            is_automated?: boolean;
+          }>;
+          const mapped: ChatMessage[] = raw.map((m) => ({
+            id: m.id ?? `hist-${Math.random()}`,
+            sessionId,
+            senderId: m.sender_id ?? "",
+            senderType: m.sender_role,
+            content: m.content,
+            createdAt: m.created_at,
+            isAutomated: m.is_automated,
+          }));
+          setMessages((prev) => {
+            if (prev.length === 0) return mapped;
+            const byId = new Map(prev.map((p) => [p.id, p]));
+            for (const m of mapped) {
+              if (!byId.has(m.id)) byId.set(m.id, m);
+            }
+            return [...byId.values()].sort(
+              (a, b) =>
+                new Date(a.createdAt).getTime() -
+                new Date(b.createdAt).getTime()
+            );
+          });
+        } catch {
+          // optional
+        }
+        socket.emit("join_session", { sessionId });
+      })();
     });
 
     socket.on("connect_error", () => {
@@ -219,7 +256,9 @@ export function ChatSessionClient({ sessionId }: ChatSessionClientProps) {
       if (msg.sessionId !== sessionId) {
         return;
       }
-      setMessages((prev) => [...prev, msg]);
+      setMessages((prev) =>
+        prev.some((p) => p.id === msg.id) ? prev : [...prev, msg]
+      );
     });
 
     socket.on(
