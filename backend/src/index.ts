@@ -6,6 +6,7 @@ import { Server } from "socket.io";
 
 import { connect as connectRedis } from "./lib/redis.js";
 import { adminRouter } from "./routes/admin.js";
+import { astrologerRouter } from "./routes/astrologer.js";
 import { astrologersRouter } from "./routes/astrologers.js";
 import { authRouter } from "./routes/auth.js";
 import { callsRouter } from "./routes/calls.js";
@@ -36,6 +37,7 @@ app.use("/api/admin", adminRouter);
 app.use("/api/auth", authRouter);
 app.use("/api/users", usersRouter);
 app.use("/api/astrologers", astrologersRouter);
+app.use("/api/astrologer", astrologerRouter);
 app.use("/api/chat", chatRouter);
 app.use("/api/kundali", kundaliRouter);
 app.use("/api/calls", callsRouter);

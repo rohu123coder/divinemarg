@@ -23,8 +23,19 @@ CREATE TABLE users (
   expo_push_token TEXT,
   push_token_updated_at TIMESTAMPTZ,
   push_platform VARCHAR(10),
-  push_enabled BOOLEAN DEFAULT true
+  push_enabled BOOLEAN DEFAULT true,
+  date_of_birth DATE,
+  time_of_birth TIME,
+  birth_place_name VARCHAR(255),
+  birth_lat NUMERIC(10, 7),
+  birth_lng NUMERIC(10, 7),
+  birth_utc_offset NUMERIC(4, 2) DEFAULT 5.5,
+  gender VARCHAR(20)
 );
+
+CREATE INDEX IF NOT EXISTS idx_users_has_birth_details
+  ON users (id)
+  WHERE date_of_birth IS NOT NULL;
 
 CREATE TABLE astrologers (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
