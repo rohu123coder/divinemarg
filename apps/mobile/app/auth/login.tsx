@@ -5,6 +5,7 @@ import { Alert, Pressable, StyleSheet, Text, TextInput, View } from "react-nativ
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import api from "../../lib/api";
+import { setupPushNotifications } from "../../lib/pushNotifications";
 import { useAppStore, type User } from "../../lib/store";
 
 export default function LoginScreen() {
@@ -47,6 +48,7 @@ export default function LoginScreen() {
         },
         token,
       });
+      void setupPushNotifications(token);
       router.replace("/(tabs)");
     } catch {
       Alert.alert("Error", "Invalid OTP.");

@@ -1,0 +1,232 @@
+npm warn Unknown env config "devdir". This will stop working in the next major version of npm. See `npm help npmrc` for supported config options.
+
+> build
+> npm run build --workspaces --if-present
+
+npm warn Unknown env config "devdir". This will stop working in the next major version of npm. See `npm help npmrc` for supported config options.
+
+> divinemarg-admin@0.1.0 build
+> next build
+
+  ▲ Next.js 14.2.35
+  - Environments: .env.local
+
+   Creating an optimized production build ...
+ ⚠ Found lockfile missing swc dependencies, patching...
+npm warn config ignoring workspace config at /Users/rohit/astro-platform/apps/admin/.npmrc
+npm warn Unknown env config "devdir". This will stop working in the next major version of npm. See `npm help npmrc` for supported config options.
+npm error code ENOWORKSPACES
+npm error This command does not support workspaces.
+npm error A complete log of this run can be found in: /var/folders/4f/m02h6m412kz7tj2549mvmjw40000gn/T/cursor-sandbox-cache/961e351ea875e98f969d718d024a9706/npm/_logs/2026-05-04T18_26_47_138Z-debug-0.log
+ ⨯ Failed to patch lockfile, please try uninstalling and reinstalling next in this workspace
+[TypeError: fetch failed] {
+  [cause]: Error: getaddrinfo ENOTFOUND registry.npmjs.org
+      at GetAddrInfoReqWrap.onlookupall [as oncomplete] (node:dns:121:26) {
+    errno: -3008,
+    code: 'ENOTFOUND',
+    syscall: 'getaddrinfo',
+    hostname: 'registry.npmjs.org'
+  }
+}
+ ⚠ Found lockfile missing swc dependencies, patching...
+npm warn config ignoring workspace config at /Users/rohit/astro-platform/apps/admin/.npmrc
+npm warn Unknown env config "devdir". This will stop working in the next major version of npm. See `npm help npmrc` for supported config options.
+npm error code ENOWORKSPACES
+npm error This command does not support workspaces.
+npm error A complete log of this run can be found in: /var/folders/4f/m02h6m412kz7tj2549mvmjw40000gn/T/cursor-sandbox-cache/961e351ea875e98f969d718d024a9706/npm/_logs/2026-05-04T18_26_49_079Z-debug-0.log
+ ⨯ Failed to patch lockfile, please try uninstalling and reinstalling next in this workspace
+[TypeError: fetch failed] {
+  [cause]: Error: getaddrinfo ENOTFOUND registry.npmjs.org
+      at GetAddrInfoReqWrap.onlookupall [as oncomplete] (node:dns:121:26) {
+    errno: -3008,
+    code: 'ENOTFOUND',
+    syscall: 'getaddrinfo',
+    hostname: 'registry.npmjs.org'
+  }
+}
+ ⚠ Found lockfile missing swc dependencies, patching...
+npm warn config ignoring workspace config at /Users/rohit/astro-platform/apps/admin/.npmrc
+npm warn Unknown env config "devdir". This will stop working in the next major version of npm. See `npm help npmrc` for supported config options.
+npm error code ENOWORKSPACES
+npm error This command does not support workspaces.
+npm error A complete log of this run can be found in: /var/folders/4f/m02h6m412kz7tj2549mvmjw40000gn/T/cursor-sandbox-cache/961e351ea875e98f969d718d024a9706/npm/_logs/2026-05-04T18_26_49_754Z-debug-0.log
+ ⨯ Failed to patch lockfile, please try uninstalling and reinstalling next in this workspace
+[TypeError: fetch failed] {
+  [cause]: Error: getaddrinfo ENOTFOUND registry.npmjs.org
+      at GetAddrInfoReqWrap.onlookupall [as oncomplete] (node:dns:121:26) {
+    errno: -3008,
+    code: 'ENOTFOUND',
+    syscall: 'getaddrinfo',
+    hostname: 'registry.npmjs.org'
+  }
+}
+ ✓ Compiled successfully
+   Linting and checking validity of types ...
+
+Failed to compile.
+
+./app/error.tsx
+4:3  Error: 'error' is defined but never used.  @typescript-eslint/no-unused-vars
+
+./app/global-error.tsx
+4:3  Error: 'error' is defined but never used.  @typescript-eslint/no-unused-vars
+
+info  - Need to disable some ESLint rules? Learn more here: https://nextjs.org/docs/basic-features/eslint#disabling-rules
+npm error Lifecycle script `build` failed with error:
+npm error code 1
+npm error path /Users/rohit/astro-platform/apps/admin
+npm error workspace divinemarg-admin@0.1.0
+npm error location /Users/rohit/astro-platform/apps/admin
+npm error command failed
+npm error command sh -c next build
+
+
+> divinemarg-web@0.1.0 build
+> next build
+
+  ▲ Next.js 14.2.35
+  - Environments: .env.local
+
+   Creating an optimized production build ...
+ ⚠ Found lockfile missing swc dependencies, patching...
+npm warn Unknown env config "devdir". This will stop working in the next major version of npm. See `npm help npmrc` for supported config options.
+npm error code ENOWORKSPACES
+npm error This command does not support workspaces.
+npm error A complete log of this run can be found in: /var/folders/4f/m02h6m412kz7tj2549mvmjw40000gn/T/cursor-sandbox-cache/961e351ea875e98f969d718d024a9706/npm/_logs/2026-05-04T18_26_54_174Z-debug-0.log
+ ⨯ Failed to patch lockfile, please try uninstalling and reinstalling next in this workspace
+[TypeError: fetch failed] {
+  [cause]: Error: getaddrinfo ENOTFOUND registry.npmjs.org
+      at GetAddrInfoReqWrap.onlookupall [as oncomplete] (node:dns:121:26) {
+    errno: -3008,
+    code: 'ENOTFOUND',
+    syscall: 'getaddrinfo',
+    hostname: 'registry.npmjs.org'
+  }
+}
+ ⚠ Found lockfile missing swc dependencies, patching...
+npm warn Unknown env config "devdir". This will stop working in the next major version of npm. See `npm help npmrc` for supported config options.
+npm error code ENOWORKSPACES
+npm error This command does not support workspaces.
+npm error A complete log of this run can be found in: /var/folders/4f/m02h6m412kz7tj2549mvmjw40000gn/T/cursor-sandbox-cache/961e351ea875e98f969d718d024a9706/npm/_logs/2026-05-04T18_26_56_096Z-debug-0.log
+ ⨯ Failed to patch lockfile, please try uninstalling and reinstalling next in this workspace
+[TypeError: fetch failed] {
+  [cause]: Error: getaddrinfo ENOTFOUND registry.npmjs.org
+      at GetAddrInfoReqWrap.onlookupall [as oncomplete] (node:dns:121:26) {
+    errno: -3008,
+    code: 'ENOTFOUND',
+    syscall: 'getaddrinfo',
+    hostname: 'registry.npmjs.org'
+  }
+}
+ ⚠ Found lockfile missing swc dependencies, patching...
+npm warn Unknown env config "devdir". This will stop working in the next major version of npm. See `npm help npmrc` for supported config options.
+npm error code ENOWORKSPACES
+npm error This command does not support workspaces.
+npm error A complete log of this run can be found in: /var/folders/4f/m02h6m412kz7tj2549mvmjw40000gn/T/cursor-sandbox-cache/961e351ea875e98f969d718d024a9706/npm/_logs/2026-05-04T18_26_57_094Z-debug-0.log
+ ⨯ Failed to patch lockfile, please try uninstalling and reinstalling next in this workspace
+[TypeError: fetch failed] {
+  [cause]: Error: getaddrinfo ENOTFOUND registry.npmjs.org
+      at GetAddrInfoReqWrap.onlookupall [as oncomplete] (node:dns:121:26) {
+    errno: -3008,
+    code: 'ENOTFOUND',
+    syscall: 'getaddrinfo',
+    hostname: 'registry.npmjs.org'
+  }
+}
+ ✓ Compiled successfully
+   Skipping validation of types
+   Skipping linting
+   Collecting page data ...
+ ⚠ Found lockfile missing swc dependencies, patching...
+npm warn Unknown env config "devdir". This will stop working in the next major version of npm. See `npm help npmrc` for supported config options.
+npm error code ENOWORKSPACES
+npm error This command does not support workspaces.
+npm error A complete log of this run can be found in: /var/folders/4f/m02h6m412kz7tj2549mvmjw40000gn/T/cursor-sandbox-cache/961e351ea875e98f969d718d024a9706/npm/_logs/2026-05-04T18_26_58_750Z-debug-0.log
+ ⨯ Failed to patch lockfile, please try uninstalling and reinstalling next in this workspace
+[TypeError: fetch failed] {
+  [cause]: Error: getaddrinfo ENOTFOUND registry.npmjs.org
+      at GetAddrInfoReqWrap.onlookupall [as oncomplete] (node:dns:121:26) {
+    errno: -3008,
+    code: 'ENOTFOUND',
+    syscall: 'getaddrinfo',
+    hostname: 'registry.npmjs.org'
+  }
+}
+ ⚠ Using edge runtime on a page currently disables static generation for that page
+   Generating static pages (0/36) ...
+Error: Minified React error #31; visit https://react.dev/errors/31?args[]=object%20with%20keys%20%7B%24%24typeof%2C%20type%2C%20key%2C%20ref%2C%20props%2C%20_owner%7D for the full message or use the non-minified dev environment for full errors and additional helpful warnings.
+    at retryNode (/Users/rohit/astro-platform/node_modules/react-dom/cjs/react-dom-server.browser.production.js:5004:13)
+    at renderNodeDestructive (/Users/rohit/astro-platform/node_modules/react-dom/cjs/react-dom-server.browser.production.js:4779:7)
+    at renderElement (/Users/rohit/astro-platform/node_modules/react-dom/cjs/react-dom-server.browser.production.js:4365:7)
+    at retryNode (/Users/rohit/astro-platform/node_modules/react-dom/cjs/react-dom-server.browser.production.js:4960:16)
+    at renderNodeDestructive (/Users/rohit/astro-platform/node_modules/react-dom/cjs/react-dom-server.browser.production.js:4779:7)
+    at finishFunctionComponent (/Users/rohit/astro-platform/node_modules/react-dom/cjs/react-dom-server.browser.production.js:4271:9)
+    at renderElement (/Users/rohit/astro-platform/node_modules/react-dom/cjs/react-dom-server.browser.production.js:4370:7)
+    at retryNode (/Users/rohit/astro-platform/node_modules/react-dom/cjs/react-dom-server.browser.production.js:4960:16)
+    at renderNodeDestructive (/Users/rohit/astro-platform/node_modules/react-dom/cjs/react-dom-server.browser.production.js:4779:7)
+    at renderNode (/Users/rohit/astro-platform/node_modules/react-dom/cjs/react-dom-server.browser.production.js:5215:14)
+
+Error occurred prerendering page "/404". Read more: https://nextjs.org/docs/messages/prerender-error
+
+Error: Minified React error #31; visit https://react.dev/errors/31?args[]=object%20with%20keys%20%7B%24%24typeof%2C%20type%2C%20key%2C%20ref%2C%20props%2C%20_owner%7D for the full message or use the non-minified dev environment for full errors and additional helpful warnings.
+    at retryNode (/Users/rohit/astro-platform/node_modules/react-dom/cjs/react-dom-server.browser.production.js:5004:13)
+    at renderNodeDestructive (/Users/rohit/astro-platform/node_modules/react-dom/cjs/react-dom-server.browser.production.js:4779:7)
+    at renderElement (/Users/rohit/astro-platform/node_modules/react-dom/cjs/react-dom-server.browser.production.js:4365:7)
+    at retryNode (/Users/rohit/astro-platform/node_modules/react-dom/cjs/react-dom-server.browser.production.js:4960:16)
+    at renderNodeDestructive (/Users/rohit/astro-platform/node_modules/react-dom/cjs/react-dom-server.browser.production.js:4779:7)
+    at finishFunctionComponent (/Users/rohit/astro-platform/node_modules/react-dom/cjs/react-dom-server.browser.production.js:4271:9)
+    at renderElement (/Users/rohit/astro-platform/node_modules/react-dom/cjs/react-dom-server.browser.production.js:4370:7)
+    at retryNode (/Users/rohit/astro-platform/node_modules/react-dom/cjs/react-dom-server.browser.production.js:4960:16)
+    at renderNodeDestructive (/Users/rohit/astro-platform/node_modules/react-dom/cjs/react-dom-server.browser.production.js:4779:7)
+    at renderNode (/Users/rohit/astro-platform/node_modules/react-dom/cjs/react-dom-server.browser.production.js:5215:14)
+Error: Minified React error #31; visit https://react.dev/errors/31?args[]=object%20with%20keys%20%7B%24%24typeof%2C%20type%2C%20key%2C%20ref%2C%20props%2C%20_owner%7D for the full message or use the non-minified dev environment for full errors and additional helpful warnings.
+    at retryNode (/Users/rohit/astro-platform/node_modules/react-dom/cjs/react-dom-server.browser.production.js:5004:13)
+    at renderNodeDestructive (/Users/rohit/astro-platform/node_modules/react-dom/cjs/react-dom-server.browser.production.js:4779:7)
+    at renderElement (/Users/rohit/astro-platform/node_modules/react-dom/cjs/react-dom-server.browser.production.js:4365:7)
+    at retryNode (/Users/rohit/astro-platform/node_modules/react-dom/cjs/react-dom-server.browser.production.js:4960:16)
+    at renderNodeDestructive (/Users/rohit/astro-platform/node_modules/react-dom/cjs/react-dom-server.browser.production.js:4779:7)
+    at finishFunctionComponent (/Users/rohit/astro-platform/node_modules/react-dom/cjs/react-dom-server.browser.production.js:4271:9)
+    at renderElement (/Users/rohit/astro-platform/node_modules/react-dom/cjs/react-dom-server.browser.production.js:4370:7)
+    at retryNode (/Users/rohit/astro-platform/node_modules/react-dom/cjs/react-dom-server.browser.production.js:4960:16)
+    at renderNodeDestructive (/Users/rohit/astro-platform/node_modules/react-dom/cjs/react-dom-server.browser.production.js:4779:7)
+    at renderNode (/Users/rohit/astro-platform/node_modules/react-dom/cjs/react-dom-server.browser.production.js:5215:14)
+
+Error occurred prerendering page "/500". Read more: https://nextjs.org/docs/messages/prerender-error
+
+Error: Minified React error #31; visit https://react.dev/errors/31?args[]=object%20with%20keys%20%7B%24%24typeof%2C%20type%2C%20key%2C%20ref%2C%20props%2C%20_owner%7D for the full message or use the non-minified dev environment for full errors and additional helpful warnings.
+    at retryNode (/Users/rohit/astro-platform/node_modules/react-dom/cjs/react-dom-server.browser.production.js:5004:13)
+    at renderNodeDestructive (/Users/rohit/astro-platform/node_modules/react-dom/cjs/react-dom-server.browser.production.js:4779:7)
+    at renderElement (/Users/rohit/astro-platform/node_modules/react-dom/cjs/react-dom-server.browser.production.js:4365:7)
+    at retryNode (/Users/rohit/astro-platform/node_modules/react-dom/cjs/react-dom-server.browser.production.js:4960:16)
+    at renderNodeDestructive (/Users/rohit/astro-platform/node_modules/react-dom/cjs/react-dom-server.browser.production.js:4779:7)
+    at finishFunctionComponent (/Users/rohit/astro-platform/node_modules/react-dom/cjs/react-dom-server.browser.production.js:4271:9)
+    at renderElement (/Users/rohit/astro-platform/node_modules/react-dom/cjs/react-dom-server.browser.production.js:4370:7)
+    at retryNode (/Users/rohit/astro-platform/node_modules/react-dom/cjs/react-dom-server.browser.production.js:4960:16)
+    at renderNodeDestructive (/Users/rohit/astro-platform/node_modules/react-dom/cjs/react-dom-server.browser.production.js:4779:7)
+    at renderNode (/Users/rohit/astro-platform/node_modules/react-dom/cjs/react-dom-server.browser.production.js:5215:14)
+(node:40006) Warning: `--localstorage-file` was provided without a valid path
+(Use `node --trace-warnings ...` to show where the warning was created)
+   Generating static pages (9/36) 
+   Generating static pages (18/36) 
+   Generating static pages (27/36) 
+ ✓ Generating static pages (36/36)
+
+> Export encountered errors on following paths:
+	/_error: /404
+	/_error: /500
+npm error Lifecycle script `build` failed with error:
+npm error code 1
+npm error path /Users/rohit/astro-platform/apps/web
+npm error workspace divinemarg-web@0.1.0
+npm error location /Users/rohit/astro-platform/apps/web
+npm error command failed
+npm error command sh -c next build
+
+
+> divinemarg-backend@1.0.0 build
+> tsc
+
+
+> divinemarg-shared@1.0.0 build
+> tsc
+

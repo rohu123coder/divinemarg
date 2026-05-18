@@ -3,6 +3,7 @@ import { persist, createJSONStorage } from "zustand/middleware";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
 import { setToken } from "./auth";
+import { unregisterPushNotifications } from "./pushNotifications";
 
 export type User = {
   id: string;
@@ -60,7 +61,7 @@ type AppState = {
 
 export const useAppStore = create<AppState>()(
   persist(
-    (set) => ({
+    (set, get) => ({
       user: null,
       token: "",
       isLoggedIn: false,
@@ -72,7 +73,11 @@ export const useAppStore = create<AppState>()(
         set({ user, token, isLoggedIn: true });
       },
       logout: () => {
+        const prevToken = get().token;
         void setToken(null);
+        if (prevToken) {
+          void unregisterPushNotifications(prevToken);
+        }
         set({ user: null, token: "", isLoggedIn: false });
       },
       setAstrologers: (astrologers) => set({ astrologers }),

@@ -17,6 +17,7 @@ import { setSocketServer } from "./socket/io.js";
 import { registerSocketHandlers } from "./socket/index.js";
 import { sessionsRouter } from "./routes/sessions.js";
 import { usersRouter } from "./routes/users.js";
+import { leadsRouter } from "./routes/leads.js";
 import { walletRouter } from "./routes/wallet.js";
 
 dotenv.config();
@@ -43,6 +44,7 @@ app.use("/api/kundali", kundaliRouter);
 app.use("/api/calls", callsRouter);
 app.use("/api/sessions", sessionsRouter);
 app.use("/api/wallet", walletRouter);
+app.use("/api/leads", leadsRouter);
 app.use("/api/notifications", notificationsRouter);
 
 const httpServer = createServer(app);

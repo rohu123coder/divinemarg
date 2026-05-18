@@ -2,9 +2,10 @@ import axios from "axios";
 import { router } from "expo-router";
 
 import { getTokenAsync } from "./auth";
+import { PUBLIC_API_BASE_URL } from "./env";
 import { useAppStore } from "./store";
 
-const baseURL = "https://divinemarg.onrender.com";
+const baseURL = PUBLIC_API_BASE_URL;
 
 const api = axios.create({
   baseURL,
