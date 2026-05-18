@@ -1,5 +1,8 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { Suspense } from "react";
+
+import { ThankYouDemoClient } from "./ThankYouDemoClient";
 
 export const metadata: Metadata = {
   title: "Demo Booked | DivineMarg",
@@ -10,6 +13,9 @@ export const metadata: Metadata = {
 export default function ThankYouDemoPage() {
   return (
     <main className="flex min-h-screen flex-col items-center justify-center bg-[#1A0B2E] px-4 text-center text-[#FFF8E7]">
+      <Suspense fallback={null}>
+        <ThankYouDemoClient />
+      </Suspense>
       <p className="text-5xl">✨</p>
       <h1 className="mt-4 text-3xl font-bold md:text-4xl">Booking Confirmed!</h1>
       <p className="mt-4 max-w-md text-lg text-[#FFF8E7]/85">

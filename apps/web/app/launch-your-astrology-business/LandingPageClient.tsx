@@ -1,6 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
+
+import { trackGAEvent, trackMetaEvent } from "@/lib/tracking";
 
 import { ComparisonTable } from "./components/ComparisonTable";
 import { CursorTrail } from "./components/CursorTrail";
@@ -28,11 +30,18 @@ export function LandingPageClient() {
   const [checkoutOpen, setCheckoutOpen] = useState(false);
   const [checkoutSource, setCheckoutSource] = useState("landing-cta");
 
+  useEffect(() => {
+    trackMetaEvent("ViewContent", {
+      content_name: "B2B Astrology Business Demo",
+    });
+    trackGAEvent("view_content", {
+      content_name: "b2b_astrology_demo",
+    });
+  }, []);
+
   const handleOpenCheckout = (source: string) => {
     setCheckoutSource(source);
     setCheckoutOpen(true);
-    // Meta Pixel: fbq('track', 'InitiateCheckout');
-    // GA4: gtag('event', 'demo_modal_opened');
   };
 
   return (
@@ -64,11 +73,6 @@ export function LandingPageClient() {
           onClose={() => setCheckoutOpen(false)}
           source={checkoutSource}
         />
-
-        {/* Tracking placeholders
-        <Script id="meta-pixel" strategy="afterInteractive">{`...`}</Script>
-        <Script id="ga4" strategy="afterInteractive">{`...`}</Script>
-        */}
       </div>
     </DemoBookingProvider>
   );

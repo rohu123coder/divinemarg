@@ -1,6 +1,5 @@
 import { createHmac, timingSafeEqual } from "node:crypto";
 
-import Razorpay from "razorpay";
 import { Router, type Request, type Response } from "express";
 import { z } from "zod";
 
@@ -13,25 +12,19 @@ import {
 const router = Router();
 
 const DEMO_AMOUNT_INR = 99;
-const DEMO_AMOUNT_PAISE = 9900;
-
-function getRazorpay(): Razorpay {
-  const key_id = process.env.RAZORPAY_KEY_ID;
-  const key_secret = process.env.RAZORPAY_KEY_SECRET;
-  if (!key_id || !key_secret) {
-    throw new Error("RAZORPAY_KEY_ID and RAZORPAY_KEY_SECRET are required");
-  }
-  return new Razorpay({ key_id, key_secret });
-}
 
 const demoBookingBody = z.object({
   name: z.string().min(2).max(120),
   email: z.string().email(),
-  phone: z.string().min(10).max(15),
+  phone: z
+    .string()
+    .transform((s) => s.replace(/\D/g, ""))
+    .pipe(z.string().regex(/^\d{10}$/, "Phone must be 10 digits")),
   city: z.string().min(2).max(80),
   currentBusiness: z.string().max(2000).optional(),
   amount: z.number().default(DEMO_AMOUNT_INR),
   source: z.string().default("landing-page-b2b"),
+  status: z.enum(["lead_only", "pending", "paid"]).default("lead_only"),
 });
 
 router.post("/demo-booking", async (req: Request, res: Response) => {
@@ -44,22 +37,13 @@ router.post("/demo-booking", async (req: Request, res: Response) => {
     return;
   }
 
-  const { name, email, phone, city, currentBusiness, source } = parsed.data;
-
-  let rzp: Razorpay;
-  try {
-    rzp = getRazorpay();
-  } catch (e) {
-    console.error(e);
-    res.status(500).json({ success: false, error: "Payment provider misconfigured" });
-    return;
-  }
+  const { name, email, phone, city, currentBusiness, source, status } = parsed.data;
 
   const leadResult = await query<{ id: string }>(
     `INSERT INTO demo_booking_leads (name, email, phone, city, current_business, amount, source, status)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, 'pending')
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
      RETURNING id`,
-    [name, email, phone, city, currentBusiness ?? null, DEMO_AMOUNT_INR, source]
+    [name, email, phone, city, currentBusiness ?? null, DEMO_AMOUNT_INR, source, status]
   );
 
   const leadId = leadResult.rows[0]?.id;
@@ -68,42 +52,15 @@ router.post("/demo-booking", async (req: Request, res: Response) => {
     return;
   }
 
-  const receipt = `demo_${leadId.replace(/-/g, "").slice(0, 12)}_${Date.now()}`.slice(
-    0,
-    40
-  );
-
-  let order: { id: string; amount: number; currency: string };
-  try {
-    order = (await rzp.orders.create({
-      amount: DEMO_AMOUNT_PAISE,
-      currency: "INR",
-      receipt,
-      notes: { lead_id: leadId, source },
-    })) as { id: string; amount: number; currency: string };
-  } catch (e) {
-    console.error("Razorpay demo order failed:", e);
-    res.status(502).json({ success: false, error: "Could not create payment order" });
-    return;
-  }
-
-  await query(
-    `UPDATE demo_booking_leads SET razorpay_order_id = $1 WHERE id = $2`,
-    [order.id, leadId]
-  );
-
   res.status(201).json({
     success: true,
     data: {
-      leadId,
-      orderId: order.id,
-      amount: order.amount,
-      currency: order.currency,
-      keyId: process.env.RAZORPAY_KEY_ID,
+      lead_id: leadId,
     },
   });
 });
 
+/** Legacy SDK checkout verify — kept for NEXT_PUBLIC_USE_CUSTOM_CHECKOUT */
 const verifyDemoBody = z.object({
   leadId: z.string().uuid(),
   razorpay_order_id: z.string().min(1),
@@ -162,7 +119,7 @@ router.post("/demo-booking/verify", async (req: Request, res: Response) => {
     return;
   }
 
-  if (lead.razorpay_order_id !== razorpay_order_id) {
+  if (lead.razorpay_order_id && lead.razorpay_order_id !== razorpay_order_id) {
     res.status(400).json({ success: false, error: "Order mismatch" });
     return;
   }
@@ -176,9 +133,11 @@ router.post("/demo-booking/verify", async (req: Request, res: Response) => {
     `UPDATE demo_booking_leads
      SET status = 'paid',
          razorpay_payment_id = $1,
+         razorpay_order_id = COALESCE(razorpay_order_id, $2),
+         amount_paid = $3,
          paid_at = now()
-     WHERE id = $2`,
-    [razorpay_payment_id, leadId]
+     WHERE id = $4`,
+    [razorpay_payment_id, razorpay_order_id, DEMO_AMOUNT_INR, leadId]
   );
 
   void sendDemoBookingConfirmation(lead.email, lead.name).catch((err) =>

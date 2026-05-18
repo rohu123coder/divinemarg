@@ -2,15 +2,11 @@
 
 import { AnimatePresence, motion } from "framer-motion";
 import { X } from "lucide-react";
-import { useRouter } from "next/navigation";
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 
-import {
-  createDemoBooking,
-  verifyDemoBooking,
-  type DemoBookingFormData,
-} from "@/lib/leadCapture";
-import { loadRazorpayScript } from "@/lib/razorpay";
+import { createDemoBooking, type DemoBookingFormData } from "@/lib/leadCapture";
+import { buildRazorpayPaymentPageUrl } from "@/lib/razorpayPaymentPage";
+import { trackGAEvent, trackMetaEvent } from "@/lib/tracking";
 
 type RazorpayCheckoutProps = {
   open: boolean;
@@ -26,30 +22,70 @@ const initialForm: DemoBookingFormData = {
   currentBusiness: "",
 };
 
+const DEMO_VALUE = 99;
+const DEMO_CURRENCY = "INR";
+
+function normalizePhone(phone: string): string {
+  const digits = phone.replace(/\D/g, "");
+  if (digits.length === 12 && digits.startsWith("91")) {
+    return digits.slice(2);
+  }
+  return digits;
+}
+
 function validateForm(form: DemoBookingFormData): string | null {
   if (form.name.trim().length < 2) return "Please enter your full name";
-  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email)) return "Please enter a valid email";
-  if (!/^\d{10,15}$/.test(form.phone.replace(/\D/g, ""))) return "Please enter a valid phone number";
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email.trim())) {
+    return "Please enter a valid email address";
+  }
+  const phone = normalizePhone(form.phone);
+  if (!/^\d{10}$/.test(phone)) return "Phone must be exactly 10 digits";
   if (form.city.trim().length < 2) return "Please enter your city";
   return null;
 }
 
 export function RazorpayCheckout({ open, onClose, source }: RazorpayCheckoutProps) {
-  const router = useRouter();
   const [form, setForm] = useState<DemoBookingFormData>(initialForm);
   const [error, setError] = useState<string | null>(null);
+  const [warning, setWarning] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
   const reset = useCallback(() => {
     setForm(initialForm);
     setError(null);
+    setWarning(null);
     setLoading(false);
   }, []);
+
+  useEffect(() => {
+    if (!open) return;
+    trackMetaEvent("InitiateCheckout", { value: DEMO_VALUE, currency: DEMO_CURRENCY });
+    trackGAEvent("begin_checkout", {
+      value: DEMO_VALUE,
+      currency: DEMO_CURRENCY,
+      items: [{ item_name: "B2B Demo Booking" }],
+    });
+  }, [open]);
 
   const handleClose = () => {
     if (loading) return;
     reset();
     onClose();
+  };
+
+  const redirectToPaymentPage = (params: {
+    name: string;
+    email: string;
+    phone: string;
+    leadId?: string;
+  }) => {
+    const paymentUrl = buildRazorpayPaymentPageUrl(params);
+    if (!paymentUrl) {
+      setError("Payment page is not configured. Please contact support@divinemarg.com.");
+      setLoading(false);
+      return;
+    }
+    window.location.href = paymentUrl;
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -61,100 +97,52 @@ export function RazorpayCheckout({ open, onClose, source }: RazorpayCheckoutProp
     }
 
     setError(null);
+    setWarning(null);
     setLoading(true);
 
+    const payload = {
+      name: form.name.trim(),
+      email: form.email.trim(),
+      phone: normalizePhone(form.phone),
+      city: form.city.trim(),
+      currentBusiness: form.currentBusiness?.trim() || undefined,
+      source,
+    };
+
+    let leadId: string | undefined;
+
     try {
-      // trackEvent('demo_form_submitted');
-      const order = await createDemoBooking({
-        name: form.name.trim(),
-        email: form.email.trim(),
-        phone: form.phone.replace(/\D/g, ""),
-        city: form.city.trim(),
-        currentBusiness: form.currentBusiness?.trim() || undefined,
+      const result = await createDemoBooking(payload);
+      leadId = result.lead_id;
+
+      trackMetaEvent("Lead", {
+        value: DEMO_VALUE,
+        currency: DEMO_CURRENCY,
+        content_name: "B2B Demo Booking",
       });
-
-      await loadRazorpayScript();
-      const Razorpay = window.Razorpay;
-      if (!Razorpay) {
-        throw new Error("Payment gateway unavailable");
-      }
-
-      // trackEvent('demo_payment_initiated');
-
-      const rzp = new Razorpay({
-        key: order.keyId,
-        amount: order.amount,
-        currency: order.currency,
-        name: "DivineMarg",
-        description: "₹99 Live Demo Booking",
-        order_id: order.orderId,
-        prefill: {
-          name: form.name,
-          email: form.email,
-          contact: form.phone,
-        },
-        notes: { source, lead_id: order.leadId },
-        handler: async (response: {
-          razorpay_payment_id: string;
-          razorpay_order_id: string;
-          razorpay_signature: string;
-        }) => {
-          setLoading(true);
-          try {
-            await verifyDemoBooking({
-              leadId: order.leadId,
-              razorpay_order_id: response.razorpay_order_id,
-              razorpay_payment_id: response.razorpay_payment_id,
-              razorpay_signature: response.razorpay_signature,
-            });
-            // trackEvent('demo_payment_success');
-            handleClose();
-            router.push("/thank-you-demo");
-          } catch (err: unknown) {
-            const msg =
-              err &&
-              typeof err === "object" &&
-              "response" in err &&
-              err.response &&
-              typeof err.response === "object" &&
-              "data" in err.response &&
-              err.response.data &&
-              typeof err.response.data === "object" &&
-              "error" in err.response.data
-                ? String((err.response.data as { error?: string }).error)
-                : "Payment verification failed. Contact support@divinemarg.com";
-            setError(msg);
-          } finally {
-            setLoading(false);
-          }
-        },
-        modal: {
-          ondismiss: () => {
-            setLoading(false);
-          },
-        },
+      trackGAEvent("generate_lead", {
+        value: DEMO_VALUE,
+        currency: DEMO_CURRENCY,
       });
-
-      setLoading(false);
-      rzp.open();
-    } catch (err: unknown) {
-      const msg =
-        err &&
-        typeof err === "object" &&
-        "response" in err &&
-        err.response &&
-        typeof err.response === "object" &&
-        "data" in err.response &&
-        err.response.data &&
-        typeof err.response.data === "object" &&
-        "error" in err.response.data
-          ? String((err.response.data as { error?: string }).error)
-          : err instanceof Error
-            ? err.message
-            : "Could not start checkout. Please try again.";
-      setError(msg);
-      setLoading(false);
+    } catch {
+      setWarning(
+        "We could not save your details right now, but you can still continue to payment."
+      );
     }
+
+    /*
+     * Custom Razorpay SDK checkout (uncomment when divinemarg.com account is approved):
+     * Set NEXT_PUBLIC_USE_CUSTOM_CHECKOUT=true and restore loadRazorpayScript + verifyDemoBooking flow.
+     *
+     * if (process.env.NEXT_PUBLIC_USE_CUSTOM_CHECKOUT === 'true') { ... }
+     */
+
+    redirectToPaymentPage({
+      name: payload.name,
+      email: payload.email,
+      phone: payload.phone,
+      leadId,
+    });
   };
 
   const update = (field: keyof DemoBookingFormData, value: string) => {
@@ -216,6 +204,7 @@ export function RazorpayCheckout({ open, onClose, source }: RazorpayCheckoutProp
                   onChange={(e) => update("name", e.target.value)}
                   className="field-input"
                   placeholder="Your name"
+                  autoComplete="name"
                 />
               </Field>
               <Field label="Email *" id="email">
@@ -227,6 +216,7 @@ export function RazorpayCheckout({ open, onClose, source }: RazorpayCheckoutProp
                   onChange={(e) => update("email", e.target.value)}
                   className="field-input"
                   placeholder="you@email.com"
+                  autoComplete="email"
                 />
               </Field>
               <Field label="Phone (WhatsApp) *" id="phone">
@@ -234,10 +224,13 @@ export function RazorpayCheckout({ open, onClose, source }: RazorpayCheckoutProp
                   id="phone"
                   type="tel"
                   required
+                  inputMode="numeric"
+                  maxLength={10}
                   value={form.phone}
-                  onChange={(e) => update("phone", e.target.value)}
+                  onChange={(e) => update("phone", e.target.value.replace(/\D/g, "").slice(0, 10))}
                   className="field-input"
                   placeholder="10-digit mobile"
+                  autoComplete="tel"
                 />
               </Field>
               <Field label="City *" id="city">
@@ -248,6 +241,7 @@ export function RazorpayCheckout({ open, onClose, source }: RazorpayCheckoutProp
                   onChange={(e) => update("city", e.target.value)}
                   className="field-input"
                   placeholder="Mumbai, Delhi, etc."
+                  autoComplete="address-level2"
                 />
               </Field>
               <Field label="Current Business (optional)" id="business">
@@ -261,6 +255,12 @@ export function RazorpayCheckout({ open, onClose, source }: RazorpayCheckoutProp
                 />
               </Field>
 
+              {warning ? (
+                <p className="rounded-lg bg-amber-500/10 px-3 py-2 text-sm text-amber-200">
+                  {warning}
+                </p>
+              ) : null}
+
               {error ? (
                 <p className="rounded-lg bg-red-500/10 px-3 py-2 text-sm text-red-300">{error}</p>
               ) : null}
@@ -270,7 +270,7 @@ export function RazorpayCheckout({ open, onClose, source }: RazorpayCheckoutProp
                 disabled={loading}
                 className="w-full rounded-full bg-cta-gold py-4 font-semibold text-cosmic-deep shadow-gold-glow disabled:opacity-60"
               >
-                {loading ? "Processing…" : "Pay ₹99 & Confirm Demo"}
+                {loading ? "Redirecting to payment…" : "Continue to Pay ₹99"}
               </button>
             </form>
           </motion.div>

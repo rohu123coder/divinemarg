@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 import { Cormorant_Garamond, Plus_Jakarta_Sans, Inter } from "next/font/google";
 
+import { AnalyticsScripts } from "@/components/AnalyticsScripts";
+
 import { faqs } from "./lib/content";
 import "./landing.css";
 
@@ -98,6 +100,7 @@ export default function LaunchLandingLayout({
         dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
       />
       {children}
+      <AnalyticsScripts />
     </div>
   );
 }

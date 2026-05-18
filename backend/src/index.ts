@@ -18,6 +18,7 @@ import { registerSocketHandlers } from "./socket/index.js";
 import { sessionsRouter } from "./routes/sessions.js";
 import { usersRouter } from "./routes/users.js";
 import { leadsRouter } from "./routes/leads.js";
+import { razorpayWebhookHandler } from "./routes/webhooks.js";
 import { walletRouter } from "./routes/wallet.js";
 
 dotenv.config();
@@ -28,6 +29,13 @@ if (!process.env.JWT_SECRET) {
 
 const app = express();
 app.use(cors({ origin: "*" }));
+
+app.post(
+  "/api/webhooks/razorpay",
+  express.raw({ type: "application/json" }),
+  razorpayWebhookHandler
+);
+
 app.use(express.json());
 
 app.get("/health", (_req, res) => {
