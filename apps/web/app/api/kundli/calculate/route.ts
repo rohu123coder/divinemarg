@@ -1,8 +1,13 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { computeKundli } from "@/lib/kundli/computeKundli";
+import {
+  computeKundli,
+  type SwissEphemerisData,
+} from "@/lib/kundli/computeKundli";
 
-const BACKEND_URL = process.env.NEXT_PUBLIC_API_URL?.replace(/\/$/, "") ?? "https://divinemarg.onrender.com";
+const BACKEND_URL =
+  process.env.NEXT_PUBLIC_API_URL?.replace(/\/$/, "") ??
+  "https://divinemarg.onrender.com";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -49,65 +54,65 @@ export async function POST(req: Request) {
   const body = parsed.data;
 
   try {
-    // Try backend Swiss Ephemeris first
-    try {
-      const backendRes = await fetch(`${BACKEND_URL}/api/kundali/calculate`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          dob: body.dob,
-          tob: body.tob ?? null,
-          lat: body.lat,
-          lng: body.lng,
-          utcOffset: body.utcOffset ?? 5.5,
-        }),
-      });
-      if (backendRes.ok) {
-        const backendData = await backendRes.json();
-        if (backendData.success && backendData.data) {
-          // Merge with local kundli for predictions/yogas/dasha
-          const localKundli = computeKundli({
-            name: body.name ?? "",
-            dob: body.dob,
-            tob: body.tob ?? null,
-            pob: body.pob ?? "",
-            lat: body.lat,
-            lng: body.lng,
-            gender: body.gender ?? "male",
-            utcOffset: body.utcOffset ?? 5.5,
-          });
-          
-          // Override with accurate Swiss Ephemeris data
-          const bd = backendData.data;
-          localKundli.basicInfo.ascendant = {
-            rashi: bd.ascendant.rashi,
-            degree: bd.ascendant.degree,
-          };
-          localKundli.basicInfo.moonSign = {
-            rashi: bd.moonSign.rashi,
-            degree: bd.moonSign.degree,
-          };
-          localKundli.basicInfo.sunSign = {
-            rashi: bd.sunSign.rashi,
-            degree: bd.sunSign.degree,
-            minutes: 0,
-          };
-          localKundli.basicInfo.nakshatra = {
-            name: bd.nakshatra.name,
-            lord: bd.nakshatra.lord,
-            pada: bd.nakshatra.pada,
-          };
-          
-          return NextResponse.json(localKundli);
-        }
-      }
-    } catch (backendError) {
-      console.error("Backend kundali error, falling back to local:", backendError);
+    const backendRes = await fetch(`${BACKEND_URL}/api/kundali/calculate`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        dob: body.dob,
+        tob: body.tob ?? null,
+        lat: body.lat,
+        lng: body.lng,
+        utcOffset: body.utcOffset ?? 5.5,
+      }),
+    });
+
+    if (!backendRes.ok) {
+      const errText = await backendRes.text().catch(() => "");
+      console.error(
+        "Backend kundali error:",
+        backendRes.status,
+        errText.slice(0, 500)
+      );
+      return NextResponse.json(
+        { error: "Kundli calculation service unavailable. Please try again." },
+        { status: 503 }
+      );
     }
 
-    const result = computeKundli(body);
+    const backendJson = (await backendRes.json()) as {
+      success?: boolean;
+      data?: SwissEphemerisData;
+      error?: string;
+    };
+
+    if (!backendJson.success || !backendJson.data) {
+      return NextResponse.json(
+        {
+          error:
+            backendJson.error ??
+            "Kundli calculation failed. Please verify birth details.",
+        },
+        { status: 502 }
+      );
+    }
+
+    const result = computeKundli(
+      {
+        name: body.name,
+        dob: body.dob,
+        tob: body.tob ?? null,
+        pob: body.pob,
+        lat: body.lat,
+        lng: body.lng,
+        gender: body.gender,
+        utcOffset: body.utcOffset ?? 5.5,
+      },
+      backendJson.data
+    );
+
     return NextResponse.json(result);
   } catch (e) {
+    console.error("Kundli calculate route error:", e);
     const message = e instanceof Error ? e.message : "Calculation failed";
     return NextResponse.json({ error: message }, { status: 500 });
   }

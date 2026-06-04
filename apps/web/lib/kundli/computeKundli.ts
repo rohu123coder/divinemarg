@@ -141,6 +141,62 @@ export type KundliInput = {
   utcOffset?: number;
 };
 
+/** Response shape from POST /api/kundali/calculate (Swiss Ephemeris backend). */
+export type SwissEphemerisData = {
+  ascendant: {
+    longitude: number;
+    rashi: string;
+    rashiIndex?: number;
+    degree: number;
+  };
+  moonSign: { rashi: string; rashiIndex?: number; degree: number };
+  sunSign: { rashi: string; rashiIndex?: number; degree: number };
+  nakshatra: { name: string; lord: string; pada: number };
+  planets: Array<{
+    name: string;
+    longitude: number;
+    rashi: string;
+    rashiIndex?: number;
+  }>;
+  approximate: boolean;
+};
+
+const PLANET_ORDER: PlanetKey[] = [
+  "Sun",
+  "Moon",
+  "Mars",
+  "Mercury",
+  "Jupiter",
+  "Venus",
+  "Saturn",
+  "Rahu",
+  "Ketu",
+];
+
+function positionsFromSwissEphemeris(data: SwissEphemerisData): {
+  approximate: boolean;
+  ascDeg: number;
+  raw: Record<PlanetKey, { longitude: number; longitudeSpeed: number }>;
+} {
+  const byName = new Map(data.planets.map((p) => [p.name, p.longitude]));
+  const raw = {} as Record<
+    PlanetKey,
+    { longitude: number; longitudeSpeed: number }
+  >;
+  for (const key of PLANET_ORDER) {
+    const lon = byName.get(key);
+    if (lon === undefined) {
+      throw new Error(`Missing planet ${key} in Swiss Ephemeris data`);
+    }
+    raw[key] = { longitude: lon, longitudeSpeed: 0.1 };
+  }
+  return {
+    approximate: data.approximate,
+    ascDeg: data.ascendant.longitude,
+    raw,
+  };
+}
+
 function normalizeLon(deg: number): number {
   return ((deg % 360) + 360) % 360;
 }
@@ -540,43 +596,51 @@ function conjunctionException(
   return sameHouse(marsLon, jupiterLon, asc);
 }
 
-export function computeKundli(input: KundliInput) {
+export function computeKundli(
+  input: KundliInput,
+  swissEphemeris?: SwissEphemerisData
+) {
   const utcOffset = resolveUtcOffset(input);
   const merged: KundliInput = { ...input, utcOffset };
 
-  const { jd: birthJd, approximate } = julianDayUTFromBirth(merged, utcOffset);
+  const { jd: birthJd, approximate: localApproximate } = julianDayUTFromBirth(
+    merged,
+    utcOffset
+  );
   const now = new Date();
   const nowJd = now.getTime() / 86400000 + JD_UNIX_EPOCH;
 
-  const raw: Record<string, { longitude: number; longitudeSpeed: number }> =
-    {};
-  const order: PlanetKey[] = [
-    "Sun",
-    "Moon",
-    "Mars",
-    "Mercury",
-    "Jupiter",
-    "Venus",
-    "Saturn",
-    "Rahu",
-    "Ketu",
-  ];
+  const order = PLANET_ORDER;
+  let raw: Record<PlanetKey, { longitude: number; longitudeSpeed: number }>;
+  let ascDeg: number;
+  let approximate: boolean;
 
-  for (const key of order) {
-    const getLon = SIDEREAL_GETTERS[key];
-    raw[key] = {
-      longitude: getLon(birthJd),
-      longitudeSpeed: centralLongitudeSpeed(birthJd, getLon),
-    };
+  if (swissEphemeris) {
+    const positions = positionsFromSwissEphemeris(swissEphemeris);
+    raw = positions.raw;
+    ascDeg = positions.ascDeg;
+    approximate = positions.approximate;
+  } else {
+    raw = {} as Record<
+      PlanetKey,
+      { longitude: number; longitudeSpeed: number }
+    >;
+    for (const key of order) {
+      const getLon = SIDEREAL_GETTERS[key];
+      raw[key] = {
+        longitude: getLon(birthJd),
+        longitudeSpeed: centralLongitudeSpeed(birthJd, getLon),
+      };
+    }
+    ascDeg = ascendantLongitude(
+      birthJd,
+      merged.lat,
+      merged.lng,
+      localApproximate,
+      raw["Sun"].longitude
+    );
+    approximate = localApproximate;
   }
-
-  const ascDeg = ascendantLongitude(
-    birthJd,
-    merged.lat,
-    merged.lng,
-    approximate,
-    raw["Sun"].longitude
-  );
 
   const moonLon = raw["Moon"].longitude;
   const sunLon = raw["Sun"].longitude;
