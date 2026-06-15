@@ -35,12 +35,18 @@ export default function ProblemAreaScreen() {
       ? decodeURIComponent(astrologerName)
       : "Astrologer";
 
-  const [selected, setSelected] = useState<string | null>(null);
+  const [selected, setSelected] = useState<string[]>([]);
   const [starting, setStarting] = useState(false);
 
+  const toggleSelection = (value: string) => {
+    setSelected((prev) =>
+      prev.includes(value) ? prev.filter((v) => v !== value) : [...prev, value]
+    );
+  };
+
   async function handleStart() {
-    if (!selected || !astrologerId) {
-      Alert.alert("Required", "Please select a problem area");
+    if (selected.length === 0 || !astrologerId) {
+      Alert.alert("Required", "Please select at least one problem area");
       return;
     }
 
@@ -85,29 +91,30 @@ export default function ProblemAreaScreen() {
         <Text style={styles.sub}>
           Aaj kaunsa topic discuss karna hai {displayName} ji ke saath?
         </Text>
+        <Text style={styles.hint}>Select one or more areas</Text>
 
         {PROBLEM_AREAS.map((p) => (
           <Pressable
             key={p.value}
-            onPress={() => setSelected(p.value)}
-            style={[styles.card, selected === p.value && styles.cardOn]}
+            onPress={() => toggleSelection(p.value)}
+            style={[styles.card, selected.includes(p.value) && styles.cardOn]}
           >
             <Text style={styles.emoji}>{p.emoji}</Text>
             <Text
-              style={[styles.cardLabel, selected === p.value && styles.cardLabelOn]}
+              style={[styles.cardLabel, selected.includes(p.value) && styles.cardLabelOn]}
             >
               {p.label}
             </Text>
-            {selected === p.value ? <Text style={styles.check}>✓</Text> : null}
+            {selected.includes(p.value) ? <Text style={styles.check}>✓</Text> : null}
           </Pressable>
         ))}
 
         <Pressable
           onPress={() => void handleStart()}
-          disabled={!selected || starting}
+          disabled={selected.length === 0 || starting}
           style={[
             styles.startBtn,
-            (!selected || starting) && styles.startBtnDisabled,
+            (selected.length === 0 || starting) && styles.startBtnDisabled,
           ]}
         >
           {starting ? (
@@ -133,7 +140,8 @@ const styles = StyleSheet.create({
   back: { color: "#fff", fontSize: 28, marginRight: 8 },
   headerTitle: { color: "#fff", fontSize: 18, fontWeight: "700", flex: 1 },
   scroll: { padding: 16, paddingBottom: 32 },
-  sub: { fontSize: 14, color: "#666", marginBottom: 16 },
+  sub: { fontSize: 14, color: "#666", marginBottom: 8 },
+  hint: { fontSize: 13, color: "#999", marginBottom: 16 },
   card: {
     flexDirection: "row",
     alignItems: "center",

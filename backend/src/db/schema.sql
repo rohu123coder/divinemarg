@@ -63,7 +63,7 @@ CREATE TABLE chat_sessions (
   ended_at TIMESTAMPTZ,
   total_minutes INTEGER,
   total_charged NUMERIC(14, 2),
-  problem_area VARCHAR(100)
+  problem_area TEXT
 );
 
 CREATE TABLE astrologer_waitlist (

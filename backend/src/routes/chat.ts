@@ -22,10 +22,12 @@ function requireUserRole(req: Request, res: Response, next: () => void): void {
   next();
 }
 
+const problemAreaInput = z.union([z.string(), z.array(z.string())]).optional().nullable();
+
 const chatRequestBody = z.object({
   astrologer_id: z.string().uuid(),
-  problem_area: z.string().max(100).optional().nullable(),
-  problemArea: z.string().max(100).optional().nullable(),
+  problem_area: problemAreaInput,
+  problemArea: problemAreaInput,
 });
 
 router.post(
@@ -50,9 +52,13 @@ router.post(
     const { astrologer_id } = parsed.data;
     const problemAreaRaw =
       parsed.data.problem_area ?? parsed.data.problemArea ?? null;
-    const problem_area =
-      problemAreaRaw != null && String(problemAreaRaw).trim() !== ""
-        ? String(problemAreaRaw).trim().slice(0, 100)
+    const problemAreaStr = Array.isArray(problemAreaRaw)
+      ? problemAreaRaw
+          .map((item) => String(item).trim())
+          .filter(Boolean)
+          .join(", ") || null
+      : problemAreaRaw != null && String(problemAreaRaw).trim() !== ""
+        ? String(problemAreaRaw).trim()
         : null;
 
     const astroResult = await query<{
@@ -129,7 +135,7 @@ router.post(
       `INSERT INTO chat_sessions (user_id, astrologer_id, status, started_at, problem_area)
        VALUES ($1, $2, 'waiting', now(), $3)
        RETURNING id`,
-      [userId, astrologer_id, problem_area]
+      [userId, astrologer_id, problemAreaStr]
     );
 
     const session = sessionResult.rows[0];
@@ -142,7 +148,7 @@ router.post(
       session.id,
       userId,
       astro.name,
-      problem_area
+      problemAreaStr
     ).catch((err) => console.error("[Auto-Inject] Error:", err));
 
     const notifyResult = await query<{
