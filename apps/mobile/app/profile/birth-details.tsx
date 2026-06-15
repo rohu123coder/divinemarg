@@ -1,6 +1,6 @@
 import DateTimePicker from "@react-native-community/datetimepicker";
 import { useRouter } from "expo-router";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -19,9 +19,9 @@ import api from "../../lib/api";
 import {
   findCityByCoordinates,
   searchCities,
-  type City,
 } from "../../lib/data/indianCities";
 import { INDIAN_STATES, type IndianState } from "../../lib/data/indianStates";
+import { geocodePlace, type GeocodeResult } from "../../lib/geocode";
 import {
   fetchPincodeData,
   getStateCoordinates,
@@ -107,55 +107,97 @@ export default function BirthDetailsScreen() {
   const [occupation, setOccupation] = useState<string | null>(null);
 
   const [citySearch, setCitySearch] = useState("");
-  const [selectedCity, setSelectedCity] = useState<City | null>(null);
-  const [filteredCities, setFilteredCities] = useState<City[]>([]);
+  const [selectedLocation, setSelectedLocation] = useState<{
+    placeName: string;
+    lat: number;
+    lng: number;
+  } | null>(null);
+  const [filteredCities, setFilteredCities] = useState<
+    ReturnType<typeof searchCities>
+  >([]);
   const [showCityDropdown, setShowCityDropdown] = useState(false);
   const [showNoResults, setShowNoResults] = useState(false);
+  const [geocodeResults, setGeocodeResults] = useState<GeocodeResult[]>([]);
+  const [geocodeLoading, setGeocodeLoading] = useState(false);
+  const geocodeDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const [showManualEntry, setShowManualEntry] = useState(false);
   const [manualCity, setManualCity] = useState("");
   const [manualState, setManualState] = useState<IndianState | null>(null);
   const [manualPincode, setManualPincode] = useState("");
   const [pincodeLoading, setPincodeLoading] = useState(false);
-  const [manualLocationConfirmed, setManualLocationConfirmed] = useState<{
-    city: string;
-    state: string;
-    pincode: string;
-    lat: number;
-    lng: number;
-  } | null>(null);
 
   useEffect(() => {
     if (citySearch.length >= 2) {
       const results = searchCities(citySearch);
       setFilteredCities(results);
-      setShowCityDropdown(results.length > 0);
-      setShowNoResults(results.length === 0);
     } else {
       setFilteredCities([]);
       setShowCityDropdown(false);
       setShowNoResults(false);
     }
+
+    if (geocodeDebounceRef.current) {
+      clearTimeout(geocodeDebounceRef.current);
+      geocodeDebounceRef.current = null;
+    }
+
+    if (citySearch.length >= 3) {
+      setGeocodeLoading(true);
+      geocodeDebounceRef.current = setTimeout(() => {
+        void geocodePlace(citySearch)
+          .then((results) => {
+            setGeocodeResults(results);
+          })
+          .catch(() => {
+            setGeocodeResults([]);
+          })
+          .finally(() => {
+            setGeocodeLoading(false);
+          });
+      }, 400);
+    } else {
+      setGeocodeResults([]);
+      setGeocodeLoading(false);
+    }
+
+    return () => {
+      if (geocodeDebounceRef.current) {
+        clearTimeout(geocodeDebounceRef.current);
+        geocodeDebounceRef.current = null;
+      }
+    };
   }, [citySearch]);
+
+  useEffect(() => {
+    if (citySearch.length < 2) return;
+
+    const hasLocal = filteredCities.length > 0;
+    const hasGeocode = geocodeResults.length > 0;
+    const waitingOnGeocode = citySearch.length >= 3 && geocodeLoading;
+
+    setShowCityDropdown(hasLocal || hasGeocode || waitingOnGeocode);
+    setShowNoResults(!hasLocal && !hasGeocode && !waitingOnGeocode);
+  }, [citySearch, filteredCities, geocodeResults, geocodeLoading]);
 
   function getFinalLocationData():
     | { placeName: string; lat: number; lng: number }
     | null {
-    if (selectedCity) {
-      return {
-        placeName: `${selectedCity.name}, ${selectedCity.state}`,
-        lat: selectedCity.lat,
-        lng: selectedCity.lng,
-      };
+    return selectedLocation;
+  }
+
+  async function resolveManualCoordinates(
+    villageName: string,
+    district: string,
+    stateName: string
+  ): Promise<{ lat: number; lng: number } | null> {
+    const geocodeQuery = `${villageName}, ${district}, ${stateName}, India`;
+    const geo = await geocodePlace(geocodeQuery);
+    if (geo.length > 0) {
+      return { lat: geo[0].lat, lng: geo[0].lng };
     }
-    if (manualLocationConfirmed) {
-      return {
-        placeName: `${manualLocationConfirmed.city}, ${manualLocationConfirmed.state} - ${manualLocationConfirmed.pincode}`,
-        lat: manualLocationConfirmed.lat,
-        lng: manualLocationConfirmed.lng,
-      };
-    }
-    return null;
+    const fb = getStateCoordinates(stateName);
+    return fb ? { lat: fb.lat, lng: fb.lng } : null;
   }
 
   async function handlePincodeLookup() {
@@ -174,9 +216,9 @@ export default function BirthDetailsScreen() {
 
     setPincodeLoading(true);
     try {
+      const villageName = manualCity.trim();
       const pincodeData = await fetchPincodeData(manualPincode);
-      let lat: number;
-      let lng: number;
+      let coords: { lat: number; lng: number } | null = null;
 
       if (pincodeData) {
         if (!pincodeStateMatchesSelection(pincodeData.state, manualState)) {
@@ -187,48 +229,59 @@ export default function BirthDetailsScreen() {
           setPincodeLoading(false);
           return;
         }
-        lat = pincodeData.lat;
-        lng = pincodeData.lng;
+        coords = await resolveManualCoordinates(
+          villageName,
+          pincodeData.district,
+          pincodeData.state
+        );
       } else {
-        const fb = getStateCoordinates(manualState.name);
-        if (!fb) {
-          Alert.alert("Error", "State coordinates missing.");
-          setPincodeLoading(false);
-          return;
-        }
-        lat = fb.lat;
-        lng = fb.lng;
+        coords = await resolveManualCoordinates(
+          villageName,
+          villageName,
+          manualState.name
+        );
       }
 
-      setManualLocationConfirmed({
-        city: manualCity.trim(),
-        state: manualState.name,
-        pincode: manualPincode,
-        lat,
-        lng,
+      if (!coords) {
+        Alert.alert("Error", "State coordinates missing.");
+        setPincodeLoading(false);
+        return;
+      }
+
+      setSelectedLocation({
+        placeName: `${villageName}, ${manualState.name} - ${manualPincode}`,
+        lat: coords.lat,
+        lng: coords.lng,
       });
       setShowManualEntry(false);
 
       Alert.alert(
         "Confirmed!",
-        `${manualCity.trim()}, ${manualState.name} - ${manualPincode}\nLocation saved.`
+        `${villageName}, ${manualState.name} - ${manualPincode}\nLocation saved.`
       );
     } catch {
-      const fb = manualState ? getStateCoordinates(manualState.name) : null;
-      if (fb) {
-        setManualLocationConfirmed({
-          city: manualCity.trim(),
-          state: manualState!.name,
-          pincode: manualPincode,
-          lat: fb.lat,
-          lng: fb.lng,
-        });
-        setShowManualEntry(false);
-        Alert.alert(
-          "Using approximate location",
-          "Pincode service unavailable — state center coordinates use ho rahe hain."
+      const villageName = manualCity.trim();
+      try {
+        const coords = await resolveManualCoordinates(
+          villageName,
+          villageName,
+          manualState!.name
         );
-      } else {
+        if (coords) {
+          setSelectedLocation({
+            placeName: `${villageName}, ${manualState!.name} - ${manualPincode}`,
+            lat: coords.lat,
+            lng: coords.lng,
+          });
+          setShowManualEntry(false);
+          Alert.alert(
+            "Using approximate location",
+            "Pincode service unavailable — geocode or state center coordinates use ho rahe hain."
+          );
+        } else {
+          Alert.alert("Error", "Pincode lookup failed. Try again.");
+        }
+      } catch {
         Alert.alert("Error", "Pincode lookup failed. Try again.");
       }
     } finally {
@@ -264,17 +317,21 @@ export default function BirthDetailsScreen() {
       if (lat != null && lng != null && Number.isFinite(lat) && Number.isFinite(lng)) {
         const hit = findCityByCoordinates(lat, lng);
         if (hit) {
-          setSelectedCity(hit);
+          setSelectedLocation({
+            placeName: `${hit.name}, ${hit.state}`,
+            lat,
+            lng,
+          });
         } else {
           const parsed = parseSavedManualPlace(placeName);
           if (parsed) {
-            setManualLocationConfirmed({
-              city: parsed.city,
-              state: parsed.state,
-              pincode: parsed.pincode,
+            setSelectedLocation({
+              placeName: `${parsed.city}, ${parsed.state} - ${parsed.pincode}`,
               lat,
               lng,
             });
+          } else if (placeName) {
+            setSelectedLocation({ placeName, lat, lng });
           }
         }
       }
@@ -405,67 +462,83 @@ export default function BirthDetailsScreen() {
         <View style={{ marginBottom: 24 }}>
           <Text style={styles.label}>Birth place *</Text>
 
-          {selectedCity && (
-            <View style={styles.selectedBadge}>
-              <Text style={styles.selectedBadgeText}>
-                📍 {selectedCity.name}, {selectedCity.state}
-              </Text>
-              <TouchableOpacity
-                onPress={() => {
-                  setSelectedCity(null);
-                  setCitySearch("");
+          {selectedLocation && (() => {
+            const parsedManual = parseSavedManualPlace(selectedLocation.placeName);
+            return (
+            <View
+              style={[
+                styles.selectedBadge,
+                parsedManual ? { flexDirection: "column", alignItems: "stretch" } : undefined,
+              ]}
+            >
+              <View
+                style={{
+                  flexDirection: "row",
+                  justifyContent: "space-between",
+                  alignItems: "center",
                 }}
               >
-                <Text style={{ color: "#FF6B35", fontSize: 18 }}>✕</Text>
-              </TouchableOpacity>
-            </View>
-          )}
-
-          {manualLocationConfirmed && !selectedCity && (
-            <View style={[styles.selectedBadge, { flexDirection: "column", alignItems: "stretch" }]}>
-              <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
                 <Text style={styles.selectedBadgeText}>
-                  📍 {manualLocationConfirmed.city}, {manualLocationConfirmed.state}
+                  📍 {selectedLocation.placeName}
                 </Text>
                 <TouchableOpacity
                   onPress={() => {
-                    setManualLocationConfirmed(null);
+                    setSelectedLocation(null);
+                    setCitySearch("");
                     setShowManualEntry(false);
                     setManualCity("");
                     setManualState(null);
                     setManualPincode("");
                   }}
                 >
-                  <Text style={{ color: "#FF6B35" }}>Change</Text>
+                  <Text style={{ color: "#FF6B35", fontSize: 18 }}>✕</Text>
                 </TouchableOpacity>
               </View>
-              <Text style={{ fontSize: 12, color: "#666", marginTop: 4 }}>
-                Pincode: {manualLocationConfirmed.pincode}
-              </Text>
+              {parsedManual ? (
+                <Text style={{ fontSize: 12, color: "#666", marginTop: 4 }}>
+                  Pincode: {parsedManual.pincode}
+                </Text>
+              ) : null}
             </View>
-          )}
+            );
+          })()}
 
-          {!selectedCity && !manualLocationConfirmed && (
+          {!selectedLocation && (
             <>
               <TextInput
                 value={citySearch}
-                onChangeText={setCitySearch}
+                onChangeText={(text) => {
+                  setCitySearch(text);
+                  setSelectedLocation(null);
+                }}
                 placeholder="Type your city name (e.g., Gwalior, Mumbai, Patna)"
                 style={styles.input}
                 placeholderTextColor="#999"
               />
 
-              {showCityDropdown && filteredCities.length > 0 && (
+              {showCityDropdown &&
+                (filteredCities.length > 0 ||
+                  geocodeResults.length > 0 ||
+                  geocodeLoading) && (
                 <View style={styles.dropdown}>
-                  <ScrollView style={{ maxHeight: 250 }} nestedScrollEnabled keyboardShouldPersistTaps="handled">
+                  <ScrollView
+                    style={{ maxHeight: 280 }}
+                    nestedScrollEnabled
+                    keyboardShouldPersistTaps="handled"
+                  >
                     {filteredCities.map((city, idx) => (
                       <TouchableOpacity
                         key={`${city.name}-${city.state}-${idx}`}
                         onPress={() => {
-                          setSelectedCity(city);
+                          setSelectedLocation({
+                            placeName: `${city.name}, ${city.state}`,
+                            lat: city.lat,
+                            lng: city.lng,
+                          });
                           setCitySearch("");
                           setShowCityDropdown(false);
                           setShowNoResults(false);
+                          setGeocodeResults([]);
                         }}
                         style={styles.dropdownItem}
                       >
@@ -475,6 +548,39 @@ export default function BirthDetailsScreen() {
                         </View>
                       </TouchableOpacity>
                     ))}
+
+                    {(geocodeLoading || geocodeResults.length > 0) &&
+                    citySearch.length >= 3 ? (
+                      <>
+                        <View style={styles.geocodeSectionHeader}>
+                          <Text style={styles.geocodeSectionTitle}>More places</Text>
+                          {geocodeLoading ? (
+                            <ActivityIndicator size="small" color="#FF6B35" />
+                          ) : null}
+                        </View>
+                        {geocodeResults.map((r, idx) => (
+                          <TouchableOpacity
+                            key={`geo-${r.lat}-${r.lng}-${idx}`}
+                            onPress={() => {
+                              setSelectedLocation({
+                                placeName: r.formattedAddress || r.city,
+                                lat: r.lat,
+                                lng: r.lng,
+                              });
+                              setCitySearch("");
+                              setShowCityDropdown(false);
+                              setShowNoResults(false);
+                              setGeocodeResults([]);
+                            }}
+                            style={styles.dropdownItem}
+                          >
+                            <Text style={styles.dropdownCityName}>
+                              📍 {r.formattedAddress || r.city}
+                            </Text>
+                          </TouchableOpacity>
+                        ))}
+                      </>
+                    ) : null}
                   </ScrollView>
                 </View>
               )}
@@ -503,7 +609,7 @@ export default function BirthDetailsScreen() {
             </>
           )}
 
-          {showManualEntry && !manualLocationConfirmed && (
+          {showManualEntry && !selectedLocation && (
             <View style={styles.manualForm}>
               <Text style={styles.manualFormTitle}>Apni location daalein</Text>
 
@@ -750,6 +856,24 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: "#888",
     marginTop: 2,
+  },
+  geocodeSectionHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    backgroundColor: "#F9FAFB",
+    borderTopWidth: 1,
+    borderBottomWidth: 1,
+    borderColor: "#eee",
+  },
+  geocodeSectionTitle: {
+    fontSize: 12,
+    fontWeight: "700",
+    color: "#666",
+    textTransform: "uppercase",
+    letterSpacing: 0.5,
   },
   noResultsBox: {
     padding: 16,
