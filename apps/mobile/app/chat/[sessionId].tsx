@@ -38,6 +38,7 @@ export default function ChatScreen() {
   const router = useRouter();
   const token = useAppStore((state) => state.token);
   const flatRef = useRef<FlatList>(null);
+  const callInitiatedRef = useRef(false);
 
   const [messages, setMessages] = useState<Message[]>([]);
   const [loading, setLoading] = useState(true);
@@ -188,6 +189,8 @@ export default function ChatScreen() {
       appId: string;
       callType?: string;
     }) => {
+      if (!callInitiatedRef.current) return;
+      callInitiatedRef.current = false;
       router.push({
         pathname: `/call/${sessionId}`,
         params: {
@@ -209,6 +212,10 @@ export default function ChatScreen() {
     };
   }, [astrologerName, router, sessionId, token]);
 
+  const scrollToBottom = (animated = true) => {
+    setTimeout(() => flatRef.current?.scrollToEnd({ animated }), 100);
+  };
+
   const send = () => {
     const msg = input.trim();
     if (!msg || sessionEnded || sessionStatus !== "active") return;
@@ -223,7 +230,7 @@ export default function ChatScreen() {
     ]);
     socket.emit("send_message", { sessionId, content: msg });
     setInput("");
-    setTimeout(() => flatRef.current?.scrollToEnd({ animated: true }), 100);
+    scrollToBottom();
   };
 
   const handleEndSession = () => {
@@ -233,59 +240,62 @@ export default function ChatScreen() {
 
   return (
     <SafeAreaView style={styles.safe}>
-      {/* Header */}
-      <View style={styles.header}>
-        <Pressable onPress={() => router.back()} style={{ marginRight: 10 }}>
-          <Ionicons name="arrow-back" size={22} color="#1A1A2E" />
-        </Pressable>
-        {astrologerPhoto ? (
-          <Image
-            source={{ uri: astrologerPhoto }}
-            style={styles.photo}
-            onError={() => setAstrologerPhoto(null)}
-          />
-        ) : (
-          <View style={[styles.photo, styles.photoPlaceholder]} />
-        )}
-        <Text style={styles.name}>{firstName(astrologerName)}</Text>
-        {(sessionStatus === "active" || sessionStatus === "ended") && elapsedSeconds > 0 && (
-          <Text style={styles.timerText}>
-            {String(Math.floor(elapsedSeconds / 60)).padStart(2, "0")}:
-            {String(elapsedSeconds % 60).padStart(2, "0")}
-          </Text>
-        )}
-        {sessionStatus === "active" && (
-          <View style={styles.callActions}>
-            <Pressable
-              onPress={() => {
-                socket.emit("initiate_call", { sessionId, callType: "voice" });
-              }}
-            >
-              <Ionicons name="call" size={22} color="#7C3AED" />
-            </Pressable>
-          </View>
-        )}
-        {sessionStatus === "active" && (
-          <Pressable style={styles.endBtn} onPress={handleEndSession}>
-            <Text style={styles.endText}>End</Text>
-          </Pressable>
-        )}
-        {!sessionEnded && (
-          <View style={styles.activeBadge}>
-            <Text style={styles.activeTxt}>LIVE</Text>
-          </View>
-        )}
-      </View>
-
       <KeyboardAvoidingView
         style={{ flex: 1 }}
-        behavior={Platform.OS === "ios" ? "padding" : undefined}
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
+        keyboardVerticalOffset={Platform.OS === "ios" ? 60 : 0}
       >
+        {/* Header */}
+        <View style={styles.header}>
+          <Pressable onPress={() => router.back()} style={{ marginRight: 10 }}>
+            <Ionicons name="arrow-back" size={22} color="#1A1A2E" />
+          </Pressable>
+          {astrologerPhoto ? (
+            <Image
+              source={{ uri: astrologerPhoto }}
+              style={styles.photo}
+              onError={() => setAstrologerPhoto(null)}
+            />
+          ) : (
+            <View style={[styles.photo, styles.photoPlaceholder]} />
+          )}
+          <Text style={styles.name}>{firstName(astrologerName)}</Text>
+          {(sessionStatus === "active" || sessionStatus === "ended") && elapsedSeconds > 0 && (
+            <Text style={styles.timerText}>
+              {String(Math.floor(elapsedSeconds / 60)).padStart(2, "0")}:
+              {String(elapsedSeconds % 60).padStart(2, "0")}
+            </Text>
+          )}
+          {sessionStatus === "active" && (
+            <View style={styles.callActions}>
+              <Pressable
+                onPress={() => {
+                  callInitiatedRef.current = true;
+                  socket.emit("initiate_call", { sessionId, callType: "voice" });
+                }}
+              >
+                <Ionicons name="call" size={22} color="#7C3AED" />
+              </Pressable>
+            </View>
+          )}
+          {sessionStatus === "active" && (
+            <Pressable style={styles.endBtn} onPress={handleEndSession}>
+              <Text style={styles.endText}>End</Text>
+            </Pressable>
+          )}
+          {!sessionEnded && (
+            <View style={styles.activeBadge}>
+              <Text style={styles.activeTxt}>LIVE</Text>
+            </View>
+          )}
+        </View>
+
         <FlatList
           ref={flatRef}
           data={messages}
           keyExtractor={(item) => item.id}
           contentContainerStyle={styles.messages}
+          keyboardShouldPersistTaps="handled"
           onContentSizeChange={() => flatRef.current?.scrollToEnd({ animated: false })}
           ListEmptyComponent={
             loading ? null : (
@@ -323,6 +333,7 @@ export default function ChatScreen() {
               value={input}
               onChangeText={setInput}
               onSubmitEditing={send}
+              onFocus={() => scrollToBottom()}
             />
             <Pressable style={styles.sendBtn} onPress={send}>
               <Ionicons name="arrow-up" size={18} color="#FFFFFF" />
@@ -424,6 +435,7 @@ const styles = StyleSheet.create({
     borderTopWidth: 1,
     borderColor: "#E5E7EB",
     padding: 10,
+    paddingBottom: Platform.OS === "ios" ? 10 : 12,
     gap: 8,
   },
   input: {
