@@ -27,6 +27,8 @@ type IncomingRequest = {
   sessionId: string;
   userId: string;
   userName: string;
+  type?: "voice" | "video";
+  pricePerMinute?: number;
 };
 
 type WaitlistEntry = {
@@ -145,13 +147,13 @@ export default function AstrologerDashboardPage() {
       callerName: string;
       pricePerMinute: number;
     }) => {
-      const next = {
+      const next: IncomingRequest = {
         sessionId: payload.sessionId,
         userName: payload.callerName,
-        type: "voice",
+        type: payload.callType === "video" ? "video" : "voice",
         pricePerMinute: payload.pricePerMinute,
         userId: "",
-      } as IncomingRequest;
+      };
       incomingRef.current = next;
       setIncoming(next);
       setCountdown(30);
@@ -300,7 +302,11 @@ export default function AstrologerDashboardPage() {
     socketRef.current.emit("join_session", { sessionId });
     setIncoming(null);
     const q = encodeURIComponent(userName);
-    router.push(`/astrologer/chat/${sessionId}?name=${q}&autoCall=voice`);
+    const autoCallQuery =
+      incoming.type === "voice" || incoming.type === "video"
+        ? `&autoCall=${incoming.type}`
+        : "";
+    router.push(`/astrologer/chat/${sessionId}?name=${q}${autoCallQuery}`);
   };
 
   const onDecline = () => {
@@ -614,7 +620,13 @@ export default function AstrologerDashboardPage() {
       {incoming ? (
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 p-4">
           <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl">
-            <h2 className="text-lg font-bold text-slate-900">New chat request</h2>
+            <h2 className="text-lg font-bold text-slate-900">
+              {incoming.type === "voice"
+                ? "Incoming voice call request"
+                : incoming.type === "video"
+                  ? "Incoming video call request"
+                  : "New chat request"}
+            </h2>
             <p className="mt-3 text-sm text-slate-700">
               New Chat Request from{" "}
               <span className="font-semibold">{incoming.userName}</span>
