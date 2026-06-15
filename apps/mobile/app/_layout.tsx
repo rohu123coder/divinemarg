@@ -1,19 +1,22 @@
 import * as Notifications from "expo-notifications";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { router, Stack, useSegments } from "expo-router";
+import { router, Stack, usePathname, useSegments } from "expo-router";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 
 import { AppSplashScreen } from "../components/SplashScreen";
 import { getTokenAsync } from "../lib/auth";
 import api from "../lib/api";
+import { checkProfileComplete } from "../lib/profileComplete";
 import { setupPushNotifications } from "../lib/pushNotifications";
 import { useAppStore, type User } from "../lib/store";
 
 export default function RootLayout() {
   const segments = useSegments();
+  const pathname = usePathname();
   const [showSplash, setShowSplash] = useState(true);
   const [ready, setReady] = useState(false);
   const isLoggedIn = useAppStore((state) => state.isLoggedIn);
+  const profileComplete = useAppStore((state) => state.profileComplete);
   const hydrateAuth = useAppStore((state) => state.hydrateAuth);
   const logout = useAppStore((state) => state.logout);
 
@@ -109,16 +112,34 @@ export default function RootLayout() {
     if (!ready || showSplash) {
       return;
     }
-    if (isLoggedIn && inAuthGroup) {
-      router.replace("/(tabs)");
+
+    if (!isLoggedIn) {
+      if (!inAuthGroup) {
+        router.replace("/auth/login");
+      }
       return;
     }
-    if (!isLoggedIn && !inAuthGroup) {
-      router.replace("/auth/login");
-    }
-  }, [inAuthGroup, isLoggedIn, ready, showSplash]);
 
-  if (!ready || showSplash) {
+    if (profileComplete === null) {
+      void checkProfileComplete();
+      return;
+    }
+
+    const onBirthDetails = pathname.startsWith("/profile/birth-details");
+
+    if (profileComplete === false && !onBirthDetails) {
+      router.replace("/profile/birth-details?onboarding=true");
+      return;
+    }
+
+    if (inAuthGroup) {
+      router.replace(
+        profileComplete ? "/(tabs)" : "/profile/birth-details?onboarding=true"
+      );
+    }
+  }, [inAuthGroup, isLoggedIn, ready, showSplash, profileComplete, pathname]);
+
+  if (!ready || showSplash || (isLoggedIn && profileComplete === null)) {
     return <AppSplashScreen />;
   }
 

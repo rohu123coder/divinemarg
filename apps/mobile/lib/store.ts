@@ -48,11 +48,13 @@ type AppState = {
   user: User | null;
   token: string;
   isLoggedIn: boolean;
+  profileComplete: boolean | null;
   astrologers: Astrologer[];
   activeSessions: ActiveSession[];
   notifications: Notification[];
   hydrateAuth: (payload: { user: User; token: string }) => void;
   logout: () => void;
+  setProfileComplete: (value: boolean) => void;
   setAstrologers: (astrologers: Astrologer[]) => void;
   setActiveSessions: (sessions: ActiveSession[]) => void;
   setNotifications: (notifications: Notification[]) => void;
@@ -65,12 +67,13 @@ export const useAppStore = create<AppState>()(
       user: null,
       token: "",
       isLoggedIn: false,
+      profileComplete: null,
       astrologers: [],
       activeSessions: [],
       notifications: [],
       hydrateAuth: ({ user, token }) => {
         void setToken(token);
-        set({ user, token, isLoggedIn: true });
+        set({ user, token, isLoggedIn: true, profileComplete: null });
       },
       logout: () => {
         const prevToken = get().token;
@@ -78,8 +81,9 @@ export const useAppStore = create<AppState>()(
         if (prevToken) {
           void unregisterPushNotifications(prevToken);
         }
-        set({ user: null, token: "", isLoggedIn: false });
+        set({ user: null, token: "", isLoggedIn: false, profileComplete: null });
       },
+      setProfileComplete: (value) => set({ profileComplete: value }),
       setAstrologers: (astrologers) => set({ astrologers }),
       setActiveSessions: (activeSessions) => set({ activeSessions }),
       setNotifications: (notifications) => set({ notifications }),
@@ -94,6 +98,14 @@ export const useAppStore = create<AppState>()(
     {
       name: "divinemarg-app",
       storage: createJSONStorage(() => AsyncStorage),
+      partialize: (state) => ({
+        user: state.user,
+        token: state.token,
+        isLoggedIn: state.isLoggedIn,
+        astrologers: state.astrologers,
+        activeSessions: state.activeSessions,
+        notifications: state.notifications,
+      }),
       onRehydrateStorage: () => (state) => {
         if (state?.token) {
           void setToken(state.token);

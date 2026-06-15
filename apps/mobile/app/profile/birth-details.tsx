@@ -1,5 +1,5 @@
 import DateTimePicker from "@react-native-community/datetimepicker";
-import { useRouter } from "expo-router";
+import { useLocalSearchParams, useNavigation, useRouter } from "expo-router";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
@@ -22,6 +22,7 @@ import {
 } from "../../lib/data/indianCities";
 import { INDIAN_STATES, type IndianState } from "../../lib/data/indianStates";
 import { geocodePlace, type GeocodeResult } from "../../lib/geocode";
+import { useAppStore } from "../../lib/store";
 import {
   fetchPincodeData,
   getStateCoordinates,
@@ -92,6 +93,10 @@ function parseSavedManualPlace(
 
 export default function BirthDetailsScreen() {
   const router = useRouter();
+  const navigation = useNavigation();
+  const { onboarding } = useLocalSearchParams<{ onboarding?: string }>();
+  const isOnboarding = onboarding === "true";
+  const setProfileComplete = useAppStore((state) => state.setProfileComplete);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [dob, setDob] = useState(new Date(1995, 0, 1));
@@ -346,6 +351,12 @@ export default function BirthDetailsScreen() {
     void loadExisting();
   }, [loadExisting]);
 
+  useEffect(() => {
+    navigation.setOptions({
+      gestureEnabled: !isOnboarding,
+    });
+  }, [isOnboarding, navigation]);
+
   const handleSave = async () => {
     const location = getFinalLocationData();
     if (!location) {
@@ -371,9 +382,14 @@ export default function BirthDetailsScreen() {
         maritalStatus: maritalStatus || null,
         occupation: occupation || null,
       });
-      Alert.alert("Saved", "Your details were updated.", [
-        { text: "OK", onPress: () => router.back() },
-      ]);
+      setProfileComplete(true);
+      if (isOnboarding) {
+        router.replace("/(tabs)");
+      } else {
+        Alert.alert("Saved", "Your details were updated.", [
+          { text: "OK", onPress: () => router.back() },
+        ]);
+      }
     } catch (e: unknown) {
       const msg =
         (e as { response?: { data?: { error?: string } } })?.response?.data
@@ -395,10 +411,16 @@ export default function BirthDetailsScreen() {
   return (
     <SafeAreaView style={styles.safe} edges={["top"]}>
       <View style={styles.header}>
-        <Pressable onPress={() => router.back()} hitSlop={12}>
-          <Text style={styles.back}>‹</Text>
-        </Pressable>
-        <Text style={styles.headerTitle}>My details</Text>
+        {!isOnboarding ? (
+          <Pressable onPress={() => router.back()} hitSlop={12}>
+            <Text style={styles.back}>‹</Text>
+          </Pressable>
+        ) : (
+          <View style={{ width: 28, marginRight: 8 }} />
+        )}
+        <Text style={styles.headerTitle}>
+          {isOnboarding ? "Complete your profile" : "My details"}
+        </Text>
       </View>
 
       <ScrollView
