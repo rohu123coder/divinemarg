@@ -29,7 +29,8 @@
         "NOTIFICATIONS",
         "RECEIVE_BOOT_COMPLETED",
         "VIBRATE",
-        "WAKE_LOCK"
+        "WAKE_LOCK",
+        "RECORD_AUDIO"
       ],
       "googleServicesFile": "./google-services.json"
     },
@@ -38,6 +39,7 @@
       "supportsTablet": false,
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false,
+        "NSMicrophoneUsageDescription": "DivineMarg needs microphone access for voice calls with astrologers.",
         "UIBackgroundModes": [
           "remote-notification"
         ]
