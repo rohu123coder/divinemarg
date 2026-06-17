@@ -11,27 +11,22 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
-import { submitReading } from "../../lib/handFaceReading";
 import { pickImage } from "../../lib/imagePicker";
 import { PROBLEM_AREAS } from "../../lib/problemAreas";
+import { submitFaceReading } from "../../lib/readings";
 
-export default function HandFaceReadingScreen() {
+export default function FaceReadingScreen() {
   const router = useRouter();
   const [category, setCategory] = useState<string | null>(null);
-  const [palmUri, setPalmUri] = useState<string | null>(null);
   const [faceUri, setFaceUri] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
-  async function handlePick(slot: "palm" | "face", source: "camera" | "gallery") {
+  async function handlePick(source: "camera" | "gallery") {
     const uri = await pickImage(source);
     if (!uri) {
       return;
     }
-    if (slot === "palm") {
-      setPalmUri(uri);
-    } else {
-      setFaceUri(uri);
-    }
+    setFaceUri(uri);
   }
 
   async function handleSubmit() {
@@ -39,20 +34,16 @@ export default function HandFaceReadingScreen() {
       Alert.alert("Required", "Please select a category");
       return;
     }
-    if (!palmUri && !faceUri) {
-      Alert.alert("Required", "Please add at least one photo (palm or face)");
+    if (!faceUri) {
+      Alert.alert("Required", "Please add a face photo");
       return;
     }
 
     setSubmitting(true);
     try {
-      const reading = await submitReading({
-        category,
-        palmImageUri: palmUri ?? undefined,
-        faceImageUri: faceUri ?? undefined,
-      });
+      const reading = await submitFaceReading({ category, imageUri: faceUri });
       router.push({
-        pathname: "/hand-face-reading/result",
+        pathname: "/face-reading/result",
         params: { id: reading.id },
       });
     } catch (e: unknown) {
@@ -74,7 +65,7 @@ export default function HandFaceReadingScreen() {
         <Pressable onPress={() => router.back()} style={{ marginRight: 12 }}>
           <Text style={{ fontSize: 22 }}>‹</Text>
         </Pressable>
-        <Text style={{ fontSize: 18, fontWeight: "700" }}>Hand & Face Reading</Text>
+        <Text style={{ fontSize: 18, fontWeight: "700" }}>Face Reading</Text>
       </View>
 
       <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 40 }}>
@@ -99,15 +90,9 @@ export default function HandFaceReadingScreen() {
         ))}
 
         <ImageSlot
-          label="Palm Photo"
-          uri={palmUri}
-          onPick={(source) => void handlePick("palm", source)}
-          onClear={() => setPalmUri(null)}
-        />
-        <ImageSlot
           label="Face Photo"
           uri={faceUri}
-          onPick={(source) => void handlePick("face", source)}
+          onPick={(source) => void handlePick(source)}
           onClear={() => setFaceUri(null)}
         />
 

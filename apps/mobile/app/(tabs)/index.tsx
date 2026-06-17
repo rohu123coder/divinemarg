@@ -23,8 +23,22 @@ const QUICK_ACTIONS = [
   { key: "daily", label: "Daily Horoscope", icon: "sunny-outline" as const },
   { key: "kundli", label: "Free Kundli", icon: "pie-chart-outline" as const },
   { key: "matching", label: "Kundli Matching", icon: "ring" as const },
-  { key: "handface", label: "Hand & Face", icon: "hand-left-outline" as const },
   { key: "blog", label: "Astrology Blog", icon: "book-outline" as const },
+];
+
+const READING_TYPES = [
+  {
+    key: "palm",
+    label: "Palm Reading",
+    icon: "hand-left-outline" as const,
+    route: "/palm-reading" as const,
+  },
+  {
+    key: "face",
+    label: "Face Reading",
+    icon: "person-outline" as const,
+    route: "/face-reading" as const,
+  },
 ];
 
 export default function HomeTab() {
@@ -186,7 +200,6 @@ export default function HomeTab() {
                 if (item.key === "daily") router.push("/horoscope");
                 if (item.key === "kundli") router.push("/kundli");
                 if (item.key === "matching") router.push("/kundli-matching");
-                if (item.key === "handface") router.push("/hand-face-reading");
                 if (item.key === "blog") router.push("/blog");
               }}
             >
@@ -200,6 +213,27 @@ export default function HomeTab() {
               <Text style={styles.quickLabel}>{item.label}</Text>
             </Pressable>
           ))}
+        </View>
+
+        <View style={styles.readingsSection}>
+          <Text style={styles.readingsHeading}>Get a reading now</Text>
+          <View style={styles.readingsGrid}>
+            {READING_TYPES.map((item) => (
+              <Pressable
+                key={item.key}
+                style={styles.readingsCard}
+                onPress={() => router.push(item.route)}
+              >
+                <View style={styles.quickCircle}>
+                  <Ionicons name={item.icon} size={22} color="#FFFFFF" />
+                </View>
+                <Text style={styles.quickLabel}>{item.label}</Text>
+              </Pressable>
+            ))}
+          </View>
+          <Pressable style={styles.myReadingsLink} onPress={() => router.push("/readings-history")}>
+            <Text style={styles.myReadingsText}>My Readings ›</Text>
+          </Pressable>
         </View>
 
         <View style={styles.banner}>
@@ -388,6 +422,35 @@ const styles = StyleSheet.create({
     textAlign: "center",
     color: COLORS.secondary,
     fontWeight: "600",
+  },
+  readingsSection: {
+    marginHorizontal: 16,
+    marginBottom: 14,
+  },
+  readingsHeading: {
+    fontSize: 17,
+    fontWeight: "800",
+    color: COLORS.text,
+    marginBottom: 12,
+  },
+  readingsGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 12,
+  },
+  readingsCard: {
+    width: "47%",
+    alignItems: "center",
+    paddingVertical: 8,
+  },
+  myReadingsLink: {
+    marginTop: 8,
+    alignSelf: "flex-start",
+  },
+  myReadingsText: {
+    color: COLORS.primary,
+    fontWeight: "700",
+    fontSize: 14,
   },
   banner: {
     marginHorizontal: 16,

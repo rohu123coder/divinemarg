@@ -9,8 +9,6 @@ export async function pickImage(source: "camera" | "gallery"): Promise<string | 
     const result = await ImagePicker.launchCameraAsync({
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
       quality: 0.7,
-      allowsEditing: true,
-      aspect: [1, 1],
     });
     if (result.canceled || !result.assets[0]?.uri) {
       return null;
@@ -25,8 +23,6 @@ export async function pickImage(source: "camera" | "gallery"): Promise<string | 
   const result = await ImagePicker.launchImageLibraryAsync({
     mediaTypes: ImagePicker.MediaTypeOptions.Images,
     quality: 0.7,
-    allowsEditing: true,
-    aspect: [1, 1],
   });
   if (result.canceled || !result.assets[0]?.uri) {
     return null;

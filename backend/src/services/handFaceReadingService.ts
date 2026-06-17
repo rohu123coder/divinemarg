@@ -39,18 +39,21 @@ export type ReportSections = {
   vidhi: string;
 };
 
-type TemplateContext = {
+type PalmTemplateContext = {
   category: string;
-  palm?: PalmObservation;
-  face?: FaceObservation;
-  hasPalm: boolean;
-  hasFace: boolean;
+  palm: PalmObservation;
+};
+
+type FaceTemplateContext = {
+  category: string;
+  face: FaceObservation;
 };
 
 type CategoryTemplates = {
-  overview: (ctx: TemplateContext) => string;
-  samagri: (ctx: TemplateContext) => string;
-  vidhi: (ctx: TemplateContext) => string;
+  palmOverview: (ctx: PalmTemplateContext) => string;
+  faceOverview: (ctx: FaceTemplateContext) => string;
+  samagri: () => string;
+  vidhi: () => string;
 };
 
 const VISION_MODEL = "claude-sonnet-4-6";
@@ -128,10 +131,7 @@ function pickField(obj: Record<string, string | undefined>, key: string, fallbac
   return value && value.length > 0 ? value : fallback;
 }
 
-function palmPhrase(palm: PalmObservation | undefined, hasPalm: boolean): string {
-  if (!hasPalm || !palm) {
-    return "";
-  }
+function palmPhrase(palm: PalmObservation): string {
   const lines = pickField(palm, "lines", "balanced life lines");
   const mounts = pickField(palm, "mounts", "steady mounts");
   const shape = pickField(palm, "shape", "well-formed palm");
@@ -139,10 +139,7 @@ function palmPhrase(palm: PalmObservation | undefined, hasPalm: boolean): string
   return `Aapki hatheli par ${lines} dikhai deti hain, ${mounts} active lag rahe hain, aur ${shape} structure balance dikhata hai — ${notable} bhi khaas hai.`;
 }
 
-function facePhrase(face: FaceObservation | undefined, hasFace: boolean): string {
-  if (!hasFace || !face) {
-    return "";
-  }
+function facePhrase(face: FaceObservation): string {
   const forehead = pickField(face, "forehead", "balanced forehead");
   const eyes = pickField(face, "eyes", "expressive eyes");
   const jawline = pickField(face, "jawline", "defined jawline");
@@ -152,15 +149,13 @@ function facePhrase(face: FaceObservation | undefined, hasFace: boolean): string
 
 const CATEGORY_TEMPLATES: Record<HandFaceCategory, CategoryTemplates> = {
   "Career and Business": {
-    overview: (ctx) => {
-      const palm = palmPhrase(ctx.palm, ctx.hasPalm);
-      const face = facePhrase(ctx.face, ctx.hasFace);
-      const parts = [palm, face].filter(Boolean);
-      const visual =
-        parts.length > 0
-          ? parts.join(" ")
-          : "Aapki photos se positive professional energy dikhai deti hai.";
-      return `${visual} ${ctx.category} ke context mein, yeh combination suggest karti hai ki aap mehnat aur patience se growth pa sakte ho. Abhi ka phase decisions ko clearly soch kar lena beneficial hoga — naye opportunities ke liye darwaza khula hai, bas focus maintain rakho.`;
+    palmOverview: (ctx) => {
+      const visual = palmPhrase(ctx.palm);
+      return `${visual} ${ctx.category} ke context mein, aapki hatheli suggest karti hai ki aap mehnat aur patience se growth pa sakte ho. Abhi ka phase decisions ko clearly soch kar lena beneficial hoga — naye opportunities ke liye darwaza khula hai, bas focus maintain rakho.`;
+    },
+    faceOverview: (ctx) => {
+      const visual = facePhrase(ctx.face);
+      return `${visual} ${ctx.category} ke context mein, aapka chehra suggest karta hai ki aap mehnat aur patience se growth pa sakte ho. Abhi ka phase decisions ko clearly soch kar lena beneficial hoga — naye opportunities ke liye darwaza khula hai, bas focus maintain rakho.`;
     },
     samagri: () =>
       "1 piece Citrine ya Yellow Sapphire (as per budget), 1 small brass diya, desi ghee, 5 yellow flowers, 1 yellow cloth, aur ek copper coin. In sab ko ek chhote thali mein rakho.",
@@ -168,15 +163,13 @@ const CATEGORY_TEMPLATES: Record<HandFaceCategory, CategoryTemplates> = {
       "Har Thursday subah 6–8 baje ke beech, pehle haath-dho kar yellow cloth par baith jao. Citrine ko right haath mein pakad kar 11 baar 'Om Gurave Namah' bolo. Phir diya jalao aur 5 minute tak career growth ka sankalp lo. 21 din tak repeat karo — best results ke liye same time follow karo.",
   },
   "Love and Relationship": {
-    overview: (ctx) => {
-      const palm = palmPhrase(ctx.palm, ctx.hasPalm);
-      const face = facePhrase(ctx.face, ctx.hasFace);
-      const parts = [palm, face].filter(Boolean);
-      const visual =
-        parts.length > 0
-          ? parts.join(" ")
-          : "Aapki images se warm, open-hearted energy feel hoti hai.";
-      return `${visual} ${ctx.category} ke liye yeh signs batate hain ki emotional honesty aur patience dono important hain. Agar aap dil se communicate karte ho, toh connection deepen ho sakta hai — thoda time do, par apne values se mat hato.`;
+    palmOverview: (ctx) => {
+      const visual = palmPhrase(ctx.palm);
+      return `${visual} ${ctx.category} ke liye yeh hatheli ke signs batate hain ki emotional honesty aur patience dono important hain. Agar aap dil se communicate karte ho, toh connection deepen ho sakta hai — thoda time do, par apne values se mat hato.`;
+    },
+    faceOverview: (ctx) => {
+      const visual = facePhrase(ctx.face);
+      return `${visual} ${ctx.category} ke liye yeh chehre ke signs batate hain ki emotional honesty aur patience dono important hain. Agar aap dil se communicate karte ho, toh connection deepen ho sakta hai — thoda time do, par apne values se mat hato.`;
     },
     samagri: () =>
       "Gulab ki 5 pankhudiyan, 1 chhoti Rose Quartz mala ya stone, shakkar, 1 white cloth, aur ek chhota silver bowl (steel bhi chalega). Paani thoda sa alag rakho.",
@@ -184,15 +177,13 @@ const CATEGORY_TEMPLATES: Record<HandFaceCategory, CategoryTemplates> = {
       "Har Friday shaam ko, white cloth par baith kar gulab ki pankhudiyan bowl mein rakho. Rose Quartz ko dil ke paas rakh kar 11 baar 'Om Kamadevaya Namah' whisper karo. Phir thoda paani aur shakkar mila kar apne aas-paas chhida do (ya plant ko de do). 11 din tak karo — is duration mein negative thoughts ko feed mat karo.",
   },
   Marriage: {
-    overview: (ctx) => {
-      const palm = palmPhrase(ctx.palm, ctx.hasPalm);
-      const face = facePhrase(ctx.face, ctx.hasFace);
-      const parts = [palm, face].filter(Boolean);
-      const visual =
-        parts.length > 0
-          ? parts.join(" ")
-          : "Photos se stable, family-oriented vibes aa rahi hain.";
-      return `${visual} ${ctx.category} ke sandarbh mein, yeh combination harmony aur commitment dono ko support karti hai. Agar aap patience aur respect se approach karte ho, toh long-term bond strong ho sakta hai — family blessings aur clear communication key hain.`;
+    palmOverview: (ctx) => {
+      const visual = palmPhrase(ctx.palm);
+      return `${visual} ${ctx.category} ke sandarbh mein, aapki hatheli harmony aur commitment dono ko support karti hai. Agar aap patience aur respect se approach karte ho, toh long-term bond strong ho sakta hai — family blessings aur clear communication key hain.`;
+    },
+    faceOverview: (ctx) => {
+      const visual = facePhrase(ctx.face);
+      return `${visual} ${ctx.category} ke sandarbh mein, aapka chehra harmony aur commitment dono ko support karta hai. Agar aap patience aur respect se approach karte ho, toh long-term bond strong ho sakta hai — family blessings aur clear communication key hain.`;
     },
     samagri: () =>
       "2 laal chunri ya laal kapda ke tukde, 1 mangalsutra-style thread (simple red-yellow thread bhi chalega), chhoti mithai, 1 diya, desi ghee, aur haldi powder thoda sa.",
@@ -200,15 +191,13 @@ const CATEGORY_TEMPLATES: Record<HandFaceCategory, CategoryTemplates> = {
       "Har Tuesday ya Friday ko shaam 6 baje ke baad, laal kapde par baith kar diya jalao. Thread ko dono haathon mein lapet kar 11 baar 'Om Gauri Shankaraya Namah' bolo. Mithai ka ek tukda apne saamne rakh kar marriage harmony ka sankalp lo. 21 din tak — specially jhagda wale din skip mat karo, bas calmly karo.",
   },
   "Financial Problems": {
-    overview: (ctx) => {
-      const palm = palmPhrase(ctx.palm, ctx.hasPalm);
-      const face = facePhrase(ctx.face, ctx.hasFace);
-      const parts = [palm, face].filter(Boolean);
-      const visual =
-        parts.length > 0
-          ? parts.join(" ")
-          : "Images se resilience aur recovery ki energy dikhti hai.";
-      return `${visual} ${ctx.category} ke context mein, yeh signs batate hain ki disciplined savings aur smart choices se situation improve ho sakti hai. Abhi impulsive spending avoid karo — chhote consistent steps se stability wapas aa sakti hai.`;
+    palmOverview: (ctx) => {
+      const visual = palmPhrase(ctx.palm);
+      return `${visual} ${ctx.category} ke context mein, hatheli ke yeh signs batate hain ki disciplined savings aur smart choices se situation improve ho sakti hai. Abhi impulsive spending avoid karo — chhote consistent steps se stability wapas aa sakti hai.`;
+    },
+    faceOverview: (ctx) => {
+      const visual = facePhrase(ctx.face);
+      return `${visual} ${ctx.category} ke context mein, chehre ke yeh signs batate hain ki disciplined savings aur smart choices se situation improve ho sakti hai. Abhi impulsive spending avoid karo — chhote consistent steps se stability wapas aa sakti hai.`;
     },
     samagri: () =>
       "1 Kuber Yantra (chhota print bhi chalega), 1 green cloth, 11 rice grains, 1 copper coin, aur thoda ilaichi powder. Ek chhota kalash ya bowl rakho.",
@@ -216,15 +205,13 @@ const CATEGORY_TEMPLATES: Record<HandFaceCategory, CategoryTemplates> = {
       "Har Wednesday subah, green cloth par Kuber Yantra rakho. 11 rice grains aur coin saath mein rakh kar 11 baar 'Om Shreem Mahalakshmiyei Namah' bolo. Us din ek unnecessary expense consciously avoid karo. 21 din tak repeat — har hafte apne accounts ek baar review karo.",
   },
   "Family Issues": {
-    overview: (ctx) => {
-      const palm = palmPhrase(ctx.palm, ctx.hasPalm);
-      const face = facePhrase(ctx.face, ctx.hasFace);
-      const parts = [palm, face].filter(Boolean);
-      const visual =
-        parts.length > 0
-          ? parts.join(" ")
-          : "Photos se caring, protective family energy feel hoti hai.";
-      return `${visual} ${ctx.category} ke liye yeh combination suggest karti hai ki patience aur soft communication se misunderstandings clear ho sakti hain. Gussa kam karke sunna — yeh sabse powerful upay hai. Family harmony dheere-dheere improve hogi.`;
+    palmOverview: (ctx) => {
+      const visual = palmPhrase(ctx.palm);
+      return `${visual} ${ctx.category} ke liye aapki hatheli suggest karti hai ki patience aur soft communication se misunderstandings clear ho sakti hain. Gussa kam karke sunna — yeh sabse powerful upay hai. Family harmony dheere-dheere improve hogi.`;
+    },
+    faceOverview: (ctx) => {
+      const visual = facePhrase(ctx.face);
+      return `${visual} ${ctx.category} ke liye aapka chehra suggest karta hai ki patience aur soft communication se misunderstandings clear ho sakti hain. Gussa kam karke sunna — yeh sabse powerful upay hai. Family harmony dheere-dheere improve hogi.`;
     },
     samagri: () =>
       "1 chhoti family photo (print), 1 white cloth, chandan powder, 1 diya, desi ghee, aur 5 tulsi ya neem patte (tulsi na ho toh koi bhi green patte).",
@@ -232,15 +219,13 @@ const CATEGORY_TEMPLATES: Record<HandFaceCategory, CategoryTemplates> = {
       "Har Sunday subah, family photo ko white cloth par rakho. Chandan ka chhota tilak photo par lagao (ya photo ke saamne lagao). Diya jalakar 11 baar 'Om Namah Shivaya' bolo aur family peace ka sankalp lo. 11 din tak — is duration mein ghar mein intentionally ek positive baat share karo har din.",
   },
   Health: {
-    overview: (ctx) => {
-      const palm = palmPhrase(ctx.palm, ctx.hasPalm);
-      const face = facePhrase(ctx.face, ctx.hasFace);
-      const parts = [palm, face].filter(Boolean);
-      const visual =
-        parts.length > 0
-          ? parts.join(" ")
-          : "Images se overall vitality aur self-care ki need dono reflect hote hain.";
-      return `${visual} ${ctx.category} ke context mein, yeh signs batate hain ki rest, routine aur positive mindset recovery ko support karenge. Yeh report medical advice nahi hai — par daily discipline aur stress management se energy balance ho sakti hai.`;
+    palmOverview: (ctx) => {
+      const visual = palmPhrase(ctx.palm);
+      return `${visual} ${ctx.category} ke context mein, hatheli ke yeh signs batate hain ki rest, routine aur positive mindset recovery ko support karenge. Yeh report medical advice nahi hai — par daily discipline aur stress management se energy balance ho sakti hai.`;
+    },
+    faceOverview: (ctx) => {
+      const visual = facePhrase(ctx.face);
+      return `${visual} ${ctx.category} ke context mein, chehre ke yeh signs batate hain ki rest, routine aur positive mindset recovery ko support karenge. Yeh report medical advice nahi hai — par daily discipline aur stress management se energy balance ho sakti hai.`;
     },
     samagri: () =>
       "1 amethyst ya clear quartz (chhota), 1 blue cloth, paani ka glass, thoda sendha namak, aur ek fresh fruit (seasonal — apple ya banana chalega).",
@@ -248,15 +233,13 @@ const CATEGORY_TEMPLATES: Record<HandFaceCategory, CategoryTemplates> = {
       "Har subah khali pet paani mein thoda sendha namak mila kar peene se pehle, blue cloth par baith kar stone ko pakad kar 11 baar 'Om Dhanvantre Namah' bolo. Us din ek fresh fruit khud ko gift karo. 21 din tak — sath mein 20 minute walk ya light stretch add karo agar doctor allow kare.",
   },
   Education: {
-    overview: (ctx) => {
-      const palm = palmPhrase(ctx.palm, ctx.hasPalm);
-      const face = facePhrase(ctx.face, ctx.hasFace);
-      const parts = [palm, face].filter(Boolean);
-      const visual =
-        parts.length > 0
-          ? parts.join(" ")
-          : "Photos se sharp, learning-oriented energy dikhai deti hai.";
-      return `${visual} ${ctx.category} ke liye yeh combination focus aur perseverance ko highlight karti hai. Consistent study routine aur distractions kam karne se results improve ho sakte hain — confidence badhao, comparison kam karo.`;
+    palmOverview: (ctx) => {
+      const visual = palmPhrase(ctx.palm);
+      return `${visual} ${ctx.category} ke liye aapki hatheli focus aur perseverance ko highlight karti hai. Consistent study routine aur distractions kam karne se results improve ho sakte hain — confidence badhao, comparison kam karo.`;
+    },
+    faceOverview: (ctx) => {
+      const visual = facePhrase(ctx.face);
+      return `${visual} ${ctx.category} ke liye aapka chehra focus aur perseverance ko highlight karta hai. Consistent study routine aur distractions kam karne se results improve ho sakte hain — confidence badhao, comparison kam karo.`;
     },
     samagri: () =>
       "1 yellow notebook ya study diary, 1 pen, 1 Saraswati yantra (chhota print), yellow flowers 3, aur ek chhota misri ka tukda.",
@@ -264,15 +247,13 @@ const CATEGORY_TEMPLATES: Record<HandFaceCategory, CategoryTemplates> = {
       "Har subah padhai se pehle, diary aur pen saamne rakho. 11 baar 'Om Saraswatyai Namah' bolo aur aaj ka ek clear study goal likho. Misri muh mein rakh kar padhai shuru karo. 21 din tak — har raat 5 minute revise karo jo seekha. Exam ke din extra calm rehna.",
   },
   Other: {
-    overview: (ctx) => {
-      const palm = palmPhrase(ctx.palm, ctx.hasPalm);
-      const face = facePhrase(ctx.face, ctx.hasFace);
-      const parts = [palm, face].filter(Boolean);
-      const visual =
-        parts.length > 0
-          ? parts.join(" ")
-          : "Aapki photos se balanced, hopeful energy feel hoti hai.";
-      return `${visual} Jo bhi ${ctx.category} concern ho, yeh signs batate hain ki clarity aur positive action se situation shift ho sakti hai. Khud par bharosa rakho — universe aapke saath hai jab aap consistent effort karte ho.`;
+    palmOverview: (ctx) => {
+      const visual = palmPhrase(ctx.palm);
+      return `${visual} Jo bhi ${ctx.category} concern ho, hatheli ke yeh signs batate hain ki clarity aur positive action se situation shift ho sakti hai. Khud par bharosa rakho — universe aapke saath hai jab aap consistent effort karte ho.`;
+    },
+    faceOverview: (ctx) => {
+      const visual = facePhrase(ctx.face);
+      return `${visual} Jo bhi ${ctx.category} concern ho, chehre ke yeh signs batate hain ki clarity aur positive action se situation shift ho sakti hai. Khud par bharosa rakho — universe aapke saath hai jab aap consistent effort karte ho.`;
     },
     samagri: () =>
       "1 white candle ya diya, 1 multi-colour thread (7 colours wala rakhi thread bhi chalega), chhoti mithai, aur ek chhota notebook.",
@@ -373,44 +354,47 @@ export async function getVisionObservations(images: {
   return result;
 }
 
-function parseObservationString<T extends Record<string, string | undefined>>(
-  raw: string | undefined,
-  fallback: T
-): T | undefined {
-  if (!raw) {
-    return undefined;
-  }
+function parsePalmObservationString(raw: string): PalmObservation {
   try {
-    return JSON.parse(raw) as T;
+    return JSON.parse(raw) as PalmObservation;
   } catch {
-    return fallback;
+    return { ...PALM_FALLBACK };
   }
 }
 
-export function buildReport(
-  category: string,
-  observations: VisionObservations
-): ReportSections {
-  const templateKey = HAND_FACE_CATEGORIES.includes(category as HandFaceCategory)
+function parseFaceObservationString(raw: string): FaceObservation {
+  try {
+    return JSON.parse(raw) as FaceObservation;
+  } catch {
+    return { ...FACE_FALLBACK };
+  }
+}
+
+function resolveCategoryKey(category: string): HandFaceCategory {
+  return HAND_FACE_CATEGORIES.includes(category as HandFaceCategory)
     ? (category as HandFaceCategory)
     : "Other";
+}
 
-  const templates = CATEGORY_TEMPLATES[templateKey];
-  const palm = parseObservationString(observations.palmObservations, PALM_FALLBACK);
-  const face = parseObservationString(observations.faceObservations, FACE_FALLBACK);
-
-  const ctx: TemplateContext = {
-    category,
-    palm,
-    face,
-    hasPalm: Boolean(observations.palmObservations),
-    hasFace: Boolean(observations.faceObservations),
-  };
+export function buildPalmReport(category: string, palmObservations: string): ReportSections {
+  const templates = CATEGORY_TEMPLATES[resolveCategoryKey(category)];
+  const palm = parsePalmObservationString(palmObservations);
 
   return {
-    overview: templates.overview(ctx),
-    samagri: templates.samagri(ctx),
-    vidhi: templates.vidhi(ctx),
+    overview: templates.palmOverview({ category, palm }),
+    samagri: templates.samagri(),
+    vidhi: templates.vidhi(),
+  };
+}
+
+export function buildFaceReport(category: string, faceObservations: string): ReportSections {
+  const templates = CATEGORY_TEMPLATES[resolveCategoryKey(category)];
+  const face = parseFaceObservationString(faceObservations);
+
+  return {
+    overview: templates.faceOverview({ category, face }),
+    samagri: templates.samagri(),
+    vidhi: templates.vidhi(),
   };
 }
 

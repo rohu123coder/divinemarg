@@ -3,12 +3,12 @@ import { useEffect, useState } from "react";
 import { ActivityIndicator, Pressable, ScrollView, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
-import { getReadingById, type HandFaceReading } from "../../lib/handFaceReading";
+import { getReadingById, type Reading } from "../../lib/readings";
 
-export default function HandFaceReadingResultScreen() {
+export default function PalmReadingResultScreen() {
   const router = useRouter();
   const { id } = useLocalSearchParams<{ id: string }>();
-  const [reading, setReading] = useState<HandFaceReading | null>(null);
+  const [reading, setReading] = useState<Reading | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -39,7 +39,7 @@ export default function HandFaceReadingResultScreen() {
         <Pressable onPress={() => router.back()} style={{ marginRight: 12 }}>
           <Text style={{ fontSize: 22 }}>‹</Text>
         </Pressable>
-        <Text style={{ fontSize: 18, fontWeight: "700" }}>Your Reading</Text>
+        <Text style={{ fontSize: 18, fontWeight: "700" }}>Your Palm Reading</Text>
       </View>
 
       {loading ? (
