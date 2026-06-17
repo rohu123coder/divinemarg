@@ -292,7 +292,7 @@ async function analyzePalmImage(imageUrl: string): Promise<string> {
       model: VISION_MODEL,
       max_tokens: MAX_TOKENS,
       system:
-        "You are a neutral visual observer describing palm photographs. You are NOT an astrologer and must NOT make predictions, fortune-telling, or medical claims. Respond with ONLY a valid JSON object (no markdown) with keys: lines, mounts, shape, notable_features. Each value is a brief factual visual description in English.",
+        "You are a neutral visual observer describing palm photographs for phrase fragments used in a reading template. You are NOT an astrologer and must NOT make predictions, fortune-telling, or medical claims. Return SHORT phrases (2-5 words each) suitable for insertion into a sentence — not full descriptive sentences. Focus on traits with traditional palmistry significance: line depth/length, mount prominence, palm shape. Ignore incidental details like jewelry, background, or skin blemishes. Respond with ONLY a valid JSON object (no markdown) with keys: lines, mounts, shape, notable_features.",
       messages: [
         {
           role: "user",
@@ -303,7 +303,7 @@ async function analyzePalmImage(imageUrl: string): Promise<string> {
             },
             {
               type: "text",
-              text: "Describe this palm photo visually. Return ONLY JSON: { \"lines\": \"...\", \"mounts\": \"...\", \"shape\": \"...\", \"notable_features\": \"...\" }",
+              text: 'Return ONLY JSON with short phrase values (2-5 words each), e.g. { "lines": "deep and long", "mounts": "prominent Venus mount", "shape": "square and firm", "notable_features": "clear fate line" }',
             },
           ],
         },
@@ -330,7 +330,7 @@ async function analyzeFaceImage(imageUrl: string): Promise<string> {
       model: VISION_MODEL,
       max_tokens: MAX_TOKENS,
       system:
-        "You are a neutral visual observer describing face photographs. You are NOT an astrologer and must NOT make predictions, fortune-telling, or medical claims. Respond with ONLY a valid JSON object (no markdown) with keys: forehead, eyes, jawline, notable_features. Each value is a brief factual visual description in English.",
+        "You are a neutral visual observer describing face photographs for phrase fragments used in a reading template. You are NOT an astrologer and must NOT make predictions, fortune-telling, or medical claims. Return SHORT phrases (2-5 words each) suitable for insertion into a sentence — not full descriptive sentences. Focus on traits with traditional physiognomy significance: forehead shape, eye quality, jawline strength. Ignore incidental details like glasses, clothing, hair styling, or background. Respond with ONLY a valid JSON object (no markdown) with keys: forehead, eyes, jawline, notable_features.",
       messages: [
         {
           role: "user",
@@ -341,7 +341,7 @@ async function analyzeFaceImage(imageUrl: string): Promise<string> {
             },
             {
               type: "text",
-              text: "Describe this face photo visually. Return ONLY JSON: { \"forehead\": \"...\", \"eyes\": \"...\", \"jawline\": \"...\", \"notable_features\": \"...\" }",
+              text: 'Return ONLY JSON with short phrase values (2-5 words each), e.g. { "forehead": "high and broad", "eyes": "sharp and focused", "jawline": "strong and defined", "notable_features": "calm expression" }',
             },
           ],
         },
