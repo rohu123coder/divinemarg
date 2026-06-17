@@ -23,6 +23,7 @@ const QUICK_ACTIONS = [
   { key: "daily", label: "Daily Horoscope", icon: "sunny-outline" as const },
   { key: "kundli", label: "Free Kundli", icon: "pie-chart-outline" as const },
   { key: "matching", label: "Kundli Matching", icon: "ring" as const },
+  { key: "handface", label: "Hand & Face", icon: "hand-left-outline" as const },
   { key: "blog", label: "Astrology Blog", icon: "book-outline" as const },
 ];
 
@@ -185,6 +186,7 @@ export default function HomeTab() {
                 if (item.key === "daily") router.push("/horoscope");
                 if (item.key === "kundli") router.push("/kundli");
                 if (item.key === "matching") router.push("/kundli-matching");
+                if (item.key === "handface") router.push("/hand-face-reading");
                 if (item.key === "blog") router.push("/blog");
               }}
             >

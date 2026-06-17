@@ -12,17 +12,7 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import api from "../../lib/api";
-
-const PROBLEM_AREAS = [
-  { value: "Career and Business", label: "Career & Business", emoji: "💼" },
-  { value: "Love and Relationship", label: "Love & Relationship", emoji: "💕" },
-  { value: "Marriage", label: "Marriage", emoji: "💍" },
-  { value: "Financial Problems", label: "Financial", emoji: "💰" },
-  { value: "Family Issues", label: "Family Issues", emoji: "👨‍👩‍👧" },
-  { value: "Health", label: "Health", emoji: "🏥" },
-  { value: "Education", label: "Education", emoji: "🎓" },
-  { value: "Other", label: "Other", emoji: "✨" },
-];
+import { PROBLEM_AREAS } from "../../lib/problemAreas";
 
 export default function ProblemAreaScreen() {
   const router = useRouter();

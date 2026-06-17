@@ -14,7 +14,23 @@ const api = axios.create({
   },
 });
 
+function isFormDataBody(data: unknown): boolean {
+  if (typeof FormData !== "undefined" && data instanceof FormData) {
+    return true;
+  }
+  // React Native FormData may not pass instanceof reliably; _parts is the internal shape.
+  return (
+    typeof data === "object" &&
+    data !== null &&
+    "_parts" in data &&
+    Array.isArray((data as { _parts?: unknown })._parts)
+  );
+}
+
 api.interceptors.request.use(async (config) => {
+  if (isFormDataBody(config.data)) {
+    delete config.headers["Content-Type"];
+  }
   const token = await getTokenAsync();
   if (token) {
     config.headers.Authorization = `Bearer ${token}`;

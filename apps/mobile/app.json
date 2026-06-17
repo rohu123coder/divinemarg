@@ -30,7 +30,9 @@
         "RECEIVE_BOOT_COMPLETED",
         "VIBRATE",
         "WAKE_LOCK",
-        "RECORD_AUDIO"
+        "RECORD_AUDIO",
+        "CAMERA",
+        "READ_MEDIA_IMAGES"
       ],
       "googleServicesFile": "./google-services.json"
     },
@@ -40,6 +42,8 @@
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false,
         "NSMicrophoneUsageDescription": "DivineMarg needs microphone access for voice calls with astrologers.",
+        "NSCameraUsageDescription": "DivineMarg needs camera access to capture your palm or face photo for readings.",
+        "NSPhotoLibraryUsageDescription": "DivineMarg needs photo library access to select a photo for your reading.",
         "UIBackgroundModes": [
           "remote-notification"
         ]
@@ -66,7 +70,15 @@
           "imageWidth": 200
         }
       ],
-      "@react-native-community/datetimepicker"
+      "@react-native-community/datetimepicker",
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "DivineMarg needs photo library access to select a photo for your reading.",
+          "cameraPermission": "DivineMarg needs camera access to capture your palm or face photo for readings.",
+          "microphonePermission": false
+        }
+      ]
     ],
     "extra": {
       "eas": {
