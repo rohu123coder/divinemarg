@@ -151,6 +151,8 @@ export function AstrologerChatClient({ sessionId }: Props) {
     socketRef.current = socket;
 
     socket.on("connect", () => {
+      socket.emit("join_session", { sessionId });
+      socket.emit("get_waitlist");
       void (async () => {
         try {
           const res = await api.get(`/api/chat/history/${sessionId}/messages`);
@@ -186,8 +188,6 @@ export function AstrologerChatClient({ sessionId }: Props) {
         } catch {
           // keep existing / empty
         }
-        socket.emit("join_session", { sessionId });
-        socket.emit("get_waitlist");
       })();
     });
 

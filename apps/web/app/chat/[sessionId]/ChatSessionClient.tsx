@@ -177,6 +177,7 @@ export function ChatSessionClient({ sessionId }: ChatSessionClientProps) {
     socketRef.current = socket;
 
     socket.on("connect", () => {
+      socket.emit("join_session", { sessionId });
       void (async () => {
         try {
           const res = await api.get(`/api/chat/history/${sessionId}/messages`);
@@ -212,7 +213,6 @@ export function ChatSessionClient({ sessionId }: ChatSessionClientProps) {
         } catch {
           // optional
         }
-        socket.emit("join_session", { sessionId });
       })();
     });
 
