@@ -1,5 +1,20 @@
 import * as FileSystem from "expo-file-system/legacy";
+import * as ImageManipulator from "expo-image-manipulator";
 import * as ImagePicker from "expo-image-picker";
+
+async function resizeImage(uri: string): Promise<string> {
+  try {
+    const result = await ImageManipulator.manipulateAsync(
+      uri,
+      [{ resize: { width: 1280 } }],
+      { compress: 0.7, format: ImageManipulator.SaveFormat.JPEG }
+    );
+    return result.uri;
+  } catch {
+    // If manipulation fails for any reason, fall back to original uri
+    return uri;
+  }
+}
 
 async function copyToStableUri(sourceUri: string): Promise<string> {
   try {
@@ -25,12 +40,13 @@ export async function pickImage(source: "camera" | "gallery"): Promise<string | 
     }
     const result = await ImagePicker.launchCameraAsync({
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      quality: 0.7,
+      quality: 1.0,
     });
     if (result.canceled || !result.assets[0]?.uri) {
       return null;
     }
-    const stableUri = await copyToStableUri(result.assets[0].uri);
+    const resizedUri = await resizeImage(result.assets[0].uri);
+    const stableUri = await copyToStableUri(resizedUri);
     return stableUri;
   }
 
@@ -45,6 +61,7 @@ export async function pickImage(source: "camera" | "gallery"): Promise<string | 
   if (result.canceled || !result.assets[0]?.uri) {
     return null;
   }
-  const stableUri = await copyToStableUri(result.assets[0].uri);
+  const resizedUri = await resizeImage(result.assets[0].uri);
+  const stableUri = await copyToStableUri(resizedUri);
   return stableUri;
 }

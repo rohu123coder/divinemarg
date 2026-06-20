@@ -29,7 +29,7 @@ function isFormDataBody(data: unknown): boolean {
 
 api.interceptors.request.use(async (config) => {
   if (isFormDataBody(config.data)) {
-    delete config.headers["Content-Type"];
+    config.headers["Content-Type"] = false;
   }
   const token = await getTokenAsync();
   if (token) {
