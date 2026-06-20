@@ -4,6 +4,7 @@ import {
   ActivityIndicator,
   Alert,
   Image,
+  Modal,
   Pressable,
   ScrollView,
   Text,
@@ -11,7 +12,8 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
-import { pickImage } from "../../lib/imagePicker";
+import { InAppCamera } from "../../components/InAppCamera";
+import { pickImage, processPickedImage } from "../../lib/imagePicker";
 import { PROBLEM_AREAS } from "../../lib/problemAreas";
 import { submitFaceReading } from "../../lib/readings";
 
@@ -20,13 +22,26 @@ export default function FaceReadingScreen() {
   const [category, setCategory] = useState<string | null>(null);
   const [faceUri, setFaceUri] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [showCamera, setShowCamera] = useState(false);
+  const [processingPhoto, setProcessingPhoto] = useState(false);
 
-  async function handlePick(source: "camera" | "gallery") {
-    const uri = await pickImage(source);
+  async function handleGalleryPick() {
+    const uri = await pickImage("gallery");
     if (!uri) {
       return;
     }
     setFaceUri(uri);
+  }
+
+  async function handleCameraCapture(rawUri: string) {
+    setShowCamera(false);
+    setProcessingPhoto(true);
+    try {
+      const finalUri = await processPickedImage(rawUri);
+      setFaceUri(finalUri);
+    } finally {
+      setProcessingPhoto(false);
+    }
   }
 
   async function handleSubmit() {
@@ -92,8 +107,10 @@ export default function FaceReadingScreen() {
         <ImageSlot
           label="Face Photo"
           uri={faceUri}
-          onPick={(source) => void handlePick(source)}
+          onCamera={() => setShowCamera(true)}
+          onGallery={() => void handleGalleryPick()}
           onClear={() => setFaceUri(null)}
+          busy={processingPhoto}
         />
 
         <Pressable
@@ -119,6 +136,13 @@ export default function FaceReadingScreen() {
           )}
         </Pressable>
       </ScrollView>
+
+      <Modal visible={showCamera} animationType="slide" onRequestClose={() => setShowCamera(false)}>
+        <InAppCamera
+          onCapture={(rawUri) => void handleCameraCapture(rawUri)}
+          onCancel={() => setShowCamera(false)}
+        />
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -126,13 +150,17 @@ export default function FaceReadingScreen() {
 function ImageSlot({
   label,
   uri,
-  onPick,
+  onCamera,
+  onGallery,
   onClear,
+  busy,
 }: {
   label: string;
   uri: string | null;
-  onPick: (source: "camera" | "gallery") => void;
+  onCamera: () => void;
+  onGallery: () => void;
   onClear: () => void;
+  busy?: boolean;
 }) {
   return (
     <View style={{ marginTop: 20 }}>
@@ -145,20 +173,27 @@ function ImageSlot({
           </Pressable>
         </View>
       ) : null}
-      <View style={{ flexDirection: "row", gap: 8, marginTop: 8 }}>
-        <Pressable
-          onPress={() => onPick("camera")}
-          style={{ padding: 10, backgroundColor: "#E5E7EB", borderRadius: 6 }}
-        >
-          <Text>Camera</Text>
-        </Pressable>
-        <Pressable
-          onPress={() => onPick("gallery")}
-          style={{ padding: 10, backgroundColor: "#E5E7EB", borderRadius: 6 }}
-        >
-          <Text>Gallery</Text>
-        </Pressable>
-      </View>
+      {busy ? (
+        <View style={{ flexDirection: "row", alignItems: "center", gap: 8, marginTop: 8 }}>
+          <ActivityIndicator />
+          <Text>Processing photo…</Text>
+        </View>
+      ) : (
+        <View style={{ flexDirection: "row", gap: 8, marginTop: 8 }}>
+          <Pressable
+            onPress={onCamera}
+            style={{ padding: 10, backgroundColor: "#E5E7EB", borderRadius: 6 }}
+          >
+            <Text>Camera</Text>
+          </Pressable>
+          <Pressable
+            onPress={onGallery}
+            style={{ padding: 10, backgroundColor: "#E5E7EB", borderRadius: 6 }}
+          >
+            <Text>Gallery</Text>
+          </Pressable>
+        </View>
+      )}
     </View>
   );
 }

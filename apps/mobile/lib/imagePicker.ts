@@ -32,24 +32,13 @@ async function copyToStableUri(sourceUri: string): Promise<string> {
   }
 }
 
-export async function pickImage(source: "camera" | "gallery"): Promise<string | null> {
-  if (source === "camera") {
-    const permission = await ImagePicker.requestCameraPermissionsAsync();
-    if (!permission.granted) {
-      return null;
-    }
-    const result = await ImagePicker.launchCameraAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      quality: 1.0,
-    });
-    if (result.canceled || !result.assets[0]?.uri) {
-      return null;
-    }
-    const resizedUri = await resizeImage(result.assets[0].uri);
-    const stableUri = await copyToStableUri(resizedUri);
-    return stableUri;
-  }
+export async function processPickedImage(rawUri: string): Promise<string> {
+  const resizedUri = await resizeImage(rawUri);
+  const stableUri = await copyToStableUri(resizedUri);
+  return stableUri;
+}
 
+export async function pickImage(source: "gallery"): Promise<string | null> {
   const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
   if (!permission.granted) {
     return null;
@@ -61,7 +50,5 @@ export async function pickImage(source: "camera" | "gallery"): Promise<string | 
   if (result.canceled || !result.assets[0]?.uri) {
     return null;
   }
-  const resizedUri = await resizeImage(result.assets[0].uri);
-  const stableUri = await copyToStableUri(resizedUri);
-  return stableUri;
+  return processPickedImage(result.assets[0].uri);
 }

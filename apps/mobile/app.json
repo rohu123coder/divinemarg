@@ -78,6 +78,12 @@
           "cameraPermission": "DivineMarg needs camera access to capture your palm or face photo for readings.",
           "microphonePermission": false
         }
+      ],
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "Allow $(PRODUCT_NAME) to access your camera to take reading photos."
+        }
       ]
     ],
     "extra": {
