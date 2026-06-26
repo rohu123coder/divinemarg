@@ -199,7 +199,7 @@ export function KundliForm({
     <div className="w-full px-4 py-8 sm:px-6 lg:px-8">
       <div className="mx-auto w-full max-w-2xl">
         <div className="overflow-hidden rounded-2xl border border-violet-200/60 bg-white shadow-xl shadow-violet-200/30">
-          <div className="bg-gradient-to-r from-[#4C1D95] via-[#6D28D9] to-[#7C3AED] px-6 py-8 text-center">
+          <div className="bg-gradient-to-r from-violet-900 via-violet-700 to-violet-600 px-6 py-8 text-center">
             <h1 className="text-2xl font-bold tracking-tight text-white sm:text-3xl">
               🔮 Free Kundli Generator
             </h1>

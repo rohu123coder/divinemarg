@@ -3,6 +3,7 @@
 import { useCallback, useState } from "react";
 
 import api from "@/lib/api";
+import { getTenant } from "@/lib/tenants";
 import { useAuthStore } from "@/lib/store";
 
 declare global {
@@ -47,6 +48,7 @@ type WalletWidgetProps = {
 };
 
 export function WalletWidget({ className = "" }: WalletWidgetProps) {
+  const tenant = getTenant();
   const { user, updateWalletBalance, isWalletRefreshing } = useAuthStore();
   const balance = user?.wallet_balance ?? 0;
   const [open, setOpen] = useState(false);
@@ -93,7 +95,7 @@ export function WalletWidget({ className = "" }: WalletWidgetProps) {
         key: d.keyId,
         amount: d.amount,
         currency: d.currency,
-        name: "DivineMarg",
+        name: tenant.name,
         description: "Wallet recharge",
         order_id: d.orderId,
         handler: async (response: {

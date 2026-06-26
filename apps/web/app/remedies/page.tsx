@@ -1,9 +1,11 @@
 import type { Metadata } from "next";
 
+import { tenantPageTitle } from "@/lib/tenantBranding";
+
 import { Navbar } from "@/components/Navbar";
 
 export const metadata: Metadata = {
-  title: "Planetary Remedies & Gemstones | DivineMarg",
+  title: tenantPageTitle("Planetary Remedies & Gemstones"),
   description:
     "Explore Vedic planetary remedies including mantra, daan, yantra, and gemstone recommendations.",
 };

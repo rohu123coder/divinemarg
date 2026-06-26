@@ -1,9 +1,11 @@
 import type { Metadata } from "next";
 
+import { tenantPageTitle } from "@/lib/tenantBranding";
+
 import { Navbar } from "@/components/Navbar";
 
 export const metadata: Metadata = {
-  title: "Horoscope 2026 - All Rashis | DivineMarg",
+  title: tenantPageTitle("Horoscope 2026 - All Rashis"),
   description:
     "Read 2026 yearly horoscope predictions for all 12 rashis across career, love, health, and finance.",
 };

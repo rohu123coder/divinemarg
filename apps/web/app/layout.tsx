@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import localFont from "next/font/local";
 import { getTenant } from "@/lib/tenants";
+import { tenantRootMetadata } from "@/lib/tenantBranding";
 import "./globals.css";
 
 const geistSans = localFont({
@@ -14,12 +15,7 @@ const geistMono = localFont({
   weight: "100 900",
 });
 
-export const metadata: Metadata = {
-  title: "DivineMarg — Talk to India's Top Astrologers",
-  icons: { icon: "/logo.png" },
-  description:
-    "Get answers from India’s best astrologers. Wallet-powered live chat on DivineMarg.",
-};
+export const metadata: Metadata = tenantRootMetadata();
 
 export default function RootLayout({
   children,

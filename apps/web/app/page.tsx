@@ -9,6 +9,7 @@ import { Footer } from "@/components/Footer";
 import { Navbar } from "@/components/Navbar";
 import api from "@/lib/api";
 import { formatDisplayDate } from "@/lib/formatDate";
+import { getTenant } from "@/lib/tenants";
 import { firstName } from "@/lib/utils";
 import { rashis } from "@/lib/horoscope";
 import { getSocketApiBase } from "@/lib/socketBase";
@@ -258,6 +259,7 @@ function getPanchang(date: Date) {
 }
 
 export default function HomePage() {
+  const tenant = getTenant();
   const router = useRouter();
   const { token, isLoggedIn } = useAuthStore();
   const [featured, setFeatured] = useState<Astro[]>([]);
@@ -836,7 +838,7 @@ export default function HomePage() {
 
       <section className="border-t border-violet-100 bg-violet-50/40 py-14">
         <div className="mx-auto max-w-7xl px-4 sm:px-6">
-          <h2 className="text-2xl font-bold sm:text-3xl">DivineMarg Magazine</h2>
+          <h2 className="text-2xl font-bold sm:text-3xl">{tenant.name} Magazine</h2>
           <div className="mt-7 grid gap-4 md:grid-cols-3">
             {articles.map((article) => (
               <article

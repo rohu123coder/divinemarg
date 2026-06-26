@@ -3,10 +3,12 @@ import { Suspense, useState, useRef, useCallback, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Navbar } from "@/components/Navbar";
 import api from "@/lib/api";
+import { getTenant } from "@/lib/tenants";
 import { useAuthStore, type AuthUser } from "@/lib/store";
 import Link from "next/link";
 
 function LoginContent() {
+  const tenant = getTenant();
   const router = useRouter();
   const searchParams = useSearchParams();
   const setUser = useAuthStore((s) => s.setUser);
@@ -107,7 +109,7 @@ function LoginContent() {
           
           {mode === "login" && (
             <>
-              <h1 className="text-2xl font-bold text-slate-900 text-center">Welcome to DivineMarg ✨</h1>
+              <h1 className="text-2xl font-bold text-slate-900 text-center">Welcome to {tenant.name} ✨</h1>
               <p className="text-sm text-slate-500 text-center mt-2 mb-8">Login with your phone number or email</p>
               <div className="space-y-4">
                 <input
@@ -147,7 +149,7 @@ function LoginContent() {
           {mode === "register" && (
             <>
               <h1 className="text-2xl font-bold text-slate-900 text-center">Create Account</h1>
-              <p className="text-sm text-slate-500 text-center mt-2 mb-8">Join DivineMarg today</p>
+              <p className="text-sm text-slate-500 text-center mt-2 mb-8">Join {tenant.name} today</p>
               <div className="space-y-4">
                 <input type="text" value={name} onChange={e => setName(e.target.value)}
                   placeholder="Full Name" className="w-full border border-slate-200 rounded-xl px-4 py-3 outline-none focus:ring-2 focus:ring-violet-500"/>

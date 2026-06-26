@@ -3,11 +3,16 @@ import Link from "next/link";
 
 import { Footer } from "@/components/Footer";
 import { Navbar } from "@/components/Navbar";
+import { getTenant } from "@/lib/tenants";
+import { tenantPageTitle } from "@/lib/tenantBranding";
+
+const tenant = getTenant();
+const supportEmail = tenant.contact.supportEmail;
 
 export const metadata: Metadata = {
-  title: "Refund Policy | DivineMarg",
+  title: tenantPageTitle("Refund Policy"),
   description:
-    "Review DivineMarg wallet recharge and consultation refund rules, timelines, and refund request steps.",
+    `Review ${tenant.name} wallet recharge and consultation refund rules, timelines, and refund request steps.`,
 };
 
 const sections = [
@@ -17,7 +22,7 @@ const sections = [
     items: [
       "Unused wallet balance can be refunded within 7 days of recharge",
       "Partially used balance: only unused portion eligible",
-      "Request via email: support@divinemarg.com with transaction ID",
+      `Request via email: ${supportEmail} with transaction ID`,
     ],
   },
   {
@@ -32,7 +37,7 @@ const sections = [
     id: "refund-request",
     title: "3. How to Request Refund",
     items: [
-      "Email: support@divinemarg.com",
+      `Email: ${supportEmail}`,
       'Subject: "Refund Request - [Your Phone Number]"',
       "Include: transaction ID, date, amount, reason",
       "Processing time: 5-7 business days",
@@ -65,7 +70,7 @@ export default function RefundPolicyPage() {
 
       <main className="border-b border-slate-200">
         <div className="mx-auto max-w-[1200px] px-4 py-12 md:px-8 md:py-16">
-          <h1 className="text-3xl font-extrabold text-[#7C3AED] md:text-4xl">Refund Policy</h1>
+          <h1 className="text-3xl font-extrabold text-violet-600 md:text-4xl">Refund Policy</h1>
           <p className="mt-3 max-w-3xl text-sm leading-7 text-slate-700">
             Our refund process is designed to be fair and transparent for wallet recharges and
             technical service issues.
@@ -79,7 +84,7 @@ export default function RefundPolicyPage() {
                   <Link
                     key={section.id}
                     href={`#${section.id}`}
-                    className="block text-sm text-slate-700 transition hover:text-[#7C3AED]"
+                    className="block text-sm text-slate-700 transition hover:text-violet-600"
                   >
                     {section.title}
                   </Link>
@@ -94,7 +99,7 @@ export default function RefundPolicyPage() {
                   key={section.id}
                   className="scroll-mt-24 rounded-2xl border border-slate-200 bg-white p-6"
                 >
-                  <h2 className="text-xl font-bold text-[#7C3AED]">{section.title}</h2>
+                  <h2 className="text-xl font-bold text-violet-600">{section.title}</h2>
                   <ul className="mt-3 space-y-2 text-sm leading-7 text-slate-700">
                     {section.items.map((item) => (
                       <li key={item} className="flex gap-2">

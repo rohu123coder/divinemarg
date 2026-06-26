@@ -1,5 +1,7 @@
 import Link from "next/link";
 
+import { getTenant } from "@/lib/tenants";
+
 const links = [
   ["Privacy", "/privacy-policy"],
   ["Terms", "/terms"],
@@ -8,12 +10,14 @@ const links = [
 ] as const;
 
 export function Footer() {
+  const tenant = getTenant();
+
   return (
     <footer className="border-t border-white/10 bg-[#0A0418] py-12">
       <div className="mx-auto max-w-7xl px-4 md:px-8">
         <div className="flex flex-col gap-8 md:flex-row md:items-start md:justify-between">
           <div>
-            <p className="font-heading text-2xl font-bold text-gold-accent">DivineMarg</p>
+            <p className="font-heading text-2xl font-bold text-gold-accent">{tenant.logo.text}</p>
             <p className="mt-2 font-sans text-sm text-cream-white/70">
               Powering India&apos;s Astrology Entrepreneurs
             </p>
@@ -30,8 +34,8 @@ export function Footer() {
         <div className="mt-8 space-y-2 font-sans text-sm text-cream-white/60">
           <p>
             Email:{" "}
-            <a href="mailto:support@divinemarg.com" className="text-gold-accent hover:underline">
-              support@divinemarg.com
+            <a href={`mailto:${tenant.contact.supportEmail}`} className="text-gold-accent hover:underline">
+              {tenant.contact.supportEmail}
             </a>
           </p>
           <p>
@@ -62,7 +66,7 @@ export function Footer() {
         </div>
 
         <p className="mt-8 font-sans text-xs text-cream-white/50">
-          © {new Date().getFullYear()} DivineMarg. All rights reserved.
+          © {new Date().getFullYear()} {tenant.name}. All rights reserved.
         </p>
       </div>
     </footer>

@@ -3,11 +3,16 @@ import Link from "next/link";
 
 import { Footer } from "@/components/Footer";
 import { Navbar } from "@/components/Navbar";
+import { getTenant } from "@/lib/tenants";
+import { tenantPageTitle } from "@/lib/tenantBranding";
+
+const tenant = getTenant();
+const supportEmail = tenant.contact.supportEmail;
 
 export const metadata: Metadata = {
-  title: "Privacy Policy | DivineMarg",
+  title: tenantPageTitle("Privacy Policy"),
   description:
-    "Read how DivineMarg collects, uses, and protects personal data across consultations, wallet payments, and platform operations.",
+    `Read how ${tenant.name} collects, uses, and protects personal data across consultations, wallet payments, and platform operations.`,
 };
 
 const sections = [
@@ -15,7 +20,7 @@ const sections = [
     id: "introduction",
     title: "1. Introduction",
     content:
-      'DivineMarg ("we", "us", "our") operates divinemarg.com. This policy explains how we collect, use, and protect your personal information.',
+      `${tenant.name} ("we", "us", "our") operates ${tenant.domain}. This policy explains how we collect, use, and protect your personal information.`,
   },
   {
     id: "information-we-collect",
@@ -59,7 +64,7 @@ const sections = [
     id: "your-rights",
     title: "6. Your Rights",
     items: [
-      "Access your data: email support@divinemarg.com",
+      `Access your data: email ${supportEmail}`,
       "Delete your account: request via email",
       "Opt out of communications: unsubscribe link in emails",
     ],
@@ -75,7 +80,7 @@ const sections = [
   {
     id: "contact",
     title: "8. Contact",
-    content: "support@divinemarg.com",
+    content: `${supportEmail}`,
   },
 ] as const;
 
@@ -86,7 +91,7 @@ export default function PrivacyPolicyPage() {
 
       <main className="border-b border-slate-200">
         <div className="mx-auto max-w-[1200px] px-4 py-12 md:px-8 md:py-16">
-          <h1 className="text-3xl font-extrabold text-[#7C3AED] md:text-4xl">Privacy Policy</h1>
+          <h1 className="text-3xl font-extrabold text-violet-600 md:text-4xl">Privacy Policy</h1>
           <p className="mt-3 text-sm text-slate-600">Last updated: April 2026</p>
 
           <div className="mt-8 grid gap-8 lg:grid-cols-[260px_1fr]">
@@ -97,7 +102,7 @@ export default function PrivacyPolicyPage() {
                   <Link
                     key={section.id}
                     href={`#${section.id}`}
-                    className="block text-sm text-slate-700 transition hover:text-[#7C3AED]"
+                    className="block text-sm text-slate-700 transition hover:text-violet-600"
                   >
                     {section.title}
                   </Link>
@@ -112,7 +117,7 @@ export default function PrivacyPolicyPage() {
                   key={section.id}
                   className="scroll-mt-24 rounded-2xl border border-slate-200 bg-white p-6"
                 >
-                  <h2 className="text-xl font-bold text-[#7C3AED]">{section.title}</h2>
+                  <h2 className="text-xl font-bold text-violet-600">{section.title}</h2>
                   {"content" in section ? (
                     <p className="mt-3 text-sm leading-7 text-slate-700">{section.content}</p>
                   ) : null}

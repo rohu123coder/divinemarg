@@ -7,6 +7,7 @@ import { Fragment, useEffect, useMemo, useState } from "react";
 import { io, type Socket } from "socket.io-client";
 
 import api from "@/lib/api";
+import { getTenant } from "@/lib/tenants";
 import { getSocketApiBase } from "@/lib/socketBase";
 import { useAuthStore } from "@/lib/store";
 
@@ -19,6 +20,7 @@ function formatMoney(n: number): string {
 }
 
 export function Navbar() {
+  const tenant = getTenant();
   const router = useRouter();
   const pathname = usePathname();
   const { user, isLoggedIn, logout, isWalletRefreshing, token } = useAuthStore();
@@ -135,18 +137,20 @@ export function Navbar() {
           href="/"
           className="shrink-0"
           onClick={() => setMenuOpen(false)}
-          aria-label="DivineMarg home"
+          aria-label={`${tenant.name} home`}
         >
           <div className="flex items-center gap-2">
-            <Image
-              src="/logo.png"
-              alt="DivineMarg"
-              width={140}
-              height={40}
-              className="h-10 w-auto object-contain"
-            />
+            {tenant.logo.imageUrl ? (
+              <Image
+                src={tenant.logo.imageUrl}
+                alt={tenant.name}
+                width={140}
+                height={40}
+                className="h-10 w-auto object-contain"
+              />
+            ) : null}
             <span className="text-[22px] font-bold text-[#B8960C]">
-              DivineMarg
+              {tenant.logo.text}
             </span>
           </div>
         </Link>

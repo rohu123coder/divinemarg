@@ -1,9 +1,11 @@
 import type { Metadata } from "next";
 
+import { tenantPageTitle } from "@/lib/tenantBranding";
+
 import { Navbar } from "@/components/Navbar";
 
 export const metadata: Metadata = {
-  title: "Today's Panchang | DivineMarg",
+  title: tenantPageTitle("Today's Panchang"),
   description:
     "View today's Panchang with tithi, nakshatra, yoga, rahukaal, sunrise, shubh muhurat, festivals, and choghadiya timings.",
 };

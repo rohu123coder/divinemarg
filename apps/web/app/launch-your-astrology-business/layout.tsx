@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Cormorant_Garamond, Plus_Jakarta_Sans, Inter } from "next/font/google";
 
 import { AnalyticsScripts } from "@/components/AnalyticsScripts";
+import { getTenant } from "@/lib/tenants";
 
 import { faqs } from "./lib/content";
 import "./landing.css";
@@ -25,8 +26,10 @@ const inter = Inter({
   display: "swap",
 });
 
+const tenant = getTenant();
+
 export const metadata: Metadata = {
-  title: "Launch Your Astrology Business in 30 Days | DivineMarg",
+  title: `Launch Your Astrology Business in 30 Days | ${tenant.name}`,
   description:
     "Done-for-you astrology platform setup. Website, mobile app, payment, WhatsApp automation — sab ready. Book ₹99 live demo with founder.",
   keywords: [
@@ -44,7 +47,7 @@ export const metadata: Metadata = {
   },
   twitter: {
     card: "summary_large_image",
-    title: "Launch Your Own Astrology Business | DivineMarg",
+    title: `Launch Your Own Astrology Business | ${tenant.name}`,
     description: "Apna platform, apne customers, 100% revenue. Book ₹99 live demo.",
     images: ["/landing-assets/og-image.jpg"],
   },
@@ -55,19 +58,21 @@ const jsonLd = {
   "@graph": [
     {
       "@type": "Organization",
-      name: "DivineMarg",
-      url: "https://divinemarg.com",
-      logo: "https://divinemarg.com/logo.png",
+      name: tenant.name,
+      url: `https://${tenant.domain}`,
+      logo: tenant.logo.imageUrl
+        ? `https://${tenant.domain}${tenant.logo.imageUrl}`
+        : `https://${tenant.domain}`,
       contactPoint: {
         "@type": "ContactPoint",
-        email: "support@divinemarg.com",
+        email: tenant.contact.supportEmail,
         contactType: "customer support",
       },
     },
     {
       "@type": "Service",
       name: "Launch Your Own Astrology Business",
-      provider: { "@type": "Organization", name: "DivineMarg" },
+      provider: { "@type": "Organization", name: tenant.name },
       description:
         "Done-for-you astrology platform — website, mobile app, payments, WhatsApp automation in 30 days.",
       offers: {

@@ -1,5 +1,7 @@
 import Link from "next/link";
 
+import { getTenant } from "@/lib/tenants";
+
 const footerLinks = [
   ["About", "/about"],
   ["Privacy Policy", "/privacy-policy"],
@@ -20,6 +22,7 @@ const socialLinks = [
 ] as const;
 
 export function Footer() {
+  const tenant = getTenant();
   const year = new Date().getFullYear();
 
   return (
@@ -28,7 +31,7 @@ export function Footer() {
         <div className="flex flex-col items-start justify-between gap-8 border-b border-slate-800 pb-8 md:flex-row">
           <div>
             <p className="bg-gradient-to-r from-violet-400 to-indigo-400 bg-clip-text text-xl font-bold text-transparent">
-              ✨ DivineMarg
+              ✨ {tenant.logo.text}
             </p>
             <p className="mt-2 text-sm text-slate-400">
               Accurate guidance, verified astrologers, and trusted reports.
@@ -57,7 +60,7 @@ export function Footer() {
               </Link>
             ))}
           </div>
-          <p className="text-xs text-slate-500">© {year} DivineMarg. All rights reserved.</p>
+          <p className="text-xs text-slate-500">© {year} {tenant.name}. All rights reserved.</p>
         </div>
       </div>
     </footer>

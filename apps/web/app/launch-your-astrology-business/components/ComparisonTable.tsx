@@ -2,11 +2,15 @@
 
 import { motion } from "framer-motion";
 
+import { getTenant } from "@/lib/tenants";
+
 import { comparisonRows } from "../lib/content";
 import { SectionReveal } from "./SectionReveal";
 import { GoldCTA } from "./GoldCTA";
 
 export function ComparisonTable() {
+  const tenant = getTenant();
+
   return (
     <SectionReveal className="py-16 md:py-24">
       <div className="mx-auto max-w-7xl px-4 md:px-8">
@@ -23,7 +27,7 @@ export function ComparisonTable() {
               <tr className="bg-cosmic-secondary">
                 <th className="p-4 font-semibold text-cream-white">Feature</th>
                 <th className="p-4 font-semibold text-cream-white/70">AstroTalk/Marketplace</th>
-                <th className="p-4 font-semibold text-gold-accent">DivineMarg (Your Platform)</th>
+                <th className="p-4 font-semibold text-gold-accent">{tenant.name} (Your Platform)</th>
               </tr>
             </thead>
             <tbody>

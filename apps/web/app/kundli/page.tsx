@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useState } from "react";
+import { getTenant } from "@/lib/tenants";
 import { KundliChart } from "./components/KundliChart";
 import { KundliForm } from "./components/KundliForm";
 import type { KundliCalculateResponse } from "./types";
@@ -325,6 +326,7 @@ function stars(starCount: number) {
 }
 
 export default function KundliPage() {
+  const tenant = getTenant();
   const [result, setResult] = useState<KundliCalculateResponse | null>(null);
   const lagnaKey = result ? signKey(result.basicInfo.ascendant.rashi) : "";
   const moonKey = result ? signKey(result.basicInfo.moonSign.rashi) : "";
@@ -358,7 +360,7 @@ export default function KundliPage() {
     if (navigator.share) {
       try {
         await navigator.share({
-          title: "My DivineMarg Kundli Report",
+          title: `My ${tenant.name} Kundli Report`,
           text: shareText,
           url: window.location.href,
         });
@@ -374,14 +376,14 @@ export default function KundliPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-[#EDE9FE] via-white to-violet-50/40">
+    <div className="min-h-screen bg-gradient-to-b from-violet-100 via-white to-violet-50/40">
       <header className="border-b border-violet-100/80 bg-white/70 backdrop-blur-md">
         <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-4 sm:px-6">
           <Link
             href="/"
-            className="text-lg font-semibold text-[#4C1D95] transition hover:text-violet-700"
+            className="text-lg font-semibold text-violet-900 transition hover:text-violet-700"
           >
-            DivineMarg
+            {tenant.logo.text}
           </Link>
           <span className="rounded-full bg-violet-100 px-3 py-1 text-xs font-medium text-violet-800">
             Vedic · Sidereal · Lahiri
@@ -819,7 +821,7 @@ export default function KundliPage() {
       ) : null}
 
       <footer className="border-t border-violet-100 bg-violet-950/5 py-8 text-center text-xs text-slate-500">
-        DivineMarg — Vedic astrology for clarity &amp; confidence. Results are
+        {tenant.name} — Vedic astrology for clarity &amp; confidence. Results are
         algorithmic; consult a qualified astrologer for life decisions.
       </footer>
     </div>

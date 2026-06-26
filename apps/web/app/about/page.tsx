@@ -3,11 +3,14 @@ import type { Metadata } from "next";
 import { Footer } from "@/components/Footer";
 import { FounderPhoto } from "@/components/FounderPhoto";
 import { Navbar } from "@/components/Navbar";
+import { getTenant } from "@/lib/tenants";
+
+const tenant = getTenant();
 
 export const metadata: Metadata = {
-  title: "About DivineMarg | Trusted Vedic Astrology Platform",
+  title: `About ${tenant.name} | Trusted Vedic Astrology Platform`,
   description:
-    "Learn the story behind DivineMarg, founded by Rohit Jha, and how we are building India’s most trusted platform for authentic Vedic astrology guidance.",
+    `Learn the story behind ${tenant.name}, founded by Rohit Jha, and how we are building India’s most trusted platform for authentic Vedic astrology guidance.`,
 };
 
 const missionCards = [
@@ -55,7 +58,7 @@ export default function AboutPage() {
       <main>
         <section className="border-b border-slate-200 bg-gradient-to-br from-violet-100 via-violet-50 to-white">
           <div className="mx-auto max-w-[1200px] px-4 py-16 md:px-8 md:py-20">
-            <h1 className="text-3xl font-extrabold text-[#7C3AED] md:text-5xl">About DivineMarg</h1>
+            <h1 className="text-3xl font-extrabold text-violet-600 md:text-5xl">About {tenant.name}</h1>
             <p className="mt-4 max-w-2xl text-base text-slate-700 md:text-lg">
               India&apos;s trusted platform for authentic Vedic astrology guidance
             </p>
@@ -65,10 +68,10 @@ export default function AboutPage() {
         <section className="border-b border-slate-200">
           <div className="mx-auto grid max-w-[1200px] gap-10 px-4 py-14 md:grid-cols-[320px_1fr] md:px-8 md:py-16">
             <div className="flex justify-center md:justify-start">
-              <FounderPhoto src="/rohit.jpg" alt="Rohit Jha, Founder of DivineMarg" />
+              <FounderPhoto src="/rohit.jpg" alt={`Rohit Jha, Founder of ${tenant.name}`} />
             </div>
             <div>
-              <h2 className="text-2xl font-bold text-[#7C3AED] md:text-3xl">The Story Behind DivineMarg</h2>
+              <h2 className="text-2xl font-bold text-violet-600 md:text-3xl">The Story Behind {tenant.name}</h2>
               <div className="mt-5 space-y-4 leading-7 text-slate-700">
                 <p>
                   Growing up in a traditional Indian family, I — Rohit Jha — always believed in
@@ -77,21 +80,21 @@ export default function AboutPage() {
                   guidance.
                 </p>
                 <p>
-                  That frustration became my mission. In 2024, I founded DivineMarg — which means
+                  That frustration became my mission. In 2024, I founded {tenant.name} — which means
                   &quot;The Divine Path&quot; — with one simple goal: to connect every Indian with
                   authentic, verified astrologers at fair prices.
                 </p>
                 <p>
-                  Today, DivineMarg is more than a platform. It is a movement — bringing ancient
+                  Today, {tenant.name} is more than a platform. It is a movement — bringing ancient
                   Vedic wisdom to modern lives through technology, transparency, and trust.
                 </p>
                 <p>
-                  Every astrologer on DivineMarg is manually verified. Every consultation is timed,
+                  Every astrologer on {tenant.name} is manually verified. Every consultation is timed,
                   transparent, and fairly priced. Because everyone deserves genuine divine guidance.
                 </p>
               </div>
               <p className="mt-6 text-sm font-semibold text-[#B8960C]">
-                — Rohit Jha, Founder &amp; CEO, DivineMarg
+                — Rohit Jha, Founder &amp; CEO, {tenant.name}
               </p>
             </div>
           </div>
@@ -99,11 +102,11 @@ export default function AboutPage() {
 
         <section className="border-b border-slate-200">
           <div className="mx-auto max-w-[1200px] px-4 py-14 md:px-8 md:py-16">
-            <h2 className="text-2xl font-bold text-[#7C3AED] md:text-3xl">Mission &amp; Vision</h2>
+            <h2 className="text-2xl font-bold text-violet-600 md:text-3xl">Mission &amp; Vision</h2>
             <div className="mt-8 grid gap-4 md:grid-cols-3">
               {missionCards.map((card) => (
                 <article key={card.title} className="rounded-2xl border border-slate-200 bg-white p-6">
-                  <h3 className="text-lg font-bold text-[#7C3AED]">{card.title}</h3>
+                  <h3 className="text-lg font-bold text-violet-600">{card.title}</h3>
                   <p className="mt-2 text-sm leading-6 text-slate-700">{card.text}</p>
                 </article>
               ))}
@@ -113,7 +116,7 @@ export default function AboutPage() {
 
         <section className="border-b border-slate-200">
           <div className="mx-auto max-w-[1200px] px-4 py-14 md:px-8 md:py-16">
-            <h2 className="text-2xl font-bold text-[#7C3AED] md:text-3xl">DivineMarg by Numbers</h2>
+            <h2 className="text-2xl font-bold text-violet-600 md:text-3xl">{tenant.name} by Numbers</h2>
             <div className="mt-8 grid gap-4 sm:grid-cols-2 md:grid-cols-4">
               {stats.map(([value, label]) => (
                 <div key={label} className="rounded-2xl border border-slate-200 bg-white p-6 text-center">
@@ -127,7 +130,7 @@ export default function AboutPage() {
 
         <section>
           <div className="mx-auto max-w-[1200px] px-4 py-14 md:px-8 md:py-16">
-            <h2 className="text-2xl font-bold text-[#7C3AED] md:text-3xl">How It Works</h2>
+            <h2 className="text-2xl font-bold text-violet-600 md:text-3xl">How It Works</h2>
             <div className="mt-8 grid gap-4 md:grid-cols-3">
               {steps.map((step, index) => (
                 <article key={step.title} className="rounded-2xl border border-slate-200 bg-white p-6">

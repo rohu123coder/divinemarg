@@ -152,12 +152,12 @@ export function KundliChart({
       >
         <defs>
           <linearGradient id="houseFill" x1="0%" y1="0%" x2="100%" y2="100%">
-            <stop offset="0%" stopColor="#faf5ff" />
-            <stop offset="100%" stopColor="#ede9fe" />
+            <stop offset="0%" stopColor="var(--violet-50, #faf5ff)" />
+            <stop offset="100%" stopColor="var(--violet-100, #ede9fe)" />
           </linearGradient>
           <linearGradient id="edgeGlow" x1="0%" y1="0%" x2="0%" y2="100%">
-            <stop offset="0%" stopColor="#7C3AED" stopOpacity="0.35" />
-            <stop offset="100%" stopColor="#4C1D95" stopOpacity="0.5" />
+            <stop offset="0%" stopColor="var(--violet-600, #7C3AED)" stopOpacity="0.35" />
+            <stop offset="100%" stopColor="var(--violet-900, #4C1D95)" stopOpacity="0.5" />
           </linearGradient>
         </defs>
 
@@ -167,7 +167,7 @@ export function KundliChart({
           width={VB.w}
           height={VB.h}
           rx="12"
-          fill="#f5f3ff"
+          fill="var(--violet-50, #f5f3ff)"
           stroke="url(#edgeGlow)"
           strokeWidth="2"
         />
@@ -177,7 +177,7 @@ export function KundliChart({
             key={i}
             d={toPath(pts)}
             fill="url(#houseFill)"
-            stroke="#7C3AED"
+            stroke="var(--violet-600, #7C3AED)"
             strokeOpacity={0.45}
             strokeWidth="1.25"
           />

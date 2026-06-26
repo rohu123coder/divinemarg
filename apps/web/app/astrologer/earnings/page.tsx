@@ -14,6 +14,7 @@ import {
 
 import { AstrologerNavbar } from "@/components/AstrologerNavbar";
 import api from "@/lib/api";
+import { themeColor } from "@/lib/tenantBranding";
 import { useAuthStore } from "@/lib/store";
 
 type DashboardData = {
@@ -149,7 +150,7 @@ export default function AstrologerEarningsPage() {
                     <Tooltip
                       formatter={(v: number) => [`₹${v.toFixed(0)}`, "Earned"]}
                     />
-                    <Bar dataKey="amount" fill="#7c3aed" radius={[6, 6, 0, 0]} />
+                    <Bar dataKey="amount" fill={themeColor.violet600} radius={[6, 6, 0, 0]} />
                   </BarChart>
                 </ResponsiveContainer>
               </div>

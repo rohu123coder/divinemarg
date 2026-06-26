@@ -3,11 +3,16 @@ import Link from "next/link";
 
 import { Footer } from "@/components/Footer";
 import { Navbar } from "@/components/Navbar";
+import { getTenant } from "@/lib/tenants";
+import { tenantPageTitle } from "@/lib/tenantBranding";
+
+const tenant = getTenant();
+const supportEmail = tenant.contact.supportEmail;
 
 export const metadata: Metadata = {
-  title: "Contact Us | DivineMarg Support",
+  title: tenantPageTitle("Contact Us Support"),
   description:
-    "Get in touch with DivineMarg support for account help, payments, technical issues, and general inquiries.",
+    `Get in touch with ${tenant.name} support for account help, payments, technical issues, and general inquiries.`,
 };
 
 type ContactCard = {
@@ -22,10 +27,10 @@ type ContactCard = {
 const contactCards: ContactCard[] = [
   {
     title: "Email Support",
-    value: "support@divinemarg.com",
+    value: `${supportEmail}`,
     detail: "We respond within 24 hours",
     icon: "📧",
-    href: "mailto:support@divinemarg.com",
+    href: `mailto:${supportEmail}`,
   },
   {
     title: "Live Chat",
@@ -48,7 +53,7 @@ const contactCards: ContactCard[] = [
     detail: "Sunday: 10 AM – 6 PM IST",
     icon: "⏰",
   },
-] as const;
+] ;
 
 const faqs = [
   {
@@ -59,7 +64,7 @@ const faqs = [
   {
     question: "What if I'm not satisfied with a consultation?",
     answer:
-      "Please share the issue with session details at support@divinemarg.com and our team will review it quickly.",
+      `Please share the issue with session details at ${supportEmail} and our team will review it quickly.`,
   },
   {
     question: "How are astrologers verified?",
@@ -69,7 +74,7 @@ const faqs = [
   {
     question: "How do I report an issue?",
     answer:
-      "Use this contact form or email support@divinemarg.com with your phone number, session ID, and issue details.",
+      `Use this contact form or email ${supportEmail} with your phone number, session ID, and issue details.`,
   },
 ];
 
@@ -81,7 +86,7 @@ export default function ContactPage() {
       <main>
         <section className="border-b border-slate-200">
           <div className="mx-auto max-w-[1200px] px-4 py-14 md:px-8 md:py-16">
-            <h1 className="text-3xl font-extrabold text-[#7C3AED] md:text-5xl">Contact Us</h1>
+            <h1 className="text-3xl font-extrabold text-violet-600 md:text-5xl">Contact Us</h1>
             <p className="mt-3 text-base text-slate-700 md:text-lg">We&apos;re here to help you</p>
           </div>
         </section>
@@ -94,13 +99,13 @@ export default function ContactPage() {
                   <div className="flex items-start gap-4">
                     <span className="text-2xl">{card.icon}</span>
                     <div className="min-w-0">
-                      <h2 className="text-lg font-bold text-[#7C3AED]">{card.title}</h2>
+                      <h2 className="text-lg font-bold text-violet-600">{card.title}</h2>
                       {card.href ? (
                         <Link
                           href={card.href}
                           target={card.href.startsWith("http") ? "_blank" : undefined}
                           rel={card.href.startsWith("http") ? "noreferrer" : undefined}
-                          className="mt-1 block text-sm font-medium text-slate-800 hover:text-[#7C3AED]"
+                          className="mt-1 block text-sm font-medium text-slate-800 hover:text-violet-600"
                         >
                           {card.value}
                         </Link>
@@ -111,7 +116,7 @@ export default function ContactPage() {
                       {card.cta && card.href ? (
                         <Link
                           href={card.href}
-                          className="mt-4 inline-flex rounded-full bg-[#7C3AED] px-4 py-2 text-sm font-semibold text-white transition hover:opacity-95"
+                          className="mt-4 inline-flex rounded-full bg-violet-600 px-4 py-2 text-sm font-semibold text-white transition hover:opacity-95"
                         >
                           {card.cta}
                         </Link>
@@ -123,10 +128,10 @@ export default function ContactPage() {
             </div>
 
             <div className="rounded-2xl border border-slate-200 bg-white p-6 md:p-7">
-              <h2 className="text-xl font-bold text-[#7C3AED]">Send us a message</h2>
+              <h2 className="text-xl font-bold text-violet-600">Send us a message</h2>
               <form
                 className="mt-5 space-y-4"
-                action="mailto:support@divinemarg.com"
+                action=`mailto:${supportEmail}`
                 method="POST"
                 encType="text/plain"
               >
@@ -139,7 +144,7 @@ export default function ContactPage() {
                     name="name"
                     type="text"
                     required
-                    className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm outline-none focus:border-[#7C3AED]"
+                    className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm outline-none focus:border-violet-600"
                   />
                 </div>
                 <div>
@@ -151,7 +156,7 @@ export default function ContactPage() {
                     name="email"
                     type="email"
                     required
-                    className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm outline-none focus:border-[#7C3AED]"
+                    className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm outline-none focus:border-violet-600"
                   />
                 </div>
                 <div>
@@ -162,7 +167,7 @@ export default function ContactPage() {
                     id="phone"
                     name="phone"
                     type="tel"
-                    className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm outline-none focus:border-[#7C3AED]"
+                    className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm outline-none focus:border-violet-600"
                   />
                 </div>
                 <div>
@@ -173,7 +178,7 @@ export default function ContactPage() {
                     id="subject"
                     name="subject"
                     required
-                    className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm outline-none focus:border-[#7C3AED]"
+                    className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm outline-none focus:border-violet-600"
                     defaultValue="General Inquiry"
                   >
                     <option>General Inquiry</option>
@@ -192,12 +197,12 @@ export default function ContactPage() {
                     name="message"
                     rows={5}
                     required
-                    className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm outline-none focus:border-[#7C3AED]"
+                    className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm outline-none focus:border-violet-600"
                   />
                 </div>
                 <button
                   type="submit"
-                  className="inline-flex w-full items-center justify-center rounded-full bg-[#7C3AED] px-5 py-3 text-sm font-semibold text-white transition hover:opacity-95 md:w-auto"
+                  className="inline-flex w-full items-center justify-center rounded-full bg-violet-600 px-5 py-3 text-sm font-semibold text-white transition hover:opacity-95 md:w-auto"
                 >
                   Send Message
                 </button>
@@ -208,7 +213,7 @@ export default function ContactPage() {
 
         <section>
           <div className="mx-auto max-w-[1200px] px-4 py-12 md:px-8 md:py-16">
-            <h2 className="text-2xl font-bold text-[#7C3AED] md:text-3xl">Frequently Asked Questions</h2>
+            <h2 className="text-2xl font-bold text-violet-600 md:text-3xl">Frequently Asked Questions</h2>
             <div className="mt-6 space-y-3">
               {faqs.map((faq) => (
                 <details key={faq.question} className="rounded-xl border border-slate-200 bg-white p-4">

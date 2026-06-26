@@ -6,6 +6,7 @@ import { useCallback, useEffect, useState } from "react";
 
 import { salesNotifications } from "../lib/content";
 import { usePrefersReducedMotion } from "../lib/motion";
+import { themeColor } from "@/lib/tenantBranding";
 
 function pickRandom<T>(arr: readonly T[]): T {
   return arr[Math.floor(Math.random() * arr.length)]!;
@@ -36,7 +37,10 @@ export function SalesNotificationPopup() {
     return undefined;
   }, [visible, showNext]);
 
-  const avatarColor = current.name.charCodeAt(0) % 2 === 0 ? "#8B5CF6" : "#FF6B9D";
+  const avatarColor =
+    current.name.charCodeAt(0) % 2 === 0
+      ? themeColor.violetElectric
+      : themeColor.mysticPink;
 
   return (
     <AnimatePresence>

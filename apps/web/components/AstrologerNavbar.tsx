@@ -4,8 +4,10 @@ import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 
 import { useAuthStore } from "@/lib/store";
+import { getTenant } from "@/lib/tenants";
 
 export function AstrologerNavbar() {
+  const tenant = getTenant();
   const { user, logout } = useAuthStore();
   const [mounted, setMounted] = useState(false);
   const [open, setOpen] = useState(false);
@@ -33,7 +35,7 @@ export function AstrologerNavbar() {
           href="/astrologer/dashboard"
           className="shrink-0 bg-gradient-to-r from-purple-600 via-fuchsia-500 to-orange-500 bg-clip-text text-lg font-bold text-transparent sm:text-xl"
         >
-          DivineMarg · Astrologer
+          {tenant.name} · Astrologer
         </Link>
 
         <nav className="hidden items-center gap-5 md:flex">

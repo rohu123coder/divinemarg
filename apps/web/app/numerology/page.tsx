@@ -1,9 +1,11 @@
 import type { Metadata } from "next";
 
+import { tenantPageTitle } from "@/lib/tenantBranding";
+
 import NumerologyClient from "./NumerologyClient";
 
 export const metadata: Metadata = {
-  title: "Numerology Calculator | DivineMarg",
+  title: tenantPageTitle("Numerology Calculator"),
   description:
     "Calculate life path, destiny, soul urge, and personality numbers with lucky color and gemstone.",
 };

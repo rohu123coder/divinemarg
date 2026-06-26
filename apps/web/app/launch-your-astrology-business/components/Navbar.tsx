@@ -5,16 +5,19 @@ import { motion, AnimatePresence } from "framer-motion";
 import Link from "next/link";
 import { useState } from "react";
 
+import { getTenant } from "@/lib/tenants";
+
 import { GoldCTA } from "./GoldCTA";
 
 export function Navbar() {
+  const tenant = getTenant();
   const [open, setOpen] = useState(false);
 
   return (
     <header className="fixed inset-x-0 top-0 z-50 border-b border-white/5 bg-cosmic-deep/70 backdrop-blur-xl">
       <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-3 md:px-8">
         <Link href="/" className="font-heading text-xl font-bold text-gold-accent md:text-2xl">
-          DivineMarg
+          {tenant.logo.text}
         </Link>
 
         <div className="hidden md:block">

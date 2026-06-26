@@ -1,10 +1,12 @@
 import type { Metadata } from "next";
+
+import { tenantPageTitle } from "@/lib/tenantBranding";
 import Link from "next/link";
 
 import { Navbar } from "@/components/Navbar";
 
 export const metadata: Metadata = {
-  title: "Free Astrology Reports | DivineMarg",
+  title: tenantPageTitle("Free Astrology Reports"),
   description:
     "Access free astrology reports including Mangal Dosha, Sade Sati, Numerology, Lal Kitab, Varshphal, and Kaalsarp checks.",
 };

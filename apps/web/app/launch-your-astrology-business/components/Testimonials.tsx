@@ -6,7 +6,15 @@ import { testimonials } from "../lib/content";
 import { usePrefersReducedMotion } from "../lib/motion";
 import { SectionReveal } from "./SectionReveal";
 
-const colors = ["#8B5CF6", "#FF6B9D", "#FFD700", "#10B981", "#F4C430"];
+import { themeColor } from "@/lib/tenantBranding";
+
+const colors = [
+  themeColor.violetElectric,
+  themeColor.mysticPink,
+  themeColor.goldAccent,
+  themeColor.successGreen,
+  themeColor.softGold,
+];
 
 export function Testimonials() {
   const reduced = usePrefersReducedMotion();

@@ -3,11 +3,16 @@ import Link from "next/link";
 
 import { Footer } from "@/components/Footer";
 import { Navbar } from "@/components/Navbar";
+import { getTenant } from "@/lib/tenants";
+import { tenantPageTitle } from "@/lib/tenantBranding";
+
+const tenant = getTenant();
+const supportEmail = tenant.contact.supportEmail;
 
 export const metadata: Metadata = {
-  title: "Disclaimer | DivineMarg",
+  title: tenantPageTitle("Disclaimer"),
   description:
-    "Read DivineMarg's legal disclaimer covering the scope of astrological guidance and user responsibility.",
+    `Read ${tenant.name}'s legal disclaimer covering the scope of astrological guidance and user responsibility.`,
 };
 
 const sections = [
@@ -15,7 +20,7 @@ const sections = [
     id: "general",
     title: "1. General Disclaimer",
     content:
-      "DivineMarg is an online platform that connects users with independent astrologers. The content provided on this platform is for entertainment and informational purposes only.",
+      `${tenant.name} is an online platform that connects users with independent astrologers. The content provided on this platform is for entertainment and informational purposes only.`,
   },
   {
     id: "professional-advice",
@@ -32,19 +37,19 @@ const sections = [
     id: "guarantees",
     title: "3. No Guarantees",
     content:
-      "DivineMarg does not guarantee the accuracy, completeness, or usefulness of any astrological reading. Results may vary.",
+      `${tenant.name} does not guarantee the accuracy, completeness, or usefulness of any astrological reading. Results may vary.`,
   },
   {
     id: "independent-astrologers",
     title: "4. Independent Astrologers",
     content:
-      "Astrologers on DivineMarg are independent service providers. DivineMarg verifies credentials but is not responsible for individual readings.",
+      `Astrologers on ${tenant.name} are independent service providers. ${tenant.name} verifies credentials but is not responsible for individual readings.`,
   },
   {
     id: "user-responsibility",
     title: "5. User Responsibility",
     content:
-      "Users consult astrologers at their own discretion and risk. DivineMarg is not liable for any decisions made based on astrological readings.",
+      `Users consult astrologers at their own discretion and risk. ${tenant.name} is not liable for any decisions made based on astrological readings.`,
   },
   {
     id: "age-restriction",
@@ -60,9 +65,9 @@ export default function DisclaimerPage() {
 
       <main className="border-b border-slate-200">
         <div className="mx-auto max-w-[1200px] px-4 py-12 md:px-8 md:py-16">
-          <h1 className="text-3xl font-extrabold text-[#7C3AED] md:text-4xl">Disclaimer</h1>
+          <h1 className="text-3xl font-extrabold text-violet-600 md:text-4xl">Disclaimer</h1>
           <p className="mt-3 max-w-3xl text-sm leading-7 text-slate-700">
-            Please read this disclaimer carefully before using DivineMarg services.
+            Please read this disclaimer carefully before using ${tenant.name} services.
           </p>
 
           <div className="mt-8 grid gap-8 lg:grid-cols-[260px_1fr]">
@@ -73,7 +78,7 @@ export default function DisclaimerPage() {
                   <Link
                     key={section.id}
                     href={`#${section.id}`}
-                    className="block text-sm text-slate-700 transition hover:text-[#7C3AED]"
+                    className="block text-sm text-slate-700 transition hover:text-violet-600"
                   >
                     {section.title}
                   </Link>
@@ -88,7 +93,7 @@ export default function DisclaimerPage() {
                   key={section.id}
                   className="scroll-mt-24 rounded-2xl border border-slate-200 bg-white p-6"
                 >
-                  <h2 className="text-xl font-bold text-[#7C3AED]">{section.title}</h2>
+                  <h2 className="text-xl font-bold text-violet-600">{section.title}</h2>
                   {"content" in section ? (
                     <p className="mt-3 text-sm leading-7 text-slate-700">{section.content}</p>
                   ) : null}

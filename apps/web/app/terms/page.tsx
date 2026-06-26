@@ -3,11 +3,16 @@ import Link from "next/link";
 
 import { Footer } from "@/components/Footer";
 import { Navbar } from "@/components/Navbar";
+import { getTenant } from "@/lib/tenants";
+import { tenantPageTitle } from "@/lib/tenantBranding";
+
+const tenant = getTenant();
+const supportEmail = tenant.contact.supportEmail;
 
 export const metadata: Metadata = {
-  title: "Terms and Conditions | DivineMarg",
+  title: tenantPageTitle("Terms and Conditions"),
   description:
-    "Read DivineMarg terms for user eligibility, wallet payments, consultation rules, conduct, and legal disclaimers.",
+    `Read ${tenant.name} terms for user eligibility, wallet payments, consultation rules, conduct, and legal disclaimers.`,
 };
 
 const sections = [
@@ -15,18 +20,18 @@ const sections = [
     id: "acceptance",
     title: "1. Acceptance of Terms",
     content:
-      "By using DivineMarg, you agree to these Terms and Conditions. If you do not agree, please discontinue use of the platform.",
+      `By using ${tenant.name}, you agree to these Terms and Conditions. If you do not agree, please discontinue use of the platform.`,
   },
   {
     id: "services",
     title: "2. Services Description",
     content:
-      "DivineMarg provides a platform connecting users with astrologers for entertainment and guidance purposes.",
+      `${tenant.name} provides a platform connecting users with astrologers for entertainment and guidance purposes.`,
   },
   {
     id: "eligibility",
     title: "3. User Eligibility",
-    content: "You must be 18 years or older to create an account and use DivineMarg services.",
+    content: `You must be 18 years or older to create an account and use ${tenant.name} services.`,
   },
   {
     id: "registration",
@@ -67,7 +72,7 @@ const sections = [
     id: "disclaimer",
     title: "9. Disclaimer",
     content:
-      "Astrology readings are for entertainment purposes. DivineMarg does not guarantee accuracy of predictions or outcomes.",
+      `Astrology readings are for entertainment purposes. ${tenant.name} does not guarantee accuracy of predictions or outcomes.`,
   },
   {
     id: "termination",
@@ -82,7 +87,7 @@ const sections = [
   {
     id: "contact",
     title: "12. Contact",
-    content: "support@divinemarg.com",
+    content: `${supportEmail}`,
   },
 ] as const;
 
@@ -93,9 +98,9 @@ export default function TermsPage() {
 
       <main className="border-b border-slate-200">
         <div className="mx-auto max-w-[1200px] px-4 py-12 md:px-8 md:py-16">
-          <h1 className="text-3xl font-extrabold text-[#7C3AED] md:text-4xl">Terms and Conditions</h1>
+          <h1 className="text-3xl font-extrabold text-violet-600 md:text-4xl">Terms and Conditions</h1>
           <p className="mt-3 text-sm text-slate-600">
-            Please read these terms carefully before using DivineMarg.
+            Please read these terms carefully before using ${tenant.name}.
           </p>
 
           <div className="mt-8 grid gap-8 lg:grid-cols-[260px_1fr]">
@@ -106,7 +111,7 @@ export default function TermsPage() {
                   <Link
                     key={section.id}
                     href={`#${section.id}`}
-                    className="block text-sm text-slate-700 transition hover:text-[#7C3AED]"
+                    className="block text-sm text-slate-700 transition hover:text-violet-600"
                   >
                     {section.title}
                   </Link>
@@ -121,7 +126,7 @@ export default function TermsPage() {
                   key={section.id}
                   className="scroll-mt-24 rounded-2xl border border-slate-200 bg-white p-6"
                 >
-                  <h2 className="text-xl font-bold text-[#7C3AED]">{section.title}</h2>
+                  <h2 className="text-xl font-bold text-violet-600">{section.title}</h2>
                   {"content" in section ? (
                     <p className="mt-3 text-sm leading-7 text-slate-700">{section.content}</p>
                   ) : null}
