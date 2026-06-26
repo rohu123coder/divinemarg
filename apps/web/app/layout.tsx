@@ -42,6 +42,16 @@ export default function RootLayout({
     "--hero-radial": gradients.heroRadial,
     "--cta-gold": gradients.ctaGold,
     "--card-highlight": gradients.cardHighlight,
+    ...(colors.violet50 && { "--violet-50": colors.violet50 }),
+    ...(colors.violet100 && { "--violet-100": colors.violet100 }),
+    ...(colors.violet200 && { "--violet-200": colors.violet200 }),
+    ...(colors.violet300 && { "--violet-300": colors.violet300 }),
+    ...(colors.violet400 && { "--violet-400": colors.violet400 }),
+    ...(colors.violet500 && { "--violet-500": colors.violet500 }),
+    ...(colors.violet600 && { "--violet-600": colors.violet600 }),
+    ...(colors.violet700 && { "--violet-700": colors.violet700 }),
+    ...(colors.violet800 && { "--violet-800": colors.violet800 }),
+    ...(colors.violet900 && { "--violet-900": colors.violet900 }),
   } as React.CSSProperties;
 
   return (

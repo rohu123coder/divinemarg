@@ -1,8 +1,10 @@
 import { divinemarg } from "./divinemarg";
+import { lagnalord } from "./lagnalord";
 import type { TenantConfig } from "./types";
 
 export const tenantRegistry: Record<string, TenantConfig> = {
   divinemarg,
+  lagnalord,
 };
 
 const DEFAULT_TENANT_ID = "divinemarg";

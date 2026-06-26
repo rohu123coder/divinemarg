@@ -14,6 +14,17 @@ export interface TenantConfig {
       violetLight: string;
       creamWhite: string;
       successGreen: string;
+      violet50?: string;
+      violet100?: string;
+      violet200?: string;
+      violet300?: string;
+      violet400?: string;
+      violet500?: string;
+      violet600?: string;
+      violet700?: string;
+      violet800?: string;
+      violet900?: string;
+      slate?: string;
     };
     gradients: {
       heroRadial: string;
