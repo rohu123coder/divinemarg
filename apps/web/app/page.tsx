@@ -8,6 +8,7 @@ import { io, type Socket } from "socket.io-client";
 import { Footer } from "@/components/Footer";
 import { Navbar } from "@/components/Navbar";
 import api from "@/lib/api";
+import { formatDisplayDate } from "@/lib/formatDate";
 import { firstName } from "@/lib/utils";
 import { rashis } from "@/lib/horoscope";
 import { getSocketApiBase } from "@/lib/socketBase";
@@ -365,12 +366,7 @@ export default function HomePage() {
   }, [isLoggedIn, token]);
 
   const today = new Date();
-  const todayLong = today.toLocaleDateString("en-IN", {
-    weekday: "long",
-    day: "numeric",
-    month: "long",
-    year: "numeric",
-  });
+  const todayLong = formatDisplayDate(today);
   const panchang = getPanchang(today);
 
   const handleKundliSubmit = (event: FormEvent<HTMLFormElement>) => {

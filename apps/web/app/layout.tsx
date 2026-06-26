@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import localFont from "next/font/local";
+import { getTenant } from "@/lib/tenants";
 import "./globals.css";
 
 const geistSans = localFont({
@@ -25,8 +26,26 @@ export default function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  const tenant = getTenant();
+  const { colors, gradients } = tenant.theme;
+
+  const tenantThemeStyle = {
+    "--cosmic-deep": colors.cosmicDeep,
+    "--cosmic-secondary": colors.cosmicSecondary,
+    "--gold-accent": colors.goldAccent,
+    "--soft-gold": colors.softGold,
+    "--mystic-pink": colors.mysticPink,
+    "--violet-electric": colors.violetElectric,
+    "--violet-light": colors.violetLight,
+    "--cream-white": colors.creamWhite,
+    "--success-green": colors.successGreen,
+    "--hero-radial": gradients.heroRadial,
+    "--cta-gold": gradients.ctaGold,
+    "--card-highlight": gradients.cardHighlight,
+  } as React.CSSProperties;
+
   return (
-    <html lang="en">
+    <html lang="en" style={tenantThemeStyle}>
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased text-slate-900`}
       >
