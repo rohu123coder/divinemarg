@@ -3,95 +3,96 @@ import Link from "next/link";
 
 import { Footer } from "@/components/Footer";
 import { Navbar } from "@/components/Navbar";
-import { getTenant } from "@/lib/tenants";
 import { tenantPageTitle } from "@/lib/tenantBranding";
+import { getTenant } from "@/lib/tenants";
 
-const tenant = getTenant();
-const supportEmail = tenant.contact.supportEmail;
+function getSections(tenantName: string, supportEmail: string) {
+  return [
+    {
+      id: "acceptance",
+      title: "1. Acceptance of Terms",
+      content: `By using ${tenantName}, you agree to these Terms and Conditions. If you do not agree, please discontinue use of the platform.`,
+    },
+    {
+      id: "services",
+      title: "2. Services Description",
+      content: `${tenantName} provides a platform connecting users with astrologers for entertainment and guidance purposes.`,
+    },
+    {
+      id: "eligibility",
+      title: "3. User Eligibility",
+      content: `You must be 18 years or older to create an account and use ${tenantName} services.`,
+    },
+    {
+      id: "registration",
+      title: "4. Account Registration",
+      content: "You must provide accurate information and maintain only one account per person.",
+    },
+    {
+      id: "wallet-payments",
+      title: "5. Wallet & Payments",
+      items: [
+        "Wallet must be recharged before starting consultations",
+        "Minimum recharge: ₹100",
+        "Payments processed via Razorpay",
+      ],
+    },
+    {
+      id: "consultation-rules",
+      title: "6. Consultation Rules",
+      items: [
+        "Sessions are charged per minute as displayed on astrologer profile",
+        'Session ends when either party clicks "End Session"',
+        "No refund for completed sessions",
+      ],
+    },
+    {
+      id: "conduct",
+      title: "7. User Conduct",
+      content:
+        "No abusive language, no sharing personal contact info, and no fraudulent activity are permitted on the platform.",
+    },
+    {
+      id: "astrologer-content",
+      title: "8. Astrologer Content",
+      content:
+        "Astrologers provide guidance for entertainment. This does not constitute medical, legal, or financial advice.",
+    },
+    {
+      id: "disclaimer",
+      title: "9. Disclaimer",
+      content: `Astrology readings are for entertainment purposes. ${tenantName} does not guarantee accuracy of predictions or outcomes.`,
+    },
+    {
+      id: "termination",
+      title: "10. Termination",
+      content: "We may suspend or terminate accounts that violate these terms or misuse the platform.",
+    },
+    {
+      id: "law",
+      title: "11. Governing Law",
+      content: "These terms are governed by the laws of India, jurisdiction: courts of India.",
+    },
+    {
+      id: "contact",
+      title: "12. Contact",
+      content: supportEmail,
+    },
+  ] as const;
+}
 
-export const metadata: Metadata = {
-  title: tenantPageTitle("Terms and Conditions"),
-  description:
-    `Read ${tenant.name} terms for user eligibility, wallet payments, consultation rules, conduct, and legal disclaimers.`,
-};
-
-const sections = [
-  {
-    id: "acceptance",
-    title: "1. Acceptance of Terms",
-    content:
-      `By using ${tenant.name}, you agree to these Terms and Conditions. If you do not agree, please discontinue use of the platform.`,
-  },
-  {
-    id: "services",
-    title: "2. Services Description",
-    content:
-      `${tenant.name} provides a platform connecting users with astrologers for entertainment and guidance purposes.`,
-  },
-  {
-    id: "eligibility",
-    title: "3. User Eligibility",
-    content: `You must be 18 years or older to create an account and use ${tenant.name} services.`,
-  },
-  {
-    id: "registration",
-    title: "4. Account Registration",
-    content: "You must provide accurate information and maintain only one account per person.",
-  },
-  {
-    id: "wallet-payments",
-    title: "5. Wallet & Payments",
-    items: [
-      "Wallet must be recharged before starting consultations",
-      "Minimum recharge: ₹100",
-      "Payments processed via Razorpay",
-    ],
-  },
-  {
-    id: "consultation-rules",
-    title: "6. Consultation Rules",
-    items: [
-      "Sessions are charged per minute as displayed on astrologer profile",
-      'Session ends when either party clicks "End Session"',
-      "No refund for completed sessions",
-    ],
-  },
-  {
-    id: "conduct",
-    title: "7. User Conduct",
-    content:
-      "No abusive language, no sharing personal contact info, and no fraudulent activity are permitted on the platform.",
-  },
-  {
-    id: "astrologer-content",
-    title: "8. Astrologer Content",
-    content:
-      "Astrologers provide guidance for entertainment. This does not constitute medical, legal, or financial advice.",
-  },
-  {
-    id: "disclaimer",
-    title: "9. Disclaimer",
-    content:
-      `Astrology readings are for entertainment purposes. ${tenant.name} does not guarantee accuracy of predictions or outcomes.`,
-  },
-  {
-    id: "termination",
-    title: "10. Termination",
-    content: "We may suspend or terminate accounts that violate these terms or misuse the platform.",
-  },
-  {
-    id: "law",
-    title: "11. Governing Law",
-    content: "These terms are governed by the laws of India, jurisdiction: courts of India.",
-  },
-  {
-    id: "contact",
-    title: "12. Contact",
-    content: `${supportEmail}`,
-  },
-] as const;
+export function generateMetadata(): Metadata {
+  const tenant = getTenant();
+  return {
+    title: tenantPageTitle("Terms and Conditions"),
+    description: `Read ${tenant.name} terms for user eligibility, wallet payments, consultation rules, conduct, and legal disclaimers.`,
+  };
+}
 
 export default function TermsPage() {
+  const tenant = getTenant();
+  const sections = getSections(tenant.name, tenant.contact.supportEmail);
+
   return (
     <div className="min-h-screen scroll-smooth bg-white text-slate-900">
       <Navbar />
@@ -100,7 +101,7 @@ export default function TermsPage() {
         <div className="mx-auto max-w-[1200px] px-4 py-12 md:px-8 md:py-16">
           <h1 className="text-3xl font-extrabold text-violet-600 md:text-4xl">Terms and Conditions</h1>
           <p className="mt-3 text-sm text-slate-600">
-            Please read these terms carefully before using ${tenant.name}.
+            Please read these terms carefully before using {tenant.name}.
           </p>
 
           <div className="mt-8 grid gap-8 lg:grid-cols-[260px_1fr]">

@@ -5,15 +5,17 @@ import { Footer } from "@/components/Footer";
 import { Navbar } from "@/components/Navbar";
 import { getTenant } from "@/lib/tenants";
 
-const tenant = getTenant();
-
-export const metadata: Metadata = {
-  title: `${tenant.name} Blog | Coming Soon`,
-  description:
-    `${tenant.name} blog with Vedic astrology insights, remedies, and guidance articles is coming soon.`,
-};
+export function generateMetadata(): Metadata {
+  const tenant = getTenant();
+  return {
+    title: `${tenant.name} Blog | Coming Soon`,
+    description: `${tenant.name} blog with Vedic astrology insights, remedies, and guidance articles is coming soon.`,
+  };
+}
 
 export default function BlogPage() {
+  const tenant = getTenant();
+
   return (
     <div className="min-h-screen bg-white text-slate-900">
       <Navbar />

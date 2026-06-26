@@ -3,17 +3,8 @@ import Link from "next/link";
 
 import { Footer } from "@/components/Footer";
 import { Navbar } from "@/components/Navbar";
-import { getTenant } from "@/lib/tenants";
 import { tenantPageTitle } from "@/lib/tenantBranding";
-
-const tenant = getTenant();
-const supportEmail = tenant.contact.supportEmail;
-
-export const metadata: Metadata = {
-  title: tenantPageTitle("Contact Us Support"),
-  description:
-    `Get in touch with ${tenant.name} support for account help, payments, technical issues, and general inquiries.`,
-};
+import { getTenant } from "@/lib/tenants";
 
 type ContactCard = {
   title: string;
@@ -24,61 +15,76 @@ type ContactCard = {
   cta?: string;
 };
 
-const contactCards: ContactCard[] = [
-  {
-    title: "Email Support",
-    value: `${supportEmail}`,
-    detail: "We respond within 24 hours",
-    icon: "📧",
-    href: `mailto:${supportEmail}`,
-  },
-  {
-    title: "Live Chat",
-    value: "Chat with our support team",
-    detail: "Get help while browsing astrologers",
-    icon: "💬",
-    href: "/astrologers",
-    cta: "Start Chat",
-  },
-  {
-    title: "Facebook",
-    value: "Connect with us on Facebook",
-    detail: "Follow updates and announcements",
-    icon: "📘",
-    href: "https://www.facebook.com/DivineMargOfficial",
-  },
-  {
-    title: "Support Hours",
-    value: "Monday – Saturday: 9 AM – 8 PM IST",
-    detail: "Sunday: 10 AM – 6 PM IST",
-    icon: "⏰",
-  },
-] ;
+function getContactCards(supportEmail: string): ContactCard[] {
+  return [
+    {
+      title: "Email Support",
+      value: supportEmail,
+      detail: "We respond within 24 hours",
+      icon: "📧",
+      href: `mailto:${supportEmail}`,
+    },
+    {
+      title: "Live Chat",
+      value: "Chat with our support team",
+      detail: "Get help while browsing astrologers",
+      icon: "💬",
+      href: "/astrologers",
+      cta: "Start Chat",
+    },
+    {
+      title: "Facebook",
+      value: "Connect with us on Facebook",
+      detail: "Follow updates and announcements",
+      icon: "📘",
+      href: "https://www.facebook.com/DivineMargOfficial",
+    },
+    {
+      title: "Support Hours",
+      value: "Monday – Saturday: 9 AM – 8 PM IST",
+      detail: "Sunday: 10 AM – 6 PM IST",
+      icon: "⏰",
+    },
+  ];
+}
 
-const faqs = [
-  {
-    question: "How do I recharge my wallet?",
-    answer:
-      "Go to your dashboard wallet section, choose a recharge amount, and complete payment securely via Razorpay.",
-  },
-  {
-    question: "What if I'm not satisfied with a consultation?",
-    answer:
-      `Please share the issue with session details at ${supportEmail} and our team will review it quickly.`,
-  },
-  {
-    question: "How are astrologers verified?",
-    answer:
-      "Every astrologer is manually reviewed before onboarding for experience, identity, and service quality standards.",
-  },
-  {
-    question: "How do I report an issue?",
-    answer:
-      `Use this contact form or email ${supportEmail} with your phone number, session ID, and issue details.`,
-  },
-];
+function getFaqs(supportEmail: string) {
+  return [
+    {
+      question: "How do I recharge my wallet?",
+      answer:
+        "Go to your dashboard wallet section, choose a recharge amount, and complete payment securely via Razorpay.",
+    },
+    {
+      question: "What if I'm not satisfied with a consultation?",
+      answer: `Please share the issue with session details at ${supportEmail} and our team will review it quickly.`,
+    },
+    {
+      question: "How are astrologers verified?",
+      answer:
+        "Every astrologer is manually reviewed before onboarding for experience, identity, and service quality standards.",
+    },
+    {
+      question: "How do I report an issue?",
+      answer: `Use this contact form or email ${supportEmail} with your phone number, session ID, and issue details.`,
+    },
+  ];
+}
+
+export function generateMetadata(): Metadata {
+  const tenant = getTenant();
+  return {
+    title: tenantPageTitle("Contact Us Support"),
+    description: `Get in touch with ${tenant.name} support for account help, payments, technical issues, and general inquiries.`,
+  };
+}
 
 export default function ContactPage() {
+  const tenant = getTenant();
+  const supportEmail = tenant.contact.supportEmail;
+  const contactCards = getContactCards(supportEmail);
+  const faqs = getFaqs(supportEmail);
+
   return (
     <div className="min-h-screen bg-white text-slate-900">
       <Navbar />
@@ -131,7 +137,7 @@ export default function ContactPage() {
               <h2 className="text-xl font-bold text-violet-600">Send us a message</h2>
               <form
                 className="mt-5 space-y-4"
-                action=`mailto:${supportEmail}`
+                action={`mailto:${supportEmail}`}
                 method="POST"
                 encType="text/plain"
               >

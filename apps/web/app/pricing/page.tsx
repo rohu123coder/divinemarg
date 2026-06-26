@@ -3,17 +3,8 @@ import Link from "next/link";
 
 import { Footer } from "@/components/Footer";
 import { Navbar } from "@/components/Navbar";
-import { getTenant } from "@/lib/tenants";
 import { tenantPageTitle } from "@/lib/tenantBranding";
-
-const tenant = getTenant();
-const supportEmail = tenant.contact.supportEmail;
-
-export const metadata: Metadata = {
-  title: tenantPageTitle("Pricing"),
-  description:
-    `Explore ${tenant.name}'s transparent pay-per-minute pricing, wallet recharge packages, and platform fee policy.`,
-};
+import { getTenant } from "@/lib/tenants";
 
 const pricingCards = [
   {
@@ -53,7 +44,17 @@ const faqs = [
   },
 ];
 
+export function generateMetadata(): Metadata {
+  const tenant = getTenant();
+  return {
+    title: tenantPageTitle("Pricing"),
+    description: `Explore ${tenant.name}'s transparent pay-per-minute pricing, wallet recharge packages, and platform fee policy.`,
+  };
+}
+
 export default function PricingPage() {
+  const tenant = getTenant();
+
   return (
     <div className="min-h-screen bg-white text-slate-900">
       <Navbar />
@@ -116,7 +117,7 @@ export default function PricingPage() {
             <ul className="mt-5 space-y-2 text-sm leading-7 text-slate-700">
               <li className="flex gap-2">
                 <span className="text-[#B8960C]">•</span>
-                <span>${tenant.name} charges a small platform fee.</span>
+                <span>{tenant.name} charges a small platform fee.</span>
               </li>
               <li className="flex gap-2">
                 <span className="text-[#B8960C]">•</span>

@@ -3,67 +3,71 @@ import Link from "next/link";
 
 import { Footer } from "@/components/Footer";
 import { Navbar } from "@/components/Navbar";
-import { getTenant } from "@/lib/tenants";
 import { tenantPageTitle } from "@/lib/tenantBranding";
+import { getTenant } from "@/lib/tenants";
 
-const tenant = getTenant();
-const supportEmail = tenant.contact.supportEmail;
+function getSections(supportEmail: string) {
+  return [
+    {
+      id: "wallet-recharge",
+      title: "1. Wallet Recharge Refunds",
+      items: [
+        "Unused wallet balance can be refunded within 7 days of recharge",
+        "Partially used balance: only unused portion eligible",
+        `Request via email: ${supportEmail} with transaction ID`,
+      ],
+    },
+    {
+      id: "consultation-charges",
+      title: "2. Consultation Charges",
+      items: [
+        "Charges deducted during active sessions are non-refundable",
+        "Exception: if technical error caused session to end unexpectedly, report within 24 hours",
+      ],
+    },
+    {
+      id: "refund-request",
+      title: "3. How to Request Refund",
+      items: [
+        `Email: ${supportEmail}`,
+        'Subject: "Refund Request - [Your Phone Number]"',
+        "Include: transaction ID, date, amount, reason",
+        "Processing time: 5-7 business days",
+      ],
+    },
+    {
+      id: "refund-method",
+      title: "4. Refund Method",
+      items: [
+        "Refunded to original payment method",
+        "UPI/Bank transfer: 3-5 business days",
+        "Credit/Debit card: 5-7 business days",
+      ],
+    },
+    {
+      id: "non-refundable",
+      title: "5. Non-Refundable Cases",
+      items: [
+        "Completed consultations",
+        "Wallet balance used for sessions",
+        "Bonus/promotional credits",
+      ],
+    },
+  ] as const;
+}
 
-export const metadata: Metadata = {
-  title: tenantPageTitle("Refund Policy"),
-  description:
-    `Review ${tenant.name} wallet recharge and consultation refund rules, timelines, and refund request steps.`,
-};
-
-const sections = [
-  {
-    id: "wallet-recharge",
-    title: "1. Wallet Recharge Refunds",
-    items: [
-      "Unused wallet balance can be refunded within 7 days of recharge",
-      "Partially used balance: only unused portion eligible",
-      `Request via email: ${supportEmail} with transaction ID`,
-    ],
-  },
-  {
-    id: "consultation-charges",
-    title: "2. Consultation Charges",
-    items: [
-      "Charges deducted during active sessions are non-refundable",
-      "Exception: if technical error caused session to end unexpectedly, report within 24 hours",
-    ],
-  },
-  {
-    id: "refund-request",
-    title: "3. How to Request Refund",
-    items: [
-      `Email: ${supportEmail}`,
-      'Subject: "Refund Request - [Your Phone Number]"',
-      "Include: transaction ID, date, amount, reason",
-      "Processing time: 5-7 business days",
-    ],
-  },
-  {
-    id: "refund-method",
-    title: "4. Refund Method",
-    items: [
-      "Refunded to original payment method",
-      "UPI/Bank transfer: 3-5 business days",
-      "Credit/Debit card: 5-7 business days",
-    ],
-  },
-  {
-    id: "non-refundable",
-    title: "5. Non-Refundable Cases",
-    items: [
-      "Completed consultations",
-      "Wallet balance used for sessions",
-      "Bonus/promotional credits",
-    ],
-  },
-] as const;
+export function generateMetadata(): Metadata {
+  const tenant = getTenant();
+  return {
+    title: tenantPageTitle("Refund Policy"),
+    description: `Review ${tenant.name} wallet recharge and consultation refund rules, timelines, and refund request steps.`,
+  };
+}
 
 export default function RefundPolicyPage() {
+  const tenant = getTenant();
+  const sections = getSections(tenant.contact.supportEmail);
+
   return (
     <div className="min-h-screen scroll-smooth bg-white text-slate-900">
       <Navbar />

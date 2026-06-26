@@ -3,62 +3,62 @@ import Link from "next/link";
 
 import { Footer } from "@/components/Footer";
 import { Navbar } from "@/components/Navbar";
-import { getTenant } from "@/lib/tenants";
 import { tenantPageTitle } from "@/lib/tenantBranding";
+import { getTenant } from "@/lib/tenants";
 
-const tenant = getTenant();
-const supportEmail = tenant.contact.supportEmail;
+function getSections(tenantName: string) {
+  return [
+    {
+      id: "general",
+      title: "1. General Disclaimer",
+      content: `${tenantName} is an online platform that connects users with independent astrologers. The content provided on this platform is for entertainment and informational purposes only.`,
+    },
+    {
+      id: "professional-advice",
+      title: "2. Not Professional Advice",
+      intro: "Astrological readings are NOT a substitute for:",
+      items: [
+        "Medical advice (consult a doctor)",
+        "Legal advice (consult a lawyer)",
+        "Financial advice (consult a financial advisor)",
+        "Mental health support (consult a mental health professional)",
+      ],
+    },
+    {
+      id: "guarantees",
+      title: "3. No Guarantees",
+      content: `${tenantName} does not guarantee the accuracy, completeness, or usefulness of any astrological reading. Results may vary.`,
+    },
+    {
+      id: "independent-astrologers",
+      title: "4. Independent Astrologers",
+      content: `Astrologers on ${tenantName} are independent service providers. ${tenantName} verifies credentials but is not responsible for individual readings.`,
+    },
+    {
+      id: "user-responsibility",
+      title: "5. User Responsibility",
+      content: `Users consult astrologers at their own discretion and risk. ${tenantName} is not liable for any decisions made based on astrological readings.`,
+    },
+    {
+      id: "age-restriction",
+      title: "6. Age Restriction",
+      content: "This service is intended for users 18 years and older.",
+    },
+  ] as const;
+}
 
-export const metadata: Metadata = {
-  title: tenantPageTitle("Disclaimer"),
-  description:
-    `Read ${tenant.name}'s legal disclaimer covering the scope of astrological guidance and user responsibility.`,
-};
-
-const sections = [
-  {
-    id: "general",
-    title: "1. General Disclaimer",
-    content:
-      `${tenant.name} is an online platform that connects users with independent astrologers. The content provided on this platform is for entertainment and informational purposes only.`,
-  },
-  {
-    id: "professional-advice",
-    title: "2. Not Professional Advice",
-    intro: "Astrological readings are NOT a substitute for:",
-    items: [
-      "Medical advice (consult a doctor)",
-      "Legal advice (consult a lawyer)",
-      "Financial advice (consult a financial advisor)",
-      "Mental health support (consult a mental health professional)",
-    ],
-  },
-  {
-    id: "guarantees",
-    title: "3. No Guarantees",
-    content:
-      `${tenant.name} does not guarantee the accuracy, completeness, or usefulness of any astrological reading. Results may vary.`,
-  },
-  {
-    id: "independent-astrologers",
-    title: "4. Independent Astrologers",
-    content:
-      `Astrologers on ${tenant.name} are independent service providers. ${tenant.name} verifies credentials but is not responsible for individual readings.`,
-  },
-  {
-    id: "user-responsibility",
-    title: "5. User Responsibility",
-    content:
-      `Users consult astrologers at their own discretion and risk. ${tenant.name} is not liable for any decisions made based on astrological readings.`,
-  },
-  {
-    id: "age-restriction",
-    title: "6. Age Restriction",
-    content: "This service is intended for users 18 years and older.",
-  },
-] as const;
+export function generateMetadata(): Metadata {
+  const tenant = getTenant();
+  return {
+    title: tenantPageTitle("Disclaimer"),
+    description: `Read ${tenant.name}'s legal disclaimer covering the scope of astrological guidance and user responsibility.`,
+  };
+}
 
 export default function DisclaimerPage() {
+  const tenant = getTenant();
+  const sections = getSections(tenant.name);
+
   return (
     <div className="min-h-screen scroll-smooth bg-white text-slate-900">
       <Navbar />
@@ -67,7 +67,7 @@ export default function DisclaimerPage() {
         <div className="mx-auto max-w-[1200px] px-4 py-12 md:px-8 md:py-16">
           <h1 className="text-3xl font-extrabold text-violet-600 md:text-4xl">Disclaimer</h1>
           <p className="mt-3 max-w-3xl text-sm leading-7 text-slate-700">
-            Please read this disclaimer carefully before using ${tenant.name} services.
+            Please read this disclaimer carefully before using {tenant.name} services.
           </p>
 
           <div className="mt-8 grid gap-8 lg:grid-cols-[260px_1fr]">

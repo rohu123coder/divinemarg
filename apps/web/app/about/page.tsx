@@ -5,13 +5,13 @@ import { FounderPhoto } from "@/components/FounderPhoto";
 import { Navbar } from "@/components/Navbar";
 import { getTenant } from "@/lib/tenants";
 
-const tenant = getTenant();
-
-export const metadata: Metadata = {
-  title: `About ${tenant.name} | Trusted Vedic Astrology Platform`,
-  description:
-    `Learn the story behind ${tenant.name}, founded by Rohit Jha, and how we are building India’s most trusted platform for authentic Vedic astrology guidance.`,
-};
+export function generateMetadata(): Metadata {
+  const tenant = getTenant();
+  return {
+    title: `About ${tenant.name} | Trusted Vedic Astrology Platform`,
+    description: `Learn the story behind ${tenant.name}, founded by Rohit Jha, and how we are building India’s most trusted platform for authentic Vedic astrology guidance.`,
+  };
+}
 
 const missionCards = [
   {
@@ -51,6 +51,8 @@ const steps = [
 ];
 
 export default function AboutPage() {
+  const tenant = getTenant();
+
   return (
     <div className="min-h-screen bg-white text-slate-900">
       <Navbar />
