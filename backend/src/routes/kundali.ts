@@ -34,7 +34,7 @@ const SE_VENUS = 3;
 const SE_MARS = 4;
 const SE_JUPITER = 5;
 const SE_SATURN = 6;
-const SE_TRUE_NODE = 11;
+const SE_MEAN_NODE = 10;
 const SE_SIDM_LAHIRI = 1;
 const SEFLG_SIDEREAL = 64;
 const SEFLG_SPEED = 256;
@@ -159,7 +159,7 @@ export function calculateKundaliFromInput(input: KundaliCalculateInput) {
   const jupLon = getPlanetLon(jd, SE_JUPITER);
   const venLon = getPlanetLon(jd, SE_VENUS);
   const satLon = getPlanetLon(jd, SE_SATURN);
-  const rahuLon = getPlanetLon(jd, SE_TRUE_NODE);
+  const rahuLon = getPlanetLon(jd, SE_MEAN_NODE);
   const ketuLon = ((rahuLon + 180) % 360 + 360) % 360;
 
   const ascLon = approximate ? sunLon : getAscendant(jd, lat, lng);
